@@ -166,6 +166,7 @@ bool CServerList::AddUnique(in_addr Address, ushort usGamePort, bool addAtFront)
 {
     if (m_Servers.Find(Address, usGamePort))
         return false;
+
     m_Servers.AddUnique(Address, usGamePort, addAtFront);
     return true;
 }
@@ -302,9 +303,7 @@ void CServerListLAN::Pulse()
     {
         int bytesCouldRead = recvfrom(m_Socket, szBuffer, sizeof(szBuffer), 0, (sockaddr*)&m_Remote, &len);
 
-        // dev
-        g_pCore->GetConsole()->Printf("socket data is : '%s' and bytes could read is : %d", szBuffer, bytesCouldRead);
-        // dev
+        int checkIf = strncmp(szBuffer, SERVER_LIST_SERVER_BROADCAST_STR, strlen(SERVER_LIST_SERVER_BROADCAST_STR));
 
         if (bytesCouldRead > 10)
             if (strncmp(szBuffer, SERVER_LIST_SERVER_BROADCAST_STR, strlen(SERVER_LIST_SERVER_BROADCAST_STR)) == 0)
@@ -351,10 +350,6 @@ void CServerListLAN::Refresh()
 void CServerListLAN::Discover()
 {
     m_strStatus = _("Attempting to discover LAN servers");
-
-    //dev
-    g_pCore->GetConsole()->Printf("hi trying to search lan servers!");
-    //dev
 
     // Send out the broadcast packet
     std::string strQuery = std::string(SERVER_LIST_CLIENT_BROADCAST_STR) + " " + std::string(GninE_DM_ASE_VERSION);
@@ -574,6 +569,7 @@ CServerListItem* CServerListItemList::AddUnique(in_addr Address, ushort usGamePo
     SAddressPort key(Address, usGamePort);
     if (MapContains(m_AddressMap, key))
         return NULL;
+
     CServerListItem* pItem = new CServerListItem(Address, usGamePort, this, bAtFront);
     return pItem;
 }

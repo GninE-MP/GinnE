@@ -54,6 +54,7 @@ void CQueryReceiver::RequestQuery(const SString& address, ushort port)
             return;
         addr.S_un.S_addr = *pIP;
     }
+
     RequestQuery(addr, port);
 }
 
@@ -115,7 +116,7 @@ SQueryInfo CQueryReceiver::GetServerResponse()
         // Parse relevant data
         SString strTemp;
         SString strMapTemp;
-        int     i = 4;
+        int     i = 4; //this is for `mta`
 
         // Game
         if (!ReadString(strTemp, szBuffer, i, len))

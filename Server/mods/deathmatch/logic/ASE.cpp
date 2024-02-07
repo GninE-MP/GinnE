@@ -420,7 +420,8 @@ std::string ASE::QueryLight()
 
     reply << "EYE2";
     // game
-    reply << (unsigned char)4;
+    //reply << (unsigned char)4; // this is the length for `mta` we want it send the length of the `GninE`
+    reply << (unsigned char)6;
     reply << "GninE";
     // port
     reply << (unsigned char)(m_strPort.length() + 1);
