@@ -15,15 +15,17 @@
 
 extern "C"
 {
-    #include "lua.h"
+#include "lua.h"
 }
 #include "../common/CBitStream.h"
 #include "json.h"
 
 class CElement;
 class CLuaArguments;
+class CLuaMain;
+class CResource;
 
-#define LUA_TTABLEREF 9
+#define LUA_TTABLEREF    9
 #define LUA_TSTRING_LONG 10
 
 class CLuaArgument
@@ -55,6 +57,8 @@ public:
     lua_Number         GetNumber() const { return m_Number; };
     const std::string& GetString() { return m_strString; };
     void*              GetUserData() const { return m_pUserData; };
+    CResource*         GetFunctionResource() const { return m_pResource; };
+    int                GetFunctionReference() const { return m_iFunctionRef; };
     CElement*          GetElement() const;
     bool               GetAsString(SString& strBuffer);
 
@@ -66,6 +70,9 @@ public:
 
     bool IsEqualTo(const CLuaArgument& compareTo, std::set<const CLuaArguments*>* knownTables = nullptr) const;
 
+    static int CallFunction(lua_State* luaVM);
+    static int CleanupFunction(lua_State* luaVM);
+
 private:
     void LogUnableToPacketize(const char* szMessage) const;
 
@@ -75,9 +82,11 @@ private:
     std::string    m_strString;
     void*          m_pUserData;
     CLuaArguments* m_pTableData;
+    CResource*     m_pResource;
+    int            m_iFunctionRef;
     bool           m_bWeakTableRef;
 
-#ifdef GninE_DEBUG
+#ifdef MTA_DEBUG
     std::string m_strFilename;
     int         m_iLine;
 #endif
