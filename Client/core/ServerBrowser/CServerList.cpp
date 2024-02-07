@@ -299,13 +299,21 @@ void CServerListLAN::Pulse()
     readfds.fd_count = 1;
     int len = sizeof(m_Remote);
     if (select(1, &readfds, NULL, NULL, &tm) > 0)
-        if (recvfrom(m_Socket, szBuffer, sizeof(szBuffer), 0, (sockaddr*)&m_Remote, &len) > 10)
+    {
+        int bytesCouldRead = recvfrom(m_Socket, szBuffer, sizeof(szBuffer), 0, (sockaddr*)&m_Remote, &len);
+
+        // dev
+        g_pCore->GetConsole()->Printf("socket data is : '%s' and bytes could read is : %d", szBuffer, bytesCouldRead);
+        // dev
+
+        if (bytesCouldRead > 10)
             if (strncmp(szBuffer, SERVER_LIST_SERVER_BROADCAST_STR, strlen(SERVER_LIST_SERVER_BROADCAST_STR)) == 0)
             {
                 unsigned short usPort = (unsigned short)atoi(&szBuffer[strlen(SERVER_LIST_SERVER_BROADCAST_STR) + 1]);
                 // Add the server if doesn't already exist
                 AddUnique(m_Remote.sin_addr, usPort - SERVER_LIST_QUERY_PORT_OFFSET);
             }
+    }
 
     // Scan our already known servers
     CServerList::Pulse();
@@ -343,6 +351,10 @@ void CServerListLAN::Refresh()
 void CServerListLAN::Discover()
 {
     m_strStatus = _("Attempting to discover LAN servers");
+
+    //dev
+    g_pCore->GetConsole()->Printf("hi trying to search lan servers!");
+    //dev
 
     // Send out the broadcast packet
     std::string strQuery = std::string(SERVER_LIST_CLIENT_BROADCAST_STR) + " " + std::string(GninE_DM_ASE_VERSION);
