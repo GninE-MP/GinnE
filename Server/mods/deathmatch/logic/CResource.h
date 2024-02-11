@@ -153,6 +153,9 @@ public:
 
     void Reload();
 
+    // Load resource manifest if it exists.
+    void LoadResourceManifest();
+
     // Get a resource default setting
     bool GetDefaultSetting(const char* szName, char* szValue, size_t sizeBuffer);
 
@@ -438,4 +441,6 @@ private:
 
     uint                              m_uiFunctionRightCacheRevision = 0;
     CFastHashMap<lua_CFunction, bool> m_FunctionRightCacheMap;
+
+    SString m_strResourceManifestPath;
 };

@@ -26,6 +26,7 @@ project "Deathmatch"
 			"../../../Shared/animation",
 			"../../../Shared/publicsdk/include",
 			"../../../vendor/sparsehash/src/",
+			"../../../vendor/wasm/include",
 			"logic",
 			"utils",
 			"."
@@ -33,7 +34,7 @@ project "Deathmatch"
 
 	defines { "SDK_WITH_BCRYPT" }
 	links {
-		"Lua_Server", "sqlite", "ehs", "cryptopp", "pme", "pcre", "json-c", "zip", "zlib", "blowfish_bcrypt",
+		"Lua_Server", "sqlite", "ehs", "cryptopp", "pme", "pcre", "json-c", "zip", "zlib", "blowfish_bcrypt"
 	}
 
 	vpaths {
@@ -66,12 +67,18 @@ project "Deathmatch"
 
 	filter "system:linux"
 		links { "rt" }
+	
+	filter "platforms:x86"
+		links { "../../../vendor/wasm/x86/libiwasm" }
 
 	filter "platforms:x64"
 		targetdir(buildpath("server/x64"))
+		links { "../../../vendor/wasm/x64/libiwasm" }
 
 	filter "platforms:arm"
 		targetdir(buildpath("server/arm"))
+		links { "../../../vendor/wasm/x86/libiwasm" }
 
 	filter "platforms:arm64"
 		targetdir(buildpath("server/arm64"))
+		links { "../../../vendor/wasm/x64/libiwasm" }

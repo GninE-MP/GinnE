@@ -22,6 +22,7 @@
 #include "CResourceClientFileItem.h"
 #include "CResourceScriptItem.h"
 #include "CResourceClientScriptItem.h"
+#include "CResourceManifest.h"
 #include "CAccessControlListManager.h"
 #include "CScriptDebugging.h"
 #include "CMapManager.h"
@@ -168,6 +169,11 @@ bool CResource::Load()
             m_strMinServerFromMetaXml = "";
             CXMLNode* pNodeMinMtaVersion = pRoot->FindSubNode("min_GninE_version", 0);
 
+            if (!pNodeMinMtaVersion)
+            {
+                pNodeMinMtaVersion = pRoot->FindSubNode("min_mta_version", 0);
+            }
+
             if (pNodeMinMtaVersion)
             {
                 if (CXMLAttribute* pAttr = pNodeMinMtaVersion->GetAttributes().Find("server"))
@@ -261,6 +267,13 @@ bool CResource::Load()
                 }
             }
 
+            CXMLNode* pManifest = pRoot->FindSubNode("manifest", 0);
+
+            if (pManifest)
+            {
+                m_strResourceManifestPath = pManifest->GetAttributeValue("src");
+            }
+
             // Read everything that's included. If one of these fail, delete the XML we created and return
             if (!ReadIncludedResources(pRoot) || !ReadIncludedMaps(pRoot) || !ReadIncludedFiles(pRoot) || !ReadIncludedScripts(pRoot) ||
                 !ReadIncludedHTML(pRoot) || !ReadIncludedExports(pRoot) || !ReadIncludedConfigs(pRoot))
@@ -349,6 +362,19 @@ void CResource::Reload()
 {
     Unload();
     Load();
+}
+
+void CResource::LoadResourceManifest() {
+    if (m_strResourceManifestPath.empty())
+    {
+        return;
+    }
+
+    CResourceManifest manifest(this, m_strResourceManifestPath);
+
+    manifest.Load();
+
+    manifest.Unload();
 }
 
 CResource::~CResource()
@@ -789,6 +815,8 @@ bool CResource::Start(std::list<CResource*>* pDependents, bool bManualStart, con
         }
     }
 
+    LoadResourceManifest();
+
     m_bIsPersistent = false;
 
     // Create an element group for us
@@ -1131,6 +1159,11 @@ bool CResource::CreateVM(bool bEnableOOP)
     m_pVM->SetScriptName(m_strResourceName.c_str());
     m_pVM->LoadEmbeddedScripts();
     m_pVM->RegisterModuleFunctions();
+
+    // Create WebAssembly VM
+
+    //CLogger::LogPrintf("trying to create webassembly VM!\n");
+
     return true;
 }
 

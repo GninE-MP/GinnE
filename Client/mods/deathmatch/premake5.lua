@@ -13,7 +13,8 @@ project "Client Deathmatch"
 		"../../../vendor/bass/lib/bass",
 		"../../../vendor/bass/lib/bass_fx",
 		"../../../vendor/bass/lib/bassmix",
-		"../../../vendor/bass/lib/tags"
+		"../../../vendor/bass/lib/tags",
+		"../../../vendor/wasm/x86/libiwasm"
 	}
 
 	vpaths {
@@ -43,7 +44,8 @@ project "Client Deathmatch"
 			"../../../Shared/mods/deathmatch/logic",
 			"../../../Shared/animation",
 			"../../../vendor/sparsehash/src/",
-			"../../../vendor/lunasvg/include"
+			"../../../vendor/lunasvg/include",
+			"../../../vendor/wasm/include"
 	}
 
 	files {
