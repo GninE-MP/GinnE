@@ -73,11 +73,11 @@ CClientGif* CLuaGifDefs::GifCreate(lua_State* luaVM, std::string pathOrRawdata)
                 }
                 else if (bytesRead == -2)
                 {
-                    m_pScriptDebugging->LogWarning(luaVM, "out of memory");
+                    m_pScriptDebugging->LogWarning(luaVM, "Out of memory");
                 }
                 else
                 {
-                    m_pScriptDebugging->LogError(luaVM, SString("error while reading file [%s]", lastPath.c_str()).c_str());
+                    m_pScriptDebugging->LogError(luaVM, SString("Error while reading file [%s]", lastPath.c_str()).c_str());
                 }
                 file->Unload();
                 m_pElementDeleter->Delete(file);
@@ -85,13 +85,13 @@ CClientGif* CLuaGifDefs::GifCreate(lua_State* luaVM, std::string pathOrRawdata)
             else
             {
                 delete file;
-                m_pScriptDebugging->LogError(luaVM, SString("couldn't load file [%s]", lastPath.c_str()).c_str());
+                m_pScriptDebugging->LogError(luaVM, SString("Couldn't load file [%s]", lastPath.c_str()).c_str());
                 return nullptr;
             }
         }
         else
         {
-            m_pScriptDebugging->LogError(luaVM, SString("file [%s] doesn't exists!", lastPath.c_str()).c_str());
+            m_pScriptDebugging->LogError(luaVM, SString("File [%s] doesn't exist!", lastPath.c_str()).c_str());
             return nullptr;
         }
     }
@@ -104,25 +104,25 @@ CClientGif* CLuaGifDefs::GifCreate(lua_State* luaVM, std::string pathOrRawdata)
     loader.Load(frames, delays, 0L);
     if (!loader)
     {
-        m_pScriptDebugging->LogError(luaVM, "wrong file format");
+        m_pScriptDebugging->LogError(luaVM, "Wrong file format");
         return nullptr;
     }
     if (frames.size() < 1)
     {
-        m_pScriptDebugging->LogError(luaVM, "gif has no frames");
+        m_pScriptDebugging->LogError(luaVM, "Gif has no frames");
         return nullptr;
     }
     uint width = (uint)loader.GetWidth();
     uint height = (uint)loader.GetHeight();
     if (width < 1 || height < 1)
     {
-        m_pScriptDebugging->LogError(luaVM, "gif must be 1x1 at least");
+        m_pScriptDebugging->LogError(luaVM, "Gif must be 1x1 at least");
         return nullptr;
     }
     CClientGif* gif = g_pClientGame->GetManager()->GetRenderElementManager()->CreateGif(width, height);
     if (!gif)
     {
-        m_pScriptDebugging->LogError(luaVM, "error while creating gif");
+        m_pScriptDebugging->LogError(luaVM, "Error while creating gif");
         return nullptr;
     }
     gif->SetParent(resource->GetResourceDynamicEntity());
@@ -155,13 +155,13 @@ bool CLuaGifDefs::GifSetProperty(lua_State* luaVM, CClientGif* gif, std::string 
         numberValue = std::get<int>(value);
         if (numberValue < 0)
         {
-            m_pScriptDebugging->LogError(luaVM, "property value can't be a negative number");
+            m_pScriptDebugging->LogError(luaVM, "Property value can't be a negative number");
             return false;
         }
     }
     if (property.empty())
     {
-        m_pScriptDebugging->LogError(luaVM, "property can't be empty");
+        m_pScriptDebugging->LogError(luaVM, "Property can't be empty");
         return false;
     }
     if (frame.has_value())
@@ -169,14 +169,14 @@ bool CLuaGifDefs::GifSetProperty(lua_State* luaVM, CClientGif* gif, std::string 
         int frameCount = gif->GetFrameCount();
         if (frame > frameCount)
         {
-            m_pScriptDebugging->LogError(luaVM, "frame doesn't exist");
+            m_pScriptDebugging->LogError(luaVM, "Frame doesn't exist");
             return false;
         }
         if (property == "delay")
         {
             if (!valIsNumber)
             {
-                m_pScriptDebugging->LogError(luaVM, "property `delay` must be a number value");
+                m_pScriptDebugging->LogError(luaVM, "Property `delay` must be a number value");
                 return false;
             }
             gif->SetFrameDelay(frame.value(), numberValue);
@@ -184,7 +184,7 @@ bool CLuaGifDefs::GifSetProperty(lua_State* luaVM, CClientGif* gif, std::string 
         }
         else
         {
-            m_pScriptDebugging->LogError(luaVM, "property doesn't exist for frame");
+            m_pScriptDebugging->LogError(luaVM, "Property doesn't exist for frame");
         }
     }
     else
@@ -193,7 +193,7 @@ bool CLuaGifDefs::GifSetProperty(lua_State* luaVM, CClientGif* gif, std::string 
         {
             if (!valIsNumber)
             {
-                m_pScriptDebugging->LogError(luaVM, "property `showing_frame` must be a number value");
+                m_pScriptDebugging->LogError(luaVM, "Property `showing_frame` must be a number value");
                 return false;
             }
             gif->SetFrame(numberValue);
@@ -201,7 +201,7 @@ bool CLuaGifDefs::GifSetProperty(lua_State* luaVM, CClientGif* gif, std::string 
         }
         else
         {
-            m_pScriptDebugging->LogError(luaVM, "property doens't exist for gif");
+            m_pScriptDebugging->LogError(luaVM, "Property doens't exist for gif");
         }
     }
     return false;
@@ -211,7 +211,7 @@ std::variant<bool, std::string, int> CLuaGifDefs::GifGetProperty(lua_State* luaV
 {
     if (property.empty())
     {
-        m_pScriptDebugging->LogError(luaVM, "property can't be empty");
+        m_pScriptDebugging->LogError(luaVM, "Property can't be empty");
         return false;
     }
     if (frame.has_value())
@@ -219,7 +219,7 @@ std::variant<bool, std::string, int> CLuaGifDefs::GifGetProperty(lua_State* luaV
         int frameCount = gif->GetFrameCount();
         if (frame > frameCount)
         {
-            m_pScriptDebugging->LogError(luaVM, "frame doesn't exist");
+            m_pScriptDebugging->LogError(luaVM, "Frame doesn't exist");
             return false;
         }
         if (property == "delay")
@@ -232,7 +232,7 @@ std::variant<bool, std::string, int> CLuaGifDefs::GifGetProperty(lua_State* luaV
         }
         else
         {
-            m_pScriptDebugging->LogError(luaVM, "property doesn't exist for frame");
+            m_pScriptDebugging->LogError(luaVM, "Property doesn't exist for frame");
         }
     }
     else
@@ -255,7 +255,7 @@ std::variant<bool, std::string, int> CLuaGifDefs::GifGetProperty(lua_State* luaV
         }
         else
         {
-            m_pScriptDebugging->LogError(luaVM, "property doesn't exist for gif");
+            m_pScriptDebugging->LogError(luaVM, "Property doesn't exist for gif");
         }
     }
     return false;

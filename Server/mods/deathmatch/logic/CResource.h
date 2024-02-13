@@ -17,6 +17,7 @@
 #include "SResourceStartOptions.h"
 #include "CResourceFile.h"
 #include "CAclRightName.h"
+#include "CResourceManifest.h"
 #include <unzip.h>
 #include <list>
 #include <vector>
@@ -152,9 +153,6 @@ public:
     bool Unload();
 
     void Reload();
-
-    // Load resource manifest if it exists.
-    void LoadResourceManifest();
 
     // Get a resource default setting
     bool GetDefaultSetting(const char* szName, char* szValue, size_t sizeBuffer);
@@ -329,6 +327,8 @@ public:
      */
     CResourceFile* GetResourceFile(const SString& relativePath) const;
 
+    CResourceManifest* GetResourceManifest() const { return m_pResourceManifest; }
+
 public:
     static std::list<CResource*> m_StartedResources;
 
@@ -443,4 +443,6 @@ private:
     CFastHashMap<lua_CFunction, bool> m_FunctionRightCacheMap;
 
     SString m_strResourceManifestPath;
+
+    CResourceManifest* m_pResourceManifest;
 };

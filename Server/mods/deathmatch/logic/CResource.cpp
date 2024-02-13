@@ -22,7 +22,6 @@
 #include "CResourceClientFileItem.h"
 #include "CResourceScriptItem.h"
 #include "CResourceClientScriptItem.h"
-#include "CResourceManifest.h"
 #include "CAccessControlListManager.h"
 #include "CScriptDebugging.h"
 #include "CMapManager.h"
@@ -123,6 +122,8 @@ bool CResource::Load()
     m_strResourceDirectoryPath = PathJoin(m_strAbsPath, m_strResourceName, "/");
     m_strResourceCachePath = PathJoin(g_pServerInterface->GetServerModPath(), "resource-cache", "unzipped", m_strResourceName, "/");
     m_strResourceZip = PathJoin(m_strAbsPath, m_strResourceName + ".zip");
+
+    m_pResourceManifest = nullptr;
 
     if (m_bResourceIsZip)
     {
@@ -272,6 +273,8 @@ bool CResource::Load()
             if (pManifest)
             {
                 m_strResourceManifestPath = pManifest->GetAttributeValue("src");
+
+                m_pResourceManifest = new CResourceManifest(this, m_strResourceManifestPath);
             }
 
             // Read everything that's included. If one of these fail, delete the XML we created and return
@@ -362,19 +365,6 @@ void CResource::Reload()
 {
     Unload();
     Load();
-}
-
-void CResource::LoadResourceManifest() {
-    if (m_strResourceManifestPath.empty())
-    {
-        return;
-    }
-
-    CResourceManifest manifest(this, m_strResourceManifestPath);
-
-    manifest.Load();
-
-    manifest.Unload();
 }
 
 CResource::~CResource()
@@ -815,7 +805,10 @@ bool CResource::Start(std::list<CResource*>* pDependents, bool bManualStart, con
         }
     }
 
-    LoadResourceManifest();
+    if (m_pResourceManifest)
+    {
+        m_pResourceManifest->Load();
+    }
 
     m_bIsPersistent = false;
 
@@ -1054,6 +1047,11 @@ bool CResource::Stop(bool bManualStop)
 
     if (m_bStartedManually && !bManualStop)
         return false;
+
+    if (m_pResourceManifest)
+    {
+        m_pResourceManifest->Unload();
+    }
 
     m_eState = EResourceState::Stopping;
     m_pResourceManager->RemoveMinClientRequirement(this);

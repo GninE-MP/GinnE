@@ -27,9 +27,6 @@ CResourceManifest::CResourceManifest(CResource* resource, const SString& manifes
     m_strResourceManifestFilePath = manifestFilePath;
     ConvertFileNameToWindowsFormat(m_strResourceManifestFilePath);
 
-    m_bIsLoaded = false;
-    m_bIsUnloaded = false;
-
     m_pResource = resource;
     m_pLuaVM = NULL;
 }
@@ -41,11 +38,6 @@ CResourceManifest::~CResourceManifest()
 
 void CResourceManifest::Load()
 {
-    if (m_bIsLoaded)
-    {
-        return;
-    }
-
     if (m_strResourceManifestFilePath.empty())
     {
         return;
@@ -93,22 +85,31 @@ void CResourceManifest::Load()
     }
 
     lua_close(m_pLuaVM);
-
-    m_bIsLoaded = true;
 }
 
 void CResourceManifest::Unload()
 {
-    if (m_bIsUnloaded)
+    std::list<CResourceFile*>& resourceFiles = m_pResource->GetFiles();
+
+    for (CResourceFile* file : m_pResourceFiles)
     {
-        return;
+        resourceFiles.remove(file);
+
+        if (file->IsNoClientCache())
+        {
+            FileDelete(
+                PathJoin(
+                    g_pServerInterface->GetServerModPath(),
+                    "resource-cache",
+                    "http-client-files-no-client-cache",
+                    m_pResource->GetName(),
+                    file->GetName()
+                )
+            );
+        }
     }
 
-    // we don't need m_bIsUnloaded or m_bIsLoaded because Load and Unload will call everytime resource starts and stops!
-    // CResourceManifest must be a global member in CResource class
-    // here also we need to delete CResourceManifest file items from CResource files to disable updates for them or extra add!
-
-    m_bIsUnloaded = true;
+    m_pResourceFiles.clear();
 }
 
 SString& CResourceManifest::GetManifestPath()
@@ -163,8 +164,6 @@ void CResourceManifest::ConvertFileNameToWindowsFormat(SString& fileName)
 
 void CResourceManifest::AddClientScript(CResourceManifest* manifest, const char* fileName)
 {
-    // we have a problem here while loading resource because this item needs to add to cache directory!
-
     CXMLNode*       node = g_pServerInterface->GetXML()->CreateDummyNode();
     CXMLAttributes& attributes = node->GetAttributes();
 
@@ -173,15 +172,38 @@ void CResourceManifest::AddClientScript(CResourceManifest* manifest, const char*
 
     CResource* pResource = manifest->GetResource();
 
-    if (!pResource->IsFilenameUsed(fileName, true))
+    std::string fileNameFixed = fileName;
+    ReplaceOccurrencesInString(fileNameFixed, "\\", "/");
+
+    if (!pResource->IsFilenameUsed(fileNameFixed.c_str(), true))
     {
         SString fileFullPath;
-        if (IsValidFilePath(fileName) && pResource->GetFilePath(fileName, fileFullPath))
+        if (IsValidFilePath(fileNameFixed.c_str()) && pResource->GetFilePath(fileNameFixed.c_str(), fileFullPath))
         {
-            CResourceClientScriptItem* scriptItem = new CResourceClientScriptItem(pResource, fileName, fileFullPath.c_str(), &attributes);
+            CResourceClientScriptItem* scriptItem = new CResourceClientScriptItem(pResource, fileNameFixed.c_str(), fileFullPath.c_str(), &attributes);
+
+            SString buffer;
+            FileLoad(fileFullPath.c_str(), buffer);
+
+            if (!buffer.empty())
+            {
+                FileSave(
+                    PathJoin(
+                        g_pServerInterface->GetServerModPath(),
+                        "resource-cache",
+                        "http-client-files-no-client-cache",
+                        pResource->GetName(),
+                        fileNameFixed
+                    ),
+                    buffer,
+                    true
+                );
+            }
 
             manifest->GetResourceFiles().push_back(scriptItem);
             pResource->GetFiles().push_back(scriptItem);
+
+            pResource->GenerateChecksumForFile(scriptItem).get();
         }
     }
 
@@ -195,15 +217,20 @@ void CResourceManifest::AddServerScript(CResourceManifest* manifest, const char*
 
     CResource* pResource = manifest->GetResource();
 
-    if (!pResource->IsFilenameUsed(fileName, true))
+    std::string fileNameFixed = fileName;
+    ReplaceOccurrencesInString(fileNameFixed, "\\", "/");
+
+    if (!pResource->IsFilenameUsed(fileNameFixed.c_str(), false))
     {
         SString fileFullPath;
-        if (IsValidFilePath(fileName) && pResource->GetFilePath(fileName, fileFullPath))
+        if (IsValidFilePath(fileNameFixed.c_str()) && pResource->GetFilePath(fileNameFixed.c_str(), fileFullPath))
         {
-            CResourceScriptItem* scriptItem = new CResourceScriptItem(pResource, fileName, fileFullPath.c_str(), &attributes);
+            CResourceScriptItem* scriptItem = new CResourceScriptItem(pResource, fileNameFixed.c_str(), fileFullPath.c_str(), &attributes);
 
             manifest->GetResourceFiles().push_back(scriptItem);
             pResource->GetFiles().push_back(scriptItem);
+
+            pResource->GenerateChecksumForFile(scriptItem).get();
         }
     }
 
@@ -212,20 +239,28 @@ void CResourceManifest::AddServerScript(CResourceManifest* manifest, const char*
 
 void CResourceManifest::AddFile(CResourceManifest* manifest, const char* fileName)
 {
+    // here for this file mismatch happens everytime on client. but when client reconnects it fixes itself.
+    // the problem is on restarting file client doesn't handle changes and doesn't download new file!
+
     CXMLNode*       node = g_pServerInterface->GetXML()->CreateDummyNode();
     CXMLAttributes& attributes = node->GetAttributes();
 
     CResource* pResource = manifest->GetResource();
 
-    if (!pResource->IsFilenameUsed(fileName, true))
+    std::string fileNameFixed = fileName;
+    ReplaceOccurrencesInString(fileNameFixed, "\\", "/");
+
+    if (!pResource->IsFilenameUsed(fileNameFixed.c_str(), true))
     {
         SString fileFullPath;
-        if (IsValidFilePath(fileName) && pResource->GetFilePath(fileName, fileFullPath))
+        if (IsValidFilePath(fileNameFixed.c_str()) && pResource->GetFilePath(fileNameFixed.c_str(), fileFullPath))
         {
-            CResourceClientFileItem* scriptItem = new CResourceClientFileItem(pResource, fileName, fileFullPath.c_str(), &attributes);
+            CResourceClientFileItem* fileItem = new CResourceClientFileItem(pResource, fileNameFixed.c_str(), fileFullPath.c_str(), &attributes);
 
-            manifest->GetResourceFiles().push_back(scriptItem);
-            pResource->GetFiles().push_back(scriptItem);
+            manifest->GetResourceFiles().push_back(fileItem);
+            pResource->GetFiles().push_back(fileItem);
+
+            pResource->GenerateChecksumForFile(fileItem).get();
         }
     }
 
@@ -276,10 +311,84 @@ int CResourceManifest::Lua_ClientScripts(lua_State* luaVM)
 
 int CResourceManifest::Lua_ServerScripts(lua_State* luaVM)
 {
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    if (lua_type(luaVM, -1) == LUA_TSTRING)
+    {
+        const char* fileName = lua_tostring(luaVM, -1);
+
+        AddServerScript(pManifest, fileName);
+    }
+    else if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t len = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= len; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                const char* fileName = lua_tostring(luaVM, -1);
+
+                AddServerScript(pManifest, fileName);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
     return 0;
 }
 
 int CResourceManifest::Lua_Files(lua_State* luaVM)
 {
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    if (lua_type(luaVM, -1) == LUA_TSTRING)
+    {
+        const char* fileName = lua_tostring(luaVM, -1);
+
+        AddFile(pManifest, fileName);
+    }
+    else if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t len = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= len; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                const char* fileName = lua_tostring(luaVM, -1);
+
+                AddFile(pManifest, fileName);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
     return 0;
 }

@@ -56,6 +56,7 @@ bool CResourceClientScriptItem::Start()
     {
         // HACK - Use http-client-files if possible as the resources directory may have been changed since the resource was loaded.
         SString strDstFilePath = GetCachedPathFilename();
+
         if (!FileLoad(strDstFilePath, m_sourceCode))
             return false;
 

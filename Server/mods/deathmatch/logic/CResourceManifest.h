@@ -36,9 +36,6 @@ private:
 
     std::list<CResourceFile*> m_pResourceFiles;
 
-    bool m_bIsLoaded;
-    bool m_bIsUnloaded;
-
     void RegisterLuaVMFunctions(lua_State* luaVM);
 
     static void ConvertFileNameToWindowsFormat(SString& fileName);
