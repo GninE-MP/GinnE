@@ -47,4 +47,14 @@ private:
     static int Lua_ClientScripts(lua_State* luaVM);
     static int Lua_ServerScripts(lua_State* luaVM);
     static int Lua_Files(lua_State* luaVM);
+
+    static int Lua_Execute(lua_State* luaVM);
+    static int Lua_PExecute(lua_State* luaVM);
+
+    static int Lua_GetFilePathInResource(lua_State* luaVM);
+
+    static int Lua_WasmCompilerInstalled(lua_State* luaVM);
+    static int Lua_WasmCompile(lua_State* luaVM);
+    static int Lua_WasmClient(lua_State* luaVM);
+    static int Lua_WasmServer(lua_State* luaVM);
 };

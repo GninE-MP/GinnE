@@ -9,6 +9,9 @@
  *
  *****************************************************************************/
 
+#include <stdio.h>
+#include <stdexcept>
+
 #include "StdInc.h"
 
 #include "lua/CLuaMain.h"
@@ -21,6 +24,12 @@
 #include "Utils.h"
 
 #define RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME "RESOURCE_MAIN_MANIFEST_OBJECT"
+
+#define MANIFEST_CURRENT_RESOURCE_GLOBAL_NAME            "__CURRENT_RESOURCE_NAME__"
+#define MANIFEST_CURRENT_RESOURCE_PATH_GLOBAL_NAME       "__CURRENT_RESOURCE_PATH__"
+#define MANIFEST_CURRENT_RESOURCE_CATCH_PATH_GLOBAL_NAME "__CURRENT_RESOURCE_CATCH_PATH__"
+#define MANIFEST_CURRENT_FILE_NAME                       "__CURRENT_FILE_NAME__"
+#define MANIFEST_CURRENT_FILE_PATH                       "__CURRENT_FILE_PATH__"
 
 CResourceManifest::CResourceManifest(CResource* resource, const SString& manifestFilePath)
 {
@@ -46,7 +55,7 @@ void CResourceManifest::Load()
     std::string manifestPath;
     if (!m_pResource->GetFilePath(m_strResourceManifestFilePath.c_str(), manifestPath))
     {
-        CLogger::ErrorPrintf("Couldn't find manifest file[%s].", m_strResourceManifestFilePath.c_str());
+        CLogger::ErrorPrintf("Couldn't find manifest file[%s].\n", m_strResourceManifestFilePath.c_str());
         return;
     }
 
@@ -72,6 +81,25 @@ void CResourceManifest::Load()
 
     lua_pushuserdata(m_pLuaVM, this);
     lua_setglobal(m_pLuaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    lua_pushstring(m_pLuaVM, m_pResource->GetName());
+    lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_RESOURCE_GLOBAL_NAME);
+
+    lua_pushstring(m_pLuaVM, m_pResource->GetResourceDirectoryPath().c_str());
+    lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_RESOURCE_PATH_GLOBAL_NAME);
+
+    lua_pushstring(m_pLuaVM, m_pResource->GetResourceCacheDirectoryPath().c_str());
+    lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_RESOURCE_CATCH_PATH_GLOBAL_NAME);
+
+    std::vector<SString> parts;
+    m_strResourceManifestFilePath.Split("\\", parts);
+
+    lua_pushstring(m_pLuaVM, parts[parts.size() - 1].c_str());
+    lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_FILE_NAME);
+
+    lua_pushstring(m_pLuaVM, manifestPath.c_str());
+    lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_FILE_PATH);
+
 
     RegisterLuaVMFunctions(m_pLuaVM);
 
@@ -147,6 +175,16 @@ void CResourceManifest::RegisterLuaVMFunctions(lua_State* luaVM)
     lua_register(luaVM, "server_script", Lua_ServerScripts);
     lua_register(luaVM, "files", Lua_Files);
     lua_register(luaVM, "file", Lua_Files);
+
+    lua_register(luaVM, "execute", Lua_Execute);
+    lua_register(luaVM, "pexecute", Lua_PExecute);
+
+    lua_register(luaVM, "get_file_path_in_resource", Lua_GetFilePathInResource);
+
+    lua_register(luaVM, "wasm_compiler_installed", Lua_WasmCompilerInstalled);
+    lua_register(luaVM, "wasm_compile", Lua_WasmCompile);
+    lua_register(luaVM, "wasm_client", Lua_WasmClient);
+    lua_register(luaVM, "wasm_server", Lua_WasmServer);
 }
 
 void CResourceManifest::ConvertFileNameToWindowsFormat(SString& fileName)
@@ -239,9 +277,6 @@ void CResourceManifest::AddServerScript(CResourceManifest* manifest, const char*
 
 void CResourceManifest::AddFile(CResourceManifest* manifest, const char* fileName)
 {
-    // here for this file mismatch happens everytime on client. but when client reconnects it fixes itself.
-    // the problem is on restarting file client doesn't handle changes and doesn't download new file!
-
     CXMLNode*       node = g_pServerInterface->GetXML()->CreateDummyNode();
     CXMLAttributes& attributes = node->GetAttributes();
 
@@ -325,7 +360,7 @@ int CResourceManifest::Lua_ServerScripts(lua_State* luaVM)
     if (lua_type(luaVM, -1) == LUA_TSTRING)
     {
         const char* fileName = lua_tostring(luaVM, -1);
-
+        
         AddServerScript(pManifest, fileName);
     }
     else if (lua_type(luaVM, -1) == LUA_TTABLE)
@@ -390,5 +425,144 @@ int CResourceManifest::Lua_Files(lua_State* luaVM)
         }
     }
 
+    return 0;
+}
+
+int CResourceManifest::Lua_Execute(lua_State* luaVM)
+{
+    if (lua_type(luaVM, -1) != LUA_TSTRING)
+    {
+        CLogger::ErrorPrintf("`execute` function expects `string` as first argument!\n");
+        return 0;
+    }
+
+    const char* cmd = lua_tostring(luaVM, -1);
+
+    if (strlen(cmd) < 1)
+    {
+        return 0;
+    }
+
+    int result = system(cmd);
+
+    lua_pushnumber(luaVM, result);
+
+    return 1;
+}
+
+int CResourceManifest::Lua_PExecute(lua_State* luaVM)
+{
+    if (lua_type(luaVM, -1) != LUA_TSTRING)
+    {
+        CLogger::ErrorPrintf("`pexecute` function expects `string` as first argument!\n");
+        return 0;
+    }
+
+    const char* cmd = lua_tostring(luaVM, -1);
+
+    if (strlen(cmd) < 1)
+    {
+        return 0;
+    }
+
+    char buffer[128];
+    
+    SString result = "";
+
+    FILE* pipe = _popen(cmd, "r");
+
+    if (!pipe)
+    {
+        CLogger::ErrorPrintf("Couldn't open pipe!\n");
+        return 0;
+    }
+
+    try
+    {
+        while (fgets(buffer, sizeof(buffer), pipe) != NULL)
+        {
+            result += buffer;
+        }
+    }
+    catch (std::exception error)
+    {
+        _pclose(pipe);
+
+        lua_pushnil(luaVM);
+        lua_pushstring(luaVM, error.what());
+
+        return 2;
+    }
+
+    _pclose(pipe);
+
+    lua_pushstring(luaVM, result.c_str());
+
+    return 1;
+}
+
+int CResourceManifest::Lua_GetFilePathInResource(lua_State* luaVM)
+{
+    if (lua_type(luaVM, 1) != LUA_TSTRING)
+    {
+        CLogger::ErrorPrintf("`get_file_path_in_resource` function expects `string` as first argument\n");
+        return 0;
+    }
+
+    bool checkIfExists = true;
+
+    if (lua_type(luaVM, 2) == LUA_TBOOLEAN)
+    {
+        checkIfExists = lua_toboolean(luaVM, 2);
+    }
+
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    CResource* resource = pManifest->GetResource();
+
+    const char* fileName = lua_tostring(luaVM, 1);
+
+    SString path = "";
+
+    bool exists = resource->GetFilePath(fileName, path);
+
+    if (checkIfExists && !exists)
+    {
+        return 0;
+    }
+
+    ConvertFileNameToWindowsFormat(path);
+
+    lua_pushstring(luaVM, path.c_str());
+
+    return 1;
+}
+
+int CResourceManifest::Lua_WasmCompilerInstalled(lua_State* luaVM)
+{
+    return 0;
+}
+
+int CResourceManifest::Lua_WasmCompile(lua_State* luaVM)
+{
+    return 0;
+}
+
+int CResourceManifest::Lua_WasmClient(lua_State* luaVM)
+{
+    return 0;
+}
+
+int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
+{
     return 0;
 }
