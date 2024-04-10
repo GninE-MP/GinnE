@@ -57,4 +57,5 @@ private:
     static int Lua_WasmCompile(lua_State* luaVM);
     static int Lua_WasmClient(lua_State* luaVM);
     static int Lua_WasmServer(lua_State* luaVM);
+    static int Lua_WasmHasFileValidBinary(lua_State* luaVM);
 };

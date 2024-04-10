@@ -21,6 +21,8 @@
 #include "CResourceClientFileItem.h"
 #include "CResourceClientScriptItem.h"
 
+#include "wasm/CWebAssemblyContext.h"
+
 #include "Utils.h"
 
 #define RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME "RESOURCE_MAIN_MANIFEST_OBJECT"
@@ -30,6 +32,13 @@
 #define MANIFEST_CURRENT_RESOURCE_CATCH_PATH_GLOBAL_NAME "__CURRENT_RESOURCE_CATCH_PATH__"
 #define MANIFEST_CURRENT_FILE_NAME                       "__CURRENT_FILE_NAME__"
 #define MANIFEST_CURRENT_FILE_PATH                       "__CURRENT_FILE_PATH__"
+
+#define WASM_COMPILER_COMMAND       "emcc"
+#define WASM_COMPILER_NAME          "Emscripten"
+#define WASM_COMPILER_FILE_NAME     "emcc.bat"
+#define WASM_COMPILER_PATH_IDENTIER "upstream\\emscripten"
+
+#define WINDOWS_PATH_ENVIRONMENT_VARIABLE_NAME "PATH"
 
 CResourceManifest::CResourceManifest(CResource* resource, const SString& manifestFilePath)
 {
@@ -185,6 +194,7 @@ void CResourceManifest::RegisterLuaVMFunctions(lua_State* luaVM)
     lua_register(luaVM, "wasm_compile", Lua_WasmCompile);
     lua_register(luaVM, "wasm_client", Lua_WasmClient);
     lua_register(luaVM, "wasm_server", Lua_WasmServer);
+    lua_register(luaVM, "wasm_has_file_valid_binary", Lua_WasmHasFileValidBinary);
 }
 
 void CResourceManifest::ConvertFileNameToWindowsFormat(SString& fileName)
@@ -549,7 +559,40 @@ int CResourceManifest::Lua_GetFilePathInResource(lua_State* luaVM)
 
 int CResourceManifest::Lua_WasmCompilerInstalled(lua_State* luaVM)
 {
-    return 0;
+    const char* contentData = getenv(WINDOWS_PATH_ENVIRONMENT_VARIABLE_NAME);
+
+    if (contentData == NULL)
+    {
+        lua_pushboolean(luaVM, false);
+        return 1;
+    }
+
+    SString content = contentData;
+
+    std::vector<SString> pathes;
+    content.Split(";", pathes);
+
+    for (SString path : pathes)
+    {
+        if (path.find(WASM_COMPILER_PATH_IDENTIER, 0) != SString::npos)
+        {
+            SString compilerPath = path;
+            compilerPath += '\\';
+            compilerPath += WASM_COMPILER_FILE_NAME;
+
+            if (FileExists(compilerPath.c_str()))
+            {
+                lua_pushboolean(luaVM, true);
+                return 1;
+            }
+        }
+    }
+
+    CLogger::LogPrintf("GNINE uses '%s' compiler to compile wasm modules, but it seems like we can't find this compiler on your operating system! You can make your own compiler using `execute` or `pexecute` functions in resource manifest file.\n", WASM_COMPILER_NAME);
+
+    lua_pushboolean(luaVM, false);
+
+    return 1;
 }
 
 int CResourceManifest::Lua_WasmCompile(lua_State* luaVM)
@@ -564,5 +607,163 @@ int CResourceManifest::Lua_WasmClient(lua_State* luaVM)
 
 int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 {
+    if (lua_type(luaVM, -1) != LUA_TSTRING)
+    {
+        CLogger::ErrorPrintf("`wasm_server` function expects a `string` as first argument.\n");
+        return 0;
+    }
+
+    SString filePath = lua_tostring(luaVM, -1);
+
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        CLogger::ErrorPrintf("Manifest confusion happend!\n");
+        return 0;
+    }
+
+    CResource* pResource = pManifest->GetResource();
+
+    SString path = "";
+
+    bool exists = pResource->GetFilePath(filePath.c_str(), path);
+
+    if (!exists)
+    {
+        CLogger::ErrorPrintf("File doesn't exist in resource[%s].\n", filePath.c_str());
+        return 0;
+    }
+
+    // create `CResourceWasmScriptItem` class!
+
+    FILE* wasmFile = File::Fopen(path.c_str(), "rb");
+
+    if (!wasmFile)
+    {
+        CLogger::ErrorPrintf("Couldn't load file[%s].\n", filePath.c_str());
+        return 0;
+    }
+
+    fseek(wasmFile, 0, SEEK_END);
+    size_t bufferSize = ftell(wasmFile);
+    fseek(wasmFile, 0, SEEK_SET);
+
+    char* wasmBinary = (char*)malloc(bufferSize);
+
+    if (fread(wasmBinary, bufferSize, 1, wasmFile) != 1)
+    {
+        CLogger::ErrorPrintf("Couldn't read file[%s].\n", filePath.c_str());
+
+        fclose(wasmFile);
+
+        free(wasmBinary);
+
+        return 0;
+    }
+
+    fclose(wasmFile);
+
+    CWebAssemblyContext wasmModule;
+
+    CWebAssemblyLoadState state = wasmModule.LoadBinary(wasmBinary, bufferSize);
+
+    free(wasmBinary);
+
+    if (state == CWebAssemblyLoadState::Succeed)
+    {
+        CLogger::LogPrintf("could load wasm module!\n");
+    }
+    else
+    {
+        CLogger::LogPrintf("error loading wasm module!\n");
+    }
+
     return 0;
+}
+
+int CResourceManifest::Lua_WasmHasFileValidBinary(lua_State* luaVM)
+{
+    if (lua_type(luaVM, 1) != LUA_TSTRING)
+    {
+        CLogger::ErrorPrintf("`wasm_has_file_valid_binary` function expects a `string` as first argument.\n");
+
+        lua_pushboolean(luaVM, false);
+
+        return 1;
+    }
+
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        lua_pushboolean(luaVM, false);
+        return 1;
+    }
+
+    CResource* resource = pManifest->GetResource();
+
+    const char* fileName = lua_tostring(luaVM, 1);
+
+    SString path = "";
+
+    bool exists = resource->GetFilePath(fileName, path);
+
+    if (!exists)
+    {
+        lua_pushboolean(luaVM, false);
+        return 1;
+    }
+
+    FILE* file = File::Fopen(path.c_str(), "rb");
+
+    if (!file)
+    {
+        lua_pushboolean(luaVM, false);
+        return 1;
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t bufferSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    const size_t  WASM_BINARY_HEADER_SIZE = 5;
+	unsigned char wasmHeader[WASM_BINARY_HEADER_SIZE] = {0, 97, 115, 109, 1};
+
+    if (bufferSize < WASM_BINARY_HEADER_SIZE)
+    {
+        fclose(file);
+
+        lua_pushboolean(luaVM, false);
+
+        return 1;
+    }
+
+    char* buffer = (char*)malloc(WASM_BINARY_HEADER_SIZE);
+
+    if (fread(buffer, WASM_BINARY_HEADER_SIZE, 1, file) != 1)
+    {
+        free(buffer);
+        fclose(file);
+
+        lua_pushboolean(luaVM, false);
+
+        return 1;
+    }
+
+    fclose(file);
+
+    bool result = std::string(buffer, WASM_BINARY_HEADER_SIZE) == std::string((char*)wasmHeader, WASM_BINARY_HEADER_SIZE);
+
+    lua_pushboolean(luaVM, result);
+
+    return 1;
 }

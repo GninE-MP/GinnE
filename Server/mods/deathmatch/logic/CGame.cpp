@@ -69,6 +69,7 @@
 #include "CZipMaker.h"
 #include "version.h"
 #include "net/SimHeaders.h"
+#include "logic/wasm/CWebAssemblyContext.h"
 #include <signal.h>
 
 #define MAX_BULLETSYNC_DISTANCE      400.0f
@@ -1007,6 +1008,9 @@ bool CGame::Start(int iArgumentCount, char* szArguments[])
         }
     }
 
+    // Initializing web assembly engine.
+    CWebAssemblyContext::InitializeWebAssemblyEngine();
+
     // Done
     // If you're ever going to change this message, update the "server ready" determination
     // inside CServer.cpp in deathmatch mod aswell.
@@ -1035,6 +1039,9 @@ void CGame::Stop()
 
     // Unregister our packethandler
     g_pNetServer->RegisterPacketHandler(NULL);
+
+    // Destroy web assembly engine.
+    CWebAssemblyContext::DeleteWebAssemblyEngine();
 }
 
 // Handle logging output from the net module
