@@ -14,6 +14,7 @@
 #ifndef C_WEB_ASSEMBLY_IMPORTS_HEADER
 #define C_WEB_ASSEMBLY_IMPORTS_HEADER
 
+#include "wasm_export.h"
 #include "wasm_c_api.h"
 
 #endif

@@ -668,19 +668,15 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 
     fclose(wasmFile);
 
-    CWebAssemblyContext wasmModule;
+    CWebAssemblyContext wasmModule(pResource);
 
-    CWebAssemblyLoadState state = wasmModule.LoadBinary(wasmBinary, bufferSize);
+    CWebAssemblyLoadState state = wasmModule.LoadScriptBinary(wasmBinary, bufferSize);
 
     free(wasmBinary);
 
-    if (state == CWebAssemblyLoadState::Succeed)
+    if (state == CWebAssemblyLoadState::Failed)
     {
-        CLogger::LogPrintf("could load wasm module!\n");
-    }
-    else
-    {
-        CLogger::LogPrintf("error loading wasm module!\n");
+        CLogger::LogPrintf("Error while loading web assembly module on server [\"%s\"].\n", filePath.c_str());
     }
 
     return 0;
