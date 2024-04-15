@@ -21,6 +21,7 @@
 #include "CResourceClientFileItem.h"
 #include "CResourceClientScriptItem.h"
 
+#include "wasm/CWebAssemblyVariable.h"
 #include "wasm/CWebAssemblyContext.h"
 
 #include "Utils.h"
@@ -605,6 +606,15 @@ int CResourceManifest::Lua_WasmClient(lua_State* luaVM)
     return 0;
 }
 
+WebAssemblyApi(GnineGetData, env, args, results)
+{
+    CResource* resource = GetWebAssemblyResource(env);
+
+    CLogger::LogPrintf("hi this is get data on '%s'!\n", resource->GetName().c_str());
+
+    return NULL;
+}
+
 int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 {
     if (lua_type(luaVM, -1) != LUA_TSTRING)
@@ -632,7 +642,7 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     SString path = "";
 
     bool exists = pResource->GetFilePath(filePath.c_str(), path);
-
+        
     if (!exists)
     {
         CLogger::ErrorPrintf("File doesn't exist in resource[%s].\n", filePath.c_str());
@@ -668,10 +678,110 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 
     fclose(wasmFile);
 
-    CWebAssemblyContext wasmModule(pResource);
+    //CWebAssemblyContext wasmModule(pResource);
+    CWebAssemblyContext* wasmModule = new CWebAssemblyContext(pResource);
 
-    CWebAssemblyLoadState state = wasmModule.LoadScriptBinary(wasmBinary, bufferSize);
+    CWebAssemblyScript* script = wasmModule->CreateScript();
 
+    CWebAssemblyVariables args, results;
+
+    args.PushInt32();
+
+    CWebAssemblyFunctionType functionType(args, results);
+
+    script->RegisterApiFunction("gnine_get_data", functionType, GnineGetData);
+
+    CWebAssemblyLoadState state = wasmModule->LoadScriptBinary(script, wasmBinary, bufferSize, filePath);
+
+    //script->CallMainFunction();
+
+    //CLogger::LogPrintf("calling get data from host...\n");
+
+    //CWebAssemblyVariables mArgs, mResults;
+    //mArgs.Push(130);
+
+    //script->GetApiFundction("gnine_get_data")->Call(&mArgs, &mResults);
+
+    /*CWebAssemblyFunction* func = script->GetApiFunction("gnine_get_data");
+
+    if (func)
+    {
+        func->Call(&mArgs, &mResults);
+    }*/
+
+    CWebAssemblyExtern funcExtern = script->GetExport("get_resource_name");
+
+    if (funcExtern.kind == C_WASM_EXTERN_TYPE_FUNCTION)
+    {
+        //CWebAssemblyFunction func = wasm_extern_as_func(funcExtern.context);
+
+        //func.Call(&mArgs, &mResults);
+
+        wasm_func_t* func = wasm_extern_as_func(funcExtern.context);
+
+        wasm_val_vec_t mArgs = { 0 };
+        //wasm_val_t     mData[1] = { WASM_I32_VAL(414) };
+        wasm_val_vec_t mResults = { 0 };
+        wasm_val_t     v;
+        v.kind = WASM_I32;
+        v.of.i32 = 0;
+        wasm_val_t     mResultData[1] = { v };
+        wasm_val_vec_new(&mResults, 1, mResultData);
+
+        CLogger::LogPrintf("results is : %d\n", mResults);
+
+        wasm_trap_t* trap = wasm_func_call(func, &mArgs, &mResults);
+
+        uintptr_t pointerAddress = mResults.data[0].of.i32;
+
+        if (trap)
+        {
+            wasm_message_t message;
+            wasm_trap_message(trap, &message);
+
+            CLogger::LogPrintf("function error is : %s\n", message.data);
+        }
+
+        CLogger::LogPrintf("calling get data finished! func : %d and trap is : %d\n", func, pointerAddress);
+
+
+
+        CLogger::LogPrintf("calling again!\n");
+        
+
+        wasm_val_vec_t mArgs2 = { 0 };
+        //wasm_val_t     mData[1] = { WASM_I32_VAL(414) };
+        wasm_val_vec_t mResults2 = { 0 };
+        wasm_val_t     v2;
+        v2.kind = WASM_I32;
+        v2.of.i32 = 0;
+        wasm_val_t     mResultData2[1] = { v2 };
+        wasm_val_vec_new(&mResults2, 1, mResultData2);
+
+        CLogger::LogPrintf("results is : %d\n", mResults2);
+
+        wasm_trap_t* trap2 = wasm_func_call(func, &mArgs2, &mResults2);
+
+        uintptr_t pointerAddress2 = mResults2.data[0].of.i32;
+
+        if (trap2)
+        {
+            wasm_message_t message2;
+            wasm_trap_message(trap2, &message2);
+
+            CLogger::LogPrintf("function error is : %s\n", message2.data);
+        }
+
+        CLogger::LogPrintf("called again! func is : %d and mem address is : %d\n", func, pointerAddress2);
+    }
+
+    /*CWebAssemblyFunction* apiF = script->GetApiFunction("gnine_get_data");
+
+    CWebAssemblyVariables apiArgs, apiResults;
+    args.Push((int32_t)5013);
+    apiF->Call(&apiArgs, &apiResults);*/
+    // method `CWebAssemblyFunction::Call` must be fixed
+    
     free(wasmBinary);
 
     if (state == CWebAssemblyLoadState::Failed)

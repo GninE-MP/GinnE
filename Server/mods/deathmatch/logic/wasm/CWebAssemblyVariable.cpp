@@ -245,14 +245,29 @@ CWebAssemblyVariables::~CWebAssemblyVariables()
     Clear();
 }
 
-void CWebAssemblyVariables::CopyVariablesTypeInfo(CWebAssemblyVariableTypeList* list)
+void CWebAssemblyVariables::CopyVariablesTypeInfo(CWebAssemblyVariableTypeList list)
 {
     if (!list)
     {
         return;
     }
 
-    *list = GetVariablesTypeInfo();
+    size_t size = GetSize();
+
+    if (size < 1)
+    {
+        wasm_valtype_vec_new_empty(list);
+        return;
+    }
+
+    std::vector<CWebAssemblyVariableType> types;
+
+    for (CWebAssemblyVariable& var : m_lsVariables)
+    {
+        types.push_back(var.GetVariableTypeInfo());
+    }
+
+    wasm_valtype_vec_new(list, size, types.data());
 }
 
 CWebAssemblyVariableTypeList CWebAssemblyVariables::GetVariablesTypeInfo()
@@ -301,6 +316,30 @@ void CWebAssemblyVariables::PushFloat32()
 void CWebAssemblyVariables::PushFloat64()
 {
     Push(CWebAssemblyVariable((float64_t)0));
+}
+
+void CWebAssemblyVariables::PushAnyRef()
+{
+    CWebAssemblyValue value;
+
+    value.kind = C_WASM_VARIABLE_TYPE_ANYREF;
+    value.of.ref = NULL;
+
+    CWebAssemblyVariable var(value);
+
+    m_lsVariables.push_back(var);
+}
+
+void CWebAssemblyVariables::PushFunctionRef()
+{
+    CWebAssemblyValue value;
+
+    value.kind = C_WASM_VARIABLE_TYPE_FUNCREF;
+    value.of.foreign = NULL;
+
+    CWebAssemblyVariable var(value);
+
+    m_lsVariables.push_back(var);
 }
 
 void CWebAssemblyVariables::Pop()
@@ -378,6 +417,11 @@ void CWebAssemblyVariables::FreeWebAssemblyVariablesTypeList(const CWebAssemblyV
     wasm_valtype_vec_delete(list);
 }
 
+CWebAssemblyFunctionType::CWebAssemblyFunctionType(const CWebAssemblyFunctionTypeContext& context)
+{
+    ReadFunctionTypeContext(context);
+}
+
 CWebAssemblyFunctionType::CWebAssemblyFunctionType(const CWebAssemblyVariables& args, const CWebAssemblyVariables& results)
 {
     SetArguments(args);
@@ -390,6 +434,82 @@ CWebAssemblyFunctionType::~CWebAssemblyFunctionType()
     m_wavResults.Clear();
 }
 
+void CWebAssemblyFunctionType::ReadFunctionTypeContext(const CWebAssemblyFunctionTypeContext& context)
+{
+    if (!context)
+    {
+        return;
+    }
+
+    m_wavArgs.Clear();
+    m_wavResults.Clear();
+
+    const wasm_valtype_vec_t* args = wasm_functype_params(context);
+    const wasm_valtype_vec_t* results = wasm_functype_results(context);
+    
+    size_t argsLength = args->num_elems;
+
+    for (size_t i = 0; i < argsLength; i++)
+    {
+        wasm_valtype_t* valType = args->data[i];
+
+        switch (wasm_valtype_kind(valType))
+        {
+            case C_WASM_VARIABLE_TYPE_I32:
+                m_wavArgs.PushInt32();
+                break;
+            case C_WASM_VARIABLE_TYPE_I64:
+                m_wavArgs.PushInt64();
+                break;
+            case C_WASM_VARIABLE_TYPE_F32:
+                m_wavArgs.PushFloat32();
+                break;
+            case C_WASM_VARIABLE_TYPE_F64:
+                m_wavArgs.PushFloat64();
+                break;
+            case C_WASM_VARIABLE_TYPE_ANYREF:
+                m_wavArgs.PushAnyRef();
+                break;
+            case C_WASM_VARIABLE_TYPE_FUNCREF:
+                m_wavArgs.PushFunctionRef();
+                break;
+            default:
+                break;
+        }
+    }
+
+    size_t resultsLength = results->num_elems;
+
+    for (size_t i = 0; i < resultsLength; i++)
+    {
+        wasm_valtype_t* valType = results->data[i];
+
+        switch (wasm_valtype_kind(valType))
+        {
+            case C_WASM_VARIABLE_TYPE_I32:
+                m_wavResults.PushInt32();
+                break;
+            case C_WASM_VARIABLE_TYPE_I64:
+                m_wavResults.PushInt64();
+                break;
+            case C_WASM_VARIABLE_TYPE_F32:
+                m_wavResults.PushFloat32();
+                break;
+            case C_WASM_VARIABLE_TYPE_F64:
+                m_wavResults.PushFloat64();
+                break;
+            case C_WASM_VARIABLE_TYPE_ANYREF:
+                m_wavResults.PushAnyRef();
+                break;
+            case C_WASM_VARIABLE_TYPE_FUNCREF:
+                m_wavResults.PushFunctionRef();
+                break;
+            default:
+                break;
+        }
+    }
+}
+
 void CWebAssemblyFunctionType::WriteWebAssemblyFunctionTypeContext(CWebAssemblyFunctionTypeContext* context)
 {
     if (!context)
@@ -397,18 +517,13 @@ void CWebAssemblyFunctionType::WriteWebAssemblyFunctionTypeContext(CWebAssemblyF
         return;
     }
 
-    CWebAssemblyVariableTypeList args;
-    CWebAssemblyVariableTypeList results;
+    wasm_valtype_vec_t args;
+    wasm_valtype_vec_t results;
 
     m_wavArgs.CopyVariablesTypeInfo(&args);
     m_wavResults.CopyVariablesTypeInfo(&results);
-
-    if (!args || !results)
-    {
-        return;
-    }
-
-    *context = wasm_functype_new(args, results);
+    
+    *context = wasm_functype_new(&args, &results);
 }
 
 void CWebAssemblyFunctionType::SetArguments(const CWebAssemblyVariables& args)
@@ -435,6 +550,106 @@ CWebAssemblyVariables& CWebAssemblyFunctionType::GetResults()
     return m_wavResults;
 }
 
+bool CWebAssemblyFunctionType::Compare(CWebAssemblyFunctionType functionType)
+{
+    CWebAssemblyVariables& args = functionType.GetArguments();
+    CWebAssemblyVariables& results = functionType.GetResults();
+
+    size_t argsLength = args.GetSize();
+    size_t resultsLength = results.GetSize();
+    size_t selfArgsLength = m_wavArgs.GetSize();
+    size_t selfResultsLength = m_wavResults.GetSize();
+
+    if (argsLength != selfArgsLength)
+    {
+        return false;
+    }
+
+    if (resultsLength != selfResultsLength)
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < argsLength; i++)
+    {
+        if (args[i].GetType() != m_wavArgs[i].GetType())
+        {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < resultsLength; i++)
+    {
+        if (results[i].GetType() != m_wavArgs[i].GetType())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+SString CWebAssemblyFunctionType::GenerateFunctionStructureText(const SString& functionName)
+{
+    SString result = "";
+    SString cama = ", ";
+    SString arguments = "";
+    SString returns = "";
+
+    size_t camaLength = cama.length();
+    size_t argsLength = m_wavArgs.GetSize();
+    size_t resultsLength = m_wavResults.GetSize();
+
+    if (argsLength < 1)
+    {
+        arguments = "void";
+    }
+    else
+    {
+        for (size_t i = 0; i < argsLength; i++)
+        {
+            SString typeName = CWebAssemblyVariable::GetWebAssemblyVariableTypeName(m_wavArgs[i].GetType());
+
+            arguments += typeName;
+            arguments += cama;
+        }
+
+        if (!arguments.empty())
+        {
+            arguments = arguments.substr(0, arguments.length() - camaLength);
+        }
+    }
+
+    if (resultsLength < 1)
+    {
+        returns = "void";
+    }
+    else
+    {
+        for (size_t i = 0; i < resultsLength; i++)
+        {
+            SString typeName = CWebAssemblyVariable::GetWebAssemblyVariableTypeName(m_wavResults[i].GetType());
+
+            returns += typeName;
+            returns += cama;
+        }
+
+        if (!returns.empty())
+        {
+            returns = returns.substr(0, returns.length() - camaLength);
+        }
+    }
+
+    result += returns;
+    result += " ";
+    result += functionName;
+    result += "(";
+    result += arguments;
+    result += ")";
+
+    return result;
+}
+
 void CWebAssemblyFunctionType::FreeWebAssemblyFunctionTypeContext(CWebAssemblyFunctionTypeContext context)
 {
     if (!context)
@@ -444,92 +659,48 @@ void CWebAssemblyFunctionType::FreeWebAssemblyFunctionTypeContext(CWebAssemblyFu
 
     wasm_functype_delete(context);
 }
-/*
+
 CWebAssemblyFunction::CWebAssemblyFunction()
 {
     m_pContext = NULL;
     m_pCFunction = NULL;
+    m_pEnvironment = NULL;
+    m_pStore = NULL;
 }
 
-CWebAssemblyFunction::CWebAssemblyFunction(const CWebAssemblyFunctionContext& context)
-{
-    SetContext(context);
-}
-
-CWebAssemblyFunction::~CWebAssemblyFunction()
-{
-    Free();
-}
-
-void CWebAssemblyFunction::SetContext(const CWebAssemblyFunctionContext& context)
-{
-    m_pContext = context;
-}
-
-CWebAssemblyFunctionContext CWebAssemblyFunction::GetContext()
-{
-    return m_pContext;
-}
-
-void CWebAssemblyFunction::SetFunctionType(CWebAssemblyFunctionType functionType)
-{
-    m_waFunctionType = functionType;
-}
-
-CWebAssemblyFunctionType CWebAssemblyFunction::GetFunctionType()
-{
-    return m_waFunctionType;
-}
-
-void CWebAssemblyFunction::SetCFunction(const CWebAssemblyCFunction& cFunction)
-{
-    m_pCFunction = cFunction;
-}
-
-CWebAssemblyCFunction CWebAssemblyFunction::GetCFunction()
-{
-    return m_pCFunction;
-}
-
-void CWebAssemblyFunction::Free()
-{
-    if (m_pContext)
-    {
-        return;
-    }
-
-    wasm_func_delete(m_pContext);
-
-
-}
-*/
-
-CWebAssemblyFunction::CWebAssemblyFunction()
-{
-    m_pContext = NULL;
-}
-
-CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore store)
+CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store)
 {
     SetStore(store);
 }
 
-CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore store, CWebAssemblyFunctionType functionType)
+CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType)
 {
     SetStore(store);
     SetFunctionType(functionType);
 }
 
-CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction)
+CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction)
 {
     SetStore(store);
     SetFunctionType(functionType);
     SetCFunction(cFunction);
 }
 
+CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment enviornment)
+{
+    SetStore(store);
+    SetFunctionType(functionType);
+    SetCFunction(cFunction);
+    SetApiEnviornment(enviornment);
+}
+
 CWebAssemblyFunction::CWebAssemblyFunction(const CWebAssemblyFunctionContext& context)
 {
     SetFunctionContext(context);
+
+    m_pCFunction = NULL;
+    m_pEnvironment = NULL;
+    m_pStore = NULL;
 }
 
 CWebAssemblyFunction::~CWebAssemblyFunction()
@@ -537,24 +708,32 @@ CWebAssemblyFunction::~CWebAssemblyFunction()
     Free();
 }
 
-void CWebAssemblyFunction::TakeOwenerShip(CWebAssemblyFunction function)
+void CWebAssemblyFunction::TakeOwenerShip(CWebAssemblyFunction* function)
 {
-    CWebAssemblyFunctionContext context = function.GetFunctionContext();
+    if (!function)
+    {
+        return;
+    }
+
+    CWebAssemblyFunctionContext context = function->GetFunctionContext();
 
     if (!context)
     {
         return;
     }
 
-    CWebAssemblyFunctionType functionType = function.GetFunctionType();
-    CWebAssemblyStore        engineStore = function.GetStore();
+    CWebAssemblyFunctionType   functionType = function->GetFunctionType();
+    CWebAssemblyStore*         engineStore = function->GetStore();
+    CWebAssemblyApiEnviornment environment = function->GetApiEnviornment();
 
-    function.Drop();
+    function->Drop();
 
     m_pContext = context;
     m_waFunctionType = functionType;
 
-    m_waStore = engineStore;
+    m_pStore = engineStore;
+
+    m_pEnvironment = environment;
 }
 
 void CWebAssemblyFunction::Drop()
@@ -562,7 +741,10 @@ void CWebAssemblyFunction::Drop()
     m_pContext = NULL;
 
     m_waFunctionType = CWebAssemblyFunctionType();
-    m_waStore = CWebAssemblyStore();
+
+    m_pCFunction = NULL;
+    m_pEnvironment = NULL;
+    m_pStore = NULL;
 }
 
 void CWebAssemblyFunction::Build(CWebAssemblyFunctionType functionType)
@@ -572,7 +754,7 @@ void CWebAssemblyFunction::Build(CWebAssemblyFunctionType functionType)
     Build();
 }
 
-void CWebAssemblyFunction::Build(CWebAssemblyStore store, CWebAssemblyFunctionType functionType)
+void CWebAssemblyFunction::Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType)
 {
     SetStore(store);
     SetFunctionType(functionType);
@@ -580,7 +762,7 @@ void CWebAssemblyFunction::Build(CWebAssemblyStore store, CWebAssemblyFunctionTy
     Build();
 }
 
-void CWebAssemblyFunction::Build(CWebAssemblyStore store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction)
+void CWebAssemblyFunction::Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction)
 {
     SetStore(store);
     SetFunctionType(functionType);
@@ -589,14 +771,29 @@ void CWebAssemblyFunction::Build(CWebAssemblyStore store, CWebAssemblyFunctionTy
     Build();
 }
 
+void CWebAssemblyFunction::Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment enviornment)
+{
+    SetStore(store);
+    SetFunctionType(functionType);
+    SetCFunction(cFunction);
+    SetApiEnviornment(enviornment);
+
+    Build();
+}
+
 void CWebAssemblyFunction::Build()
 {
-    if (!m_waStore)
+    if (!m_pStore)
     {
         return;
     }
 
     if (!m_pCFunction)
+    {
+        return;
+    }
+
+    if (!m_pEnvironment)
     {
         return;
     }
@@ -609,7 +806,7 @@ void CWebAssemblyFunction::Build()
         return;
     }
 
-    m_pContext = wasm_func_new(m_waStore.GetContext(), functionType, m_pCFunction);
+    m_pContext = wasm_func_new_with_env(m_pStore->GetContext(), functionType, m_pCFunction, (void*)m_pEnvironment, NULL);
 }
 
 CWebAssemblyTrap* CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results)
@@ -690,19 +887,24 @@ CWebAssemblyFunctionType CWebAssemblyFunction::GetFunctionType()
     return m_waFunctionType;
 }
 
-void CWebAssemblyFunction::SetStore(CWebAssemblyStore store)
+void CWebAssemblyFunction::SetApiEnviornment(CWebAssemblyApiEnviornment enviornment)
 {
-    if (!store)
-    {
-        return;
-    }
-
-    m_waStore = store;
+    m_pEnvironment = enviornment;
 }
 
-CWebAssemblyStore CWebAssemblyFunction::GetStore()
+CWebAssemblyApiEnviornment CWebAssemblyFunction::GetApiEnviornment()
 {
-    return m_waStore;
+    return m_pEnvironment;
+}
+
+void CWebAssemblyFunction::SetStore(CWebAssemblyStore* store)
+{
+    m_pStore = store;
+}
+
+CWebAssemblyStore* CWebAssemblyFunction::GetStore()
+{
+    return m_pStore;
 }
 
 void CWebAssemblyFunction::SetCFunction(CWebAssemblyCFunction cFunction)

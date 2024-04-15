@@ -20,24 +20,8 @@
 
 #include "WebAssemblyImports.h"
 
-#define C_WASM_EXTERN_TYPE_FUNCTION WASM_EXTERN_FUNC
-#define C_WASM_EXTERN_TYPE_GLOBAL   WASM_EXTERN_GLOBAL
-#define C_WASM_EXTERN_TYPE_TABLE    WASM_EXTERN_TABLE
-#define C_WASM_EXTERN_TYPE_MEMORY   WASM_EXTERN_MEMORY
-
-typedef wasm_engine_t*       CWebAssemblyEngineContext;
-typedef wasm_store_t*        CWebAssemblyStoreContext;
-typedef wasm_func_callback_t CWebAssemblyCFunction;
-typedef wasm_trap_t          CWebAssemblyTrap;
-typedef wasm_module_t*       CWebAssemblyModuleContext;
-typedef wasm_instance_t*     CWebAssemblyInstanceContext;
-typedef wasm_extern_t*       CWebAssemblyExternContext;
-
-typedef std::vector<CWebAssemblyCFunction> CWebAssemblyCFunctionList;
-typedef std::vector<CWebAssemblyExternContext>        CWebAssemblyImports;
-
-class CWebAssemblyScript;
-typedef std::vector<CWebAssemblyScript*> CWebAssemblyScriptList;
+class CWebAssemblyFunction;
+typedef CFastHashMap<SString, CWebAssemblyFunction*> CWebAssemblyFunctionMap;
 
 enum class CWebAssemblyLoadState
 {
@@ -107,7 +91,8 @@ public:
 
     void Destroy();
 
-    CWebAssemblyLoadState LoadScriptBinary(const char* binary, const size_t& binarySize);
+    CWebAssemblyScript*   CreateScript();
+    CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName);
 
     CWebAssemblyScriptList& GetScripts();
     void                    ClearScripts();
@@ -130,6 +115,8 @@ private:
     CWebAssemblyScriptList m_lsScripts;
 };
 
+class CWebAssemblyFunctionType;
+
 class CWebAssemblyScript
 {
 public:
@@ -141,7 +128,10 @@ public:
 
     void CallMainFunction(int32_t argc = 0, char** argv = NULL);
 
-    CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize);
+    CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
+
+    void RegisterApiFunction(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
+    void RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
 
     CWebAssemblyModuleContext   GetModule();
     CWebAssemblyInstanceContext GetInstance();
@@ -150,17 +140,39 @@ public:
 
     CWebAssemblyExtern GetExport(const SString& exportName);
 
+    CWebAssemblyFunctionMap& GetApiFunctions();
+    CWebAssemblyFunctionMap& GetGlobalFunctions();
+
     bool DoesExportExist(const SString& exportName);
+
+    bool DoesApiFunctionExist(const SString& functionName);
+    bool DoesGlobalFunctionExist(const SString& functionName);
+
+    CWebAssemblyFunction* GetApiFunction(const SString& functionName);
+    CWebAssemblyFunction* GetGlobalFunction(const SString& functionName);
+
+    void DeleteApiFunction(const SString& functionName);
+    void DeleteGlobalFunction(const SString& functionName);
+
+    void ClearApiFunctions();
+    void ClearGlobalFunctions();
+
+    SString GetScriptFile();
 
     static bool IsExternValid(const CWebAssemblyExtern& waExtern);
 
 private:
+    SString m_strScriptFile;
+
     CWebAssemblyContext* m_pContextStore;
 
-    CWebAssemblyModuleContext m_pModule;
+    CWebAssemblyModuleContext   m_pModule;
     CWebAssemblyInstanceContext m_pInstance;
 
     CWebAssemblyExternMap m_mpExports;
+
+    CWebAssemblyFunctionMap m_mpApiFunctions;
+    CWebAssemblyFunctionMap m_mpGlobalFunctions;
 };
 
 #endif

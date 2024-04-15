@@ -18,23 +18,6 @@
 
 #include "WebAssemblyImports.h"
 
-#define C_WASM_VARIABLE_TYPE_I32     WASM_I32
-#define C_WASM_VARIABLE_TYPE_I64     WASM_I64
-#define C_WASM_VARIABLE_TYPE_F32     WASM_F32
-#define C_WASM_VARIABLE_TYPE_F64     WASM_F64
-#define C_WASM_VARIABLE_TYPE_ANYREF  WASM_ANYREF
-#define C_WASM_VARIABLE_TYPE_FUNCREF WASM_FUNCREF
-
-typedef wasm_valkind_t                 CWebAssemblyVariableKind;
-typedef wasm_ref_t*                    CWebAssemblyReference;
-typedef wasm_valtype_t*                CWebAssemblyVariableType;
-typedef wasm_valtype_vec_t*            CWebAssemblyVariableTypeList;
-typedef wasm_val_t                     CWebAssemblyValue;
-typedef std::vector<CWebAssemblyValue> CWebAssemblyValueList;
-typedef wasm_func_t*                   CWebAssemblyFunctionContext;
-typedef wasm_functype_t*               CWebAssemblyFunctionTypeContext;
-typedef wasm_func_callback_t           CWebAssemblyCFunction;
-
 class CWebAssemblyVariable
 {
 public:
@@ -46,7 +29,7 @@ public:
     CWebAssemblyVariable(CWebAssemblyReference value);
     CWebAssemblyVariable(CWebAssemblyValue value);
     ~CWebAssemblyVariable() = default;
-
+    
     void                     CopyVariableTypeInfo(CWebAssemblyVariableType* type);
     CWebAssemblyVariableType GetVariableTypeInfo();
 
@@ -98,12 +81,14 @@ public:
     void PushInt64();
     void PushFloat32();
     void PushFloat64();
+    void PushAnyRef();
+    void PushFunctionRef();
 
     void Pop();
 
     void Clear();
 
-    void                         CopyVariablesTypeInfo(CWebAssemblyVariableTypeList* list);
+    void                         CopyVariablesTypeInfo(CWebAssemblyVariableTypeList list);
     CWebAssemblyVariableTypeList GetVariablesTypeInfo();
 
     void WriteValueList(CWebAssemblyValueList* list);
@@ -132,8 +117,11 @@ class CWebAssemblyFunctionType
 {
 public:
     CWebAssemblyFunctionType() = default;
+    CWebAssemblyFunctionType(const CWebAssemblyFunctionTypeContext& context);
     CWebAssemblyFunctionType(const CWebAssemblyVariables& args, const CWebAssemblyVariables& results);
     ~CWebAssemblyFunctionType();
+
+    void ReadFunctionTypeContext(const CWebAssemblyFunctionTypeContext& context);
 
     void WriteWebAssemblyFunctionTypeContext(CWebAssemblyFunctionTypeContext* context);
 
@@ -143,6 +131,10 @@ public:
     CWebAssemblyVariables& GetArguments();
     CWebAssemblyVariables& GetResults();
 
+    bool Compare(CWebAssemblyFunctionType functionType);
+
+    SString GenerateFunctionStructureText(const SString& functionName);
+
     static void FreeWebAssemblyFunctionTypeContext(CWebAssemblyFunctionTypeContext context);
 
 private:
@@ -150,50 +142,26 @@ private:
     CWebAssemblyVariables m_wavResults;
 };
 
-/*class CWebAssemblyStore;
-
-class CWebAssemblyFunction
-{
-public:
-    CWebAssemblyFunction();
-    CWebAssemblyFunction(const CWebAssemblyFunctionContext& context);
-    ~CWebAssemblyFunction();
-
-    void                        SetContext(const CWebAssemblyFunctionContext& context);
-    CWebAssemblyFunctionContext GetContext();
-
-    void                     SetFunctionType(CWebAssemblyFunctionType functionType);
-    CWebAssemblyFunctionType GetFunctionType();
-
-    void                  SetCFunction(const CWebAssemblyCFunction& cFunction);
-    CWebAssemblyCFunction GetCFunction();
-
-    void Free();
-
-private:
-    CWebAssemblyFunctionContext m_pContext;
-    CWebAssemblyFunctionType    m_waFunctionType;
-    CWebAssemblyCFunction       m_pCFunction;
-};*/ 
-
 class CWebAssemblyStore;
 
 class CWebAssemblyFunction
 {
 public:
     CWebAssemblyFunction();
-    CWebAssemblyFunction(CWebAssemblyStore store);
-    CWebAssemblyFunction(CWebAssemblyStore store, CWebAssemblyFunctionType functionType);
-    CWebAssemblyFunction(CWebAssemblyStore store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction);
+    CWebAssemblyFunction(CWebAssemblyStore* store);
+    CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType);
+    CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction);
+    CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment environment);
     CWebAssemblyFunction(const CWebAssemblyFunctionContext& context);
     ~CWebAssemblyFunction();
 
-    void TakeOwenerShip(CWebAssemblyFunction function);
+    void TakeOwenerShip(CWebAssemblyFunction* function);
     void Drop();
 
     void Build(CWebAssemblyFunctionType functionType);
-    void Build(CWebAssemblyStore store, CWebAssemblyFunctionType functionType);
-    void Build(CWebAssemblyStore store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction);
+    void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType);
+    void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction);
+    void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment environment);
     void Build();
 
     CWebAssemblyTrap* Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results);
@@ -207,8 +175,11 @@ public:
     void                  SetCFunction(CWebAssemblyCFunction cFunction);
     CWebAssemblyCFunction GetCFunction();
 
-    void              SetStore(CWebAssemblyStore store);
-    CWebAssemblyStore GetStore();
+    void                       SetApiEnviornment(CWebAssemblyApiEnviornment environment);
+    CWebAssemblyApiEnviornment GetApiEnviornment();
+
+    void               SetStore(CWebAssemblyStore* store);
+    CWebAssemblyStore* GetStore();
 
     void Free();
 
@@ -219,7 +190,9 @@ private:
     CWebAssemblyFunctionType    m_waFunctionType;
     CWebAssemblyCFunction       m_pCFunction;
 
-    CWebAssemblyStore m_waStore;
+    CWebAssemblyApiEnviornment m_pEnvironment;
+
+    CWebAssemblyStore* m_pStore;
 };
 
 #endif
