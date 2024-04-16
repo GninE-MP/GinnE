@@ -164,7 +164,7 @@ public:
     void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment environment);
     void Build();
 
-    CWebAssemblyTrap* Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results);
+    bool Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results);
 
     void                        SetFunctionContext(const CWebAssemblyFunctionContext& context);
     CWebAssemblyFunctionContext GetFunctionContext();

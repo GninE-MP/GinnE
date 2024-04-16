@@ -116,6 +116,7 @@ private:
 };
 
 class CWebAssemblyFunctionType;
+class CWebAssemblyMemory;
 
 class CWebAssemblyScript
 {
@@ -136,14 +137,22 @@ public:
     CWebAssemblyModuleContext   GetModule();
     CWebAssemblyInstanceContext GetInstance();
 
-    CWebAssemblyExternMap& GetExports();
+    void BuildExportedFunctions();
+    void BuildMemory();
 
-    CWebAssemblyExtern GetExport(const SString& exportName);
+    CWebAssemblyExternMap&   GetExports();
+    CWebAssemblyFunctionMap& GetExportedFunctions();
+
+    CWebAssemblyExtern    GetExport(const SString& exportName);
+    CWebAssemblyFunction* GetExportedFunction(const SString& functionName);
 
     CWebAssemblyFunctionMap& GetApiFunctions();
     CWebAssemblyFunctionMap& GetGlobalFunctions();
 
+    CWebAssemblyMemory* GetMemory();
+
     bool DoesExportExist(const SString& exportName);
+    bool DoesExportedFunctionExist(const SString& functionName);
 
     bool DoesApiFunctionExist(const SString& functionName);
     bool DoesGlobalFunctionExist(const SString& functionName);
@@ -151,11 +160,17 @@ public:
     CWebAssemblyFunction* GetApiFunction(const SString& functionName);
     CWebAssemblyFunction* GetGlobalFunction(const SString& functionName);
 
+    void DeleteExportedFunction(const SString& functionName);
+
     void DeleteApiFunction(const SString& functionName);
     void DeleteGlobalFunction(const SString& functionName);
 
+    void ClearExportedFunctions();
+
     void ClearApiFunctions();
     void ClearGlobalFunctions();
+
+    void DeleteMemory();
 
     SString GetScriptFile();
 
@@ -169,10 +184,39 @@ private:
     CWebAssemblyModuleContext   m_pModule;
     CWebAssemblyInstanceContext m_pInstance;
 
-    CWebAssemblyExternMap m_mpExports;
+    CWebAssemblyExternMap   m_mpExports;
+    CWebAssemblyFunctionMap m_mpExportedFunctions;
 
     CWebAssemblyFunctionMap m_mpApiFunctions;
     CWebAssemblyFunctionMap m_mpGlobalFunctions;
+
+    CWebAssemblyMemory* m_pMemory;
+};
+
+class CWebAssemblyMemory
+{
+public:
+    CWebAssemblyMemory();
+    CWebAssemblyMemory(CWebAssemblyScript* script);
+    CWebAssemblyMemory(CWebAssemblyMemoryContext context);
+    CWebAssemblyMemory(CWebAssemblyScript* script, CWebAssemblyMemoryContext context);
+    ~CWebAssemblyMemory();
+
+    void Destroy();
+
+    void*  GetBase();
+    size_t GetSize();
+
+    void                SetScript(CWebAssemblyScript* script);
+    CWebAssemblyScript* GetScript();
+
+    void                      SetContext(CWebAssemblyMemoryContext context);
+    CWebAssemblyMemoryContext GetContext();
+
+private:
+    CWebAssemblyScript* m_pScript;
+
+    CWebAssemblyMemoryContext m_pContext;
 };
 
 #endif

@@ -809,24 +809,47 @@ void CWebAssemblyFunction::Build()
     m_pContext = wasm_func_new_with_env(m_pStore->GetContext(), functionType, m_pCFunction, (void*)m_pEnvironment, NULL);
 }
 
-CWebAssemblyTrap* CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results)
+bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results)
 {
     if (!m_pContext)
     {
-        return NULL;
+        return false;
     }
+
+    CWebAssemblyVariables& functionArguments = m_waFunctionType.GetArguments();
+    CWebAssemblyVariables& functionResults = m_waFunctionType.GetResults();
 
     CWebAssemblyValueList argsValues;
 
     if (args)
     {
         args->WriteValueList(&argsValues);
+
+        int difference = (int)argsValues.size() - (int)functionArguments.GetSize();
+
+        if (difference > 0)
+        {
+            for (int i = 0; i < difference; i++, argsValues.pop_back());
+        }
     }
 
-    wasm_val_vec_t argsVector;
-    wasm_val_vec_t resultsVector;
+    wasm_val_vec_t argsVector = { 0 };
+    wasm_val_vec_t resultsVector = { 0 };
 
-    resultsVector.data = NULL;
+    size_t functionResultsLength = functionResults.GetSize();
+
+    if (functionResultsLength < 1)
+    {
+        wasm_val_vec_new_empty(&resultsVector);
+    }
+    else
+    {
+        CWebAssemblyValueList resultsValues;
+
+        functionResults.WriteValueList(&resultsValues);
+
+        wasm_val_vec_new(&resultsVector, resultsValues.size(), resultsValues.data());
+    }
 
     if (args)
     {
@@ -835,20 +858,18 @@ CWebAssemblyTrap* CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAs
 
     CWebAssemblyTrap* trap = wasm_func_call(m_pContext, &argsVector, &resultsVector);
 
-    if (results)
-    {
-        size_t length = resultsVector.num_elems;
-
-        for (size_t i = 0; i < length; i++)
-        {
-            results->Push(resultsVector.data[i]);
-        }
-
-        wasm_val_vec_delete(&resultsVector);
-    }
-
     if (resultsVector.data)
     {
+        if (results)
+        {
+            size_t length = resultsVector.num_elems;
+
+            for (size_t i = 0; i < length; i++)
+            {
+                results->Push(resultsVector.data[i]);
+            }
+        }
+
         wasm_val_vec_delete(&resultsVector);
     }
 
@@ -857,7 +878,13 @@ CWebAssemblyTrap* CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAs
         wasm_val_vec_delete(&argsVector);
     }
 
-    return trap;
+    if (trap)
+    {
+        wasm_trap_delete(trap);
+        return false;
+    }
+
+    return true;
 }
 
 void CWebAssemblyFunction::SetFunctionContext(const CWebAssemblyFunctionContext& context)

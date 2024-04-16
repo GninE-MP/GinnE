@@ -54,6 +54,7 @@ typedef wasm_val_vec_t                 CWebAssemblyValueVector;
 typedef std::vector<CWebAssemblyValue> CWebAssemblyValueList;
 typedef wasm_func_t*                   CWebAssemblyFunctionContext;
 typedef wasm_functype_t*               CWebAssemblyFunctionTypeContext;
+typedef wasm_memory_t*                 CWebAssemblyMemoryContext;
 
 typedef std::vector<CWebAssemblyExternContext> CWebAssemblyImports;
 

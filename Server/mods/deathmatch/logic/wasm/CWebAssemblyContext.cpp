@@ -311,6 +311,8 @@ CWebAssemblyScript::CWebAssemblyScript()
 
     m_pModule = NULL;
     m_pInstance = NULL;
+
+    m_pMemory = NULL;
 }
 
 CWebAssemblyScript::CWebAssemblyScript(CWebAssemblyContext* context)
@@ -319,6 +321,8 @@ CWebAssemblyScript::CWebAssemblyScript(CWebAssemblyContext* context)
 
     m_pModule = NULL;
     m_pInstance = NULL;
+
+    m_pMemory = NULL;
 }
 
 CWebAssemblyScript::~CWebAssemblyScript()
@@ -328,68 +332,53 @@ CWebAssemblyScript::~CWebAssemblyScript()
 
 void CWebAssemblyScript::CallMainFunction(int32_t argc, char** argv)
 {
-    CWebAssemblyExtern mainExtern = GetExport(WASM_MAIN_FUNCTION_NAME);
+    CWebAssemblyFunction* mainFunction = GetExportedFunction(WASM_MAIN_FUNCTION_NAME);
 
-    if (!IsExternValid(mainExtern))
-    {
-        return;
-    }
-
-    if (mainExtern.kind != C_WASM_EXTERN_TYPE_FUNCTION)
-    {
-        return;
-    }
-
-    wasm_func_t* mainFunction = wasm_extern_as_func(mainExtern.context);
+    CWebAssemblyVariables args;
+    CWebAssemblyVariables results;
 
     if (!mainFunction)
     {
-        return;
+        goto Fail;
     }
-
-    /*CWebAssemblyFunction mainFunc = mainFunction;
-
-    CWebAssemblyVariables args, results;
 
     args.Push(argc);
     args.Push((int32_t)argv);
 
-    CWebAssemblyTrap* trap = mainFunc.Call(&args, &results);*/ 
-
-    wasm_val_t AArgc;
-    AArgc.kind = WASM_I32;
-    AArgc.of.i32 = 0;
-
-    const size_t argsSize = 2;
-    wasm_val_t   argsVal[argsSize] = {
-        AArgc,
-        AArgc
-    };
-
-    wasm_val_vec_t argsVec;
-    wasm_val_vec_t resultsVec;
-
-    wasm_val_vec_new(&argsVec, argsSize, argsVal);
-
-    //CWebAssemblyTrap* trap = NULL;
-    CWebAssemblyTrap* trap = wasm_func_call(mainFunction, &argsVec, &resultsVec);
-
-    CLogger::LogPrintf("called main function : %d and resultsvec is : %d\n", mainFunction, resultsVec.data[0].of.i32);
-
-    if (trap)
+    if (!mainFunction->Call(&args, &results))
     {
-        CLogger::ErrorPrintf("Couldn't call module main function.\n");
+        goto Fail;
+    }
 
-        //wasm_trap_delete(trap);
+    if (results.GetSize() > 0)
+    {
+        int32_t exitCode = results.GetFirst().GetInt32();
 
+        if (exitCode)
+        {
+            CLogger::ErrorPrintf("Web assembly module existed with code : %d\n", exitCode);
+        }
+    }
+
+    return;
+
+Fail:
+    if (mainFunction)
+    {
+        CLogger::ErrorPrintf("Couldn't call web assembly module function '%s'.\n", mainFunction->GetFunctionType().GenerateFunctionStructureText(WASM_MAIN_FUNCTION_NAME).c_str());
         return;
     }
+
+    CLogger::ErrorPrintf("Couldn't call web assembly '%s' function.\n", WASM_MAIN_FUNCTION_NAME);
 }
 
 void CWebAssemblyScript::Destroy()
 {
+    ClearExportedFunctions();
     ClearApiFunctions();
     ClearGlobalFunctions();
+
+    DeleteMemory();
 
     m_mpExports.clear();
 
@@ -404,36 +393,6 @@ void CWebAssemblyScript::Destroy()
     }
 }
 
-/*wasm_trap_t* mta_print(const wasm_val_vec_t* args, wasm_val_vec_t* results)
-{
-    double x = args->data[0].of.f64;
-
-    CLogger::LogPrintf("this is mta print function honey! and result is : %d, %.6f\n", 2.5, 3.14f);
-
-    return NULL;
-}*/
-/*
-//CWebAssemblyTrap* mta_print(void* env, const CWebAssemblyValueVector* args, CWebAssemblyValueVector* results)
-WebAssemblyApi(mta_print, env, args, results)
-{
-    double x = args->data[0].of.f64;
-
-    //CWebAssemblyApiEnviornment* apiEnv = (CWebAssemblyApiEnviornment*)env;
-
-    //CWebAssemblyContext* context = (CWebAssemblyContext*)env;
-
-    CResource* resource = GetWebAssemblyResource(env);
-
-    SString name = resource->GetName();
-
-    CLogger::LogPrintf("data is : %d, resource is : %s\n", (int)x, name.c_str());
-
-    results->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
-    results->data[0].of.i32 = (int)x + 1030;
-
-    return NULL;
-}
-*/
 CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const size_t& binarySize, const SString& fileName)
 {
     if (binarySize < 1)
@@ -449,6 +408,11 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     if (!m_pContextStore)
     {
         return CWebAssemblyLoadState::Failed;
+    }
+
+    if (m_pInstance || m_pModule)
+    {
+        Destroy();
     }
 
     m_strScriptFile = fileName;
@@ -522,11 +486,13 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
             if (moduleName == WEB_ASSEMBLY_API_MODULE_NAME)
             {
                 CWebAssemblyFunctionType apiFunctionType;
+                CWebAssemblyFunctionType globalFunctionType;
                 CWebAssemblyFunctionType importFuncType;
 
-                
-                CWebAssemblyVariables args;
-                args.Push(313);
+                wasm_externtype_t* externType = (wasm_externtype_t*)wasm_importtype_type(importType);
+                wasm_functype_t*   functype = wasm_externtype_as_functype(externType);
+
+                importFuncType.ReadFunctionTypeContext(functype);
 
                 if (!DoesApiFunctionExist(importName))
                 {
@@ -542,15 +508,9 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
 
                 apiFunctionType = apiFunction->GetFunctionType();
 
-                wasm_externtype_t* externType = (wasm_externtype_t*)wasm_importtype_type(importType);
-                wasm_functype_t*   functype = wasm_externtype_as_functype(externType);
-
-                importFuncType.ReadFunctionTypeContext(functype);
-
                 if (!apiFunctionType.Compare(importFuncType))
                 {
-                    CLogger::ErrorPrintf("Wrong function structure on import. Defined structure is '%s' [\"@%s/%s\"]\n", apiFunctionType.GenerateFunctionStructureText(importName).c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
-                    goto Fail;
+                    goto CheckGlobalFunctions;
                 }
 
                 imports[i] = wasm_func_as_extern(apiFunction->GetFunctionContext());
@@ -558,6 +518,29 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 continue;
 
             CheckGlobalFunctions:
+                if (!DoesGlobalFunctionExist(importName))
+                {
+                    if (apiFunction)
+                    {
+                        if (!apiFunctionType.Compare(importFuncType))
+                        {
+                            CLogger::ErrorPrintf("Wrong function structure on import. Defined structure is '%s' [\"@%s/%s\"]\n", apiFunctionType.GenerateFunctionStructureText(importName).c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+                            goto Fail;
+                        }
+                    }
+
+                    goto ImportFail;
+                }
+
+                CWebAssemblyFunction* globalFunction = m_mpGlobalFunctions[importName];
+
+                globalFunctionType = globalFunction->GetFunctionType();
+
+                if (!globalFunctionType.Compare(importFuncType))
+                {
+                    CLogger::ErrorPrintf("Wrong function structure on import. Defined structure is '%s' [\"@%s/%s\"]\n", globalFunctionType.GenerateFunctionStructureText(importName).c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+                    goto Fail;
+                }
 
                 continue;
 
@@ -639,6 +622,9 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
 
         m_mpExports[exportNames[i]] = externItem;
     }
+
+    BuildExportedFunctions();
+    BuildMemory();
 
     return CWebAssemblyLoadState::Succeed;
 
@@ -725,9 +711,79 @@ CWebAssemblyInstanceContext CWebAssemblyScript::GetInstance()
     return m_pInstance;
 }
 
+void CWebAssemblyScript::BuildExportedFunctions()
+{
+    if (m_mpExports.empty())
+    {
+        return;
+    }
+
+    for (const std::pair<SString, CWebAssemblyExtern>& item : m_mpExports)
+    {
+        SString            externName = item.first;
+        CWebAssemblyExtern externData = item.second;
+
+        if (externData.kind != C_WASM_EXTERN_TYPE_FUNCTION)
+        {
+            continue;
+        }
+
+        wasm_externtype_t* externType = wasm_extern_type(externData.context);
+        wasm_functype_t*   funcType = wasm_externtype_as_functype(externType);
+
+        CWebAssemblyFunctionContext functionContext = wasm_extern_as_func(externData.context);
+
+        CWebAssemblyFunctionType functionType(funcType);
+
+        CWebAssemblyFunction* function = new CWebAssemblyFunction();
+
+        function->SetStore(m_pContextStore->GetStore());
+        function->SetFunctionType(functionType);
+        function->SetFunctionContext(functionContext);
+        function->SetApiEnviornment(m_pContextStore);
+
+        m_mpExportedFunctions[externName] = function;
+    }
+}
+
+void CWebAssemblyScript::BuildMemory()
+{
+    if (m_mpExports.empty())
+    {
+        return;
+    }
+
+    for (const std::pair<SString, CWebAssemblyExtern>& item : m_mpExports)
+    {
+        SString            externName = item.first;
+        CWebAssemblyExtern externData = item.second;
+            
+        if (externData.kind != C_WASM_EXTERN_TYPE_MEMORY)
+        {
+            continue;
+        }
+
+        if (m_pMemory)
+        {
+            DeleteMemory();
+        }
+
+        CWebAssemblyMemoryContext memory = wasm_extern_as_memory(externData.context);
+
+        m_pMemory = new CWebAssemblyMemory(this, memory);
+
+        break;
+    }
+}
+
 CWebAssemblyExternMap& CWebAssemblyScript::GetExports()
 {
     return m_mpExports;
+}
+
+CWebAssemblyFunctionMap& CWebAssemblyScript::GetExportedFunctions()
+{
+    return m_mpExportedFunctions;
 }
 
 CWebAssemblyExtern CWebAssemblyScript::GetExport(const SString& exportName)
@@ -744,6 +800,21 @@ CWebAssemblyExtern CWebAssemblyScript::GetExport(const SString& exportName)
     return m_mpExports[exportName];
 }
 
+CWebAssemblyMemory* CWebAssemblyScript::GetMemory()
+{
+    return m_pMemory;
+}
+
+CWebAssemblyFunction* CWebAssemblyScript::GetExportedFunction(const SString& functionName)
+{
+    if (!DoesExportedFunctionExist(functionName))
+    {
+        return NULL;
+    }
+
+    return m_mpExportedFunctions[functionName];
+}
+
 CWebAssemblyFunctionMap& CWebAssemblyScript::GetApiFunctions()
 {
     return m_mpApiFunctions;
@@ -757,6 +828,11 @@ CWebAssemblyFunctionMap& CWebAssemblyScript::GetGlobalFunctions()
 bool CWebAssemblyScript::DoesExportExist(const SString& exportName)
 {
     return m_mpExports.find(exportName) != m_mpExports.end();
+}
+
+bool CWebAssemblyScript::DoesExportedFunctionExist(const SString& functionName)
+{
+    return m_mpExportedFunctions.find(functionName) != m_mpExportedFunctions.end();
 }
 
 bool CWebAssemblyScript::DoesApiFunctionExist(const SString& functionName)
@@ -797,6 +873,30 @@ CWebAssemblyFunction* CWebAssemblyScript::GetGlobalFunction(const SString& funct
     }
 
     return m_mpGlobalFunctions[functionName];
+}
+
+void CWebAssemblyScript::DeleteExportedFunction(const SString& functionName)
+{
+    if (functionName.empty())
+    {
+        return;
+    }
+
+    if (!DoesExportedFunctionExist(functionName))
+    {
+        return;
+    }
+
+    CWebAssemblyFunction* function = m_mpExportedFunctions[functionName];
+
+    if (!function)
+    {
+        return;
+    }
+
+    m_mpExportedFunctions.erase(functionName);
+
+    delete function;
 }
 
 void CWebAssemblyScript::DeleteApiFunction(const SString& functionName)
@@ -847,6 +947,28 @@ void CWebAssemblyScript::DeleteGlobalFunction(const SString& functionName)
     delete function;
 }
 
+void CWebAssemblyScript::ClearExportedFunctions()
+{
+    if (m_mpExportedFunctions.empty())
+    {
+        return;
+    }
+
+    for (const std::pair<SString, CWebAssemblyFunction*>& item : m_mpExportedFunctions)
+    {
+        CWebAssemblyFunction* function = item.second;
+
+        if (!function)
+        {
+            continue;
+        }
+
+        delete function;
+    }
+
+    m_mpExportedFunctions.clear();
+}
+
 void CWebAssemblyScript::ClearApiFunctions()
 {
     if (m_mpApiFunctions.empty())
@@ -891,6 +1013,17 @@ void CWebAssemblyScript::ClearGlobalFunctions()
     m_mpGlobalFunctions.clear();
 }
 
+void CWebAssemblyScript::DeleteMemory()
+{
+    if (!m_pMemory)
+    {
+        return;
+    }
+
+    delete m_pMemory;
+    m_pMemory = NULL;
+}
+
 SString CWebAssemblyScript::GetScriptFile()
 {
     return m_strScriptFile;
@@ -899,4 +1032,85 @@ SString CWebAssemblyScript::GetScriptFile()
 bool CWebAssemblyScript::IsExternValid(const CWebAssemblyExtern& waExtern)
 {
     return waExtern.context != NULL;
+}
+
+CWebAssemblyMemory::CWebAssemblyMemory()
+{
+    m_pContext = NULL;
+    m_pScript = NULL;
+}
+
+CWebAssemblyMemory::CWebAssemblyMemory(CWebAssemblyScript* script)
+{
+    SetScript(script);
+}
+
+CWebAssemblyMemory::CWebAssemblyMemory(CWebAssemblyMemoryContext context)
+{
+    SetContext(context);
+}
+
+CWebAssemblyMemory::CWebAssemblyMemory(CWebAssemblyScript* script, CWebAssemblyMemoryContext context)
+{
+    SetScript(script);
+    SetContext(context);
+
+    byte_t* base = wasm_memory_data(context);
+    size_t size = wasm_memory_data_size(context);
+}
+
+CWebAssemblyMemory::~CWebAssemblyMemory()
+{
+    Destroy();
+}
+
+void CWebAssemblyMemory::Destroy()
+{
+    if (!m_pContext)
+    {
+        return;
+    }
+
+    wasm_memory_delete(m_pContext);
+    m_pContext = NULL;
+}
+
+void* CWebAssemblyMemory::GetBase()
+{
+    if (!m_pContext)
+    {
+        return NULL;
+    }
+
+    return wasm_memory_data(m_pContext);
+}
+
+size_t CWebAssemblyMemory::GetSize()
+{
+    if (!m_pContext)
+    {
+        return 0;
+    }
+
+    return wasm_memory_data_size(m_pContext);
+}
+
+void CWebAssemblyMemory::SetScript(CWebAssemblyScript* script)
+{
+    m_pScript = script;
+}
+
+CWebAssemblyScript* CWebAssemblyMemory::GetScript()
+{
+    return m_pScript;
+}
+
+void CWebAssemblyMemory::SetContext(CWebAssemblyMemoryContext context)
+{
+    m_pContext = context;
+}
+
+CWebAssemblyMemoryContext CWebAssemblyMemory::GetContext()
+{
+    return m_pContext;
 }
