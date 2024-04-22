@@ -83,6 +83,8 @@ public:
     void PushFloat64();
     void PushAnyRef();
     void PushFunctionRef();
+    void PushPointer();
+    void PushString();
 
     void Pop();
 

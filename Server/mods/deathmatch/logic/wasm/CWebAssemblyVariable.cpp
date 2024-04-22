@@ -342,6 +342,16 @@ void CWebAssemblyVariables::PushFunctionRef()
     m_lsVariables.push_back(var);
 }
 
+void CWebAssemblyVariables::PushPointer()
+{
+    PushInt32();
+}
+
+void CWebAssemblyVariables::PushString()
+{
+    PushInt32();
+}
+
 void CWebAssemblyVariables::Pop()
 {
     m_lsVariables.pop_back();

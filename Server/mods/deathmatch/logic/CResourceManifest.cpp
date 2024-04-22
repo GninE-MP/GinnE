@@ -1,4 +1,4 @@
-/*****************************************************************************
+﻿/*****************************************************************************
  *
  *  PROJECT:     GninE
  *  LICENSE:     See LICENSE in the top level directory
@@ -609,10 +609,93 @@ int CResourceManifest::Lua_WasmClient(lua_State* luaVM)
 WebAssemblyApi(GnineGetData, env, args, results)
 {
     CResource* resource = GetWebAssemblyResource(env);
+    CWebAssemblyScript* script = GetWebAssemblyScript(env);
 
     int arg0 = args->data[0].of.i32;
+    int arg1 = args->data[1].of.i32;
 
-    CLogger::LogPrintf("hi this is get data on '%s' and arg is : %d!\n", resource->GetName().c_str(), arg0);
+    CLogger::LogPrintf("hi this is get data on '%s' and arg is in new resource : %d and script is '%s'!\n", resource->GetName().c_str(), arg0, script->GetScriptFile().c_str());
+
+    CWebAssemblyVariables funcArgs, funcResults;
+
+    funcArgs.Push(3050);
+
+    script->CallInternalFunction(arg1, &funcArgs, &funcResults);
+
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    int func = funcResults.GetFirst().GetInt32();
+
+    for (int i = 0; i < 5; i++)
+    {
+        funcArgs.Clear();
+        funcResults.Clear();
+
+        SString data = "mobin = ";
+        data += std::to_string(i);
+
+        CWebAssemblyMemoryPointerAddress str = memory->StringToUTF8(data);
+
+        funcArgs.Push((int32_t)str);
+        funcArgs.Push(13 + i);
+
+        script->CallInternalFunction(func, &funcArgs, &funcResults);
+
+        memory->Free(str);
+
+        CLogger::LogPrintf("function call result is : %f\n", funcResults.GetFirst().GetFloat32());
+    }
+    
+    return NULL;
+}
+
+WebAssemblyApi(GninePrintData, env, args, results)
+{
+    CWebAssemblyMemoryPointerAddress formaterPointer = args->data[0].of.i32;
+
+    CWebAssemblyScript* script = GetWebAssemblyScript(env);
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    SString format = "INFO: ";
+    format += memory->UTF8ToString(formaterPointer);
+    format += "\n";
+
+    CLogger::LogPrintf(format.c_str());
+
+    return NULL;
+}
+
+WebAssemblyApi(GnineCallFunction, env, args, results)
+{
+    CWebAssemblyScript* script = GetWebAssemblyScript(env);
+
+    int refAddress = args->data[0].of.i32;
+
+    wasm_ref_t* ref = (wasm_ref_t*)((uintptr_t)refAddress);
+
+    wasm_func_t* func = wasm_ref_as_func(ref);
+
+    CWebAssemblyFunctionType fType;
+    fType.ReadFunctionTypeContext(wasm_func_type(func));
+
+    CWebAssemblyFunction f;
+    f.SetApiEnviornment(script);
+    f.SetFunctionContext(func);
+    f.SetFunctionType(fType);
+    f.SetStore(script->GetStoreContext()->GetStore());
+
+
+    CLogger::LogPrintf("ref data is : %d\n", func);
+
+    CWebAssemblyVariables fArgs;
+
+    CWebAssemblyMemoryPointerAddress str = script->GetMemory()->StringToUTF8("salam in call az ref omade!");
+
+    fArgs.Push((int32_t)str);
+
+    f.Call(&fArgs, NULL);
+
+    script->GetMemory()->Free(str);
 
     return NULL;
 }
@@ -687,22 +770,77 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     CWebAssemblyVariables args, results;
 
     args.PushInt32();
+    args.PushInt32();
 
     CWebAssemblyFunctionType functionType(args, results);
 
     script->RegisterApiFunction("gnine_get_data", functionType, GnineGetData);
 
+    CWebAssemblyVariables pargs, presults;
+
+    pargs.PushInt32();
+
+    //for (int i = 0; i < 16; i++) pargs.PushFloat64();
+
+    CWebAssemblyFunctionType printType(pargs, presults);
+
+    script->RegisterApiFunction("gnine_print_data", printType, GninePrintData);
+
+    CWebAssemblyVariables cArgs, cResults;
+
+    //cArgs.PushAnyRef();
+    cArgs.PushInt32();
+    
+    CWebAssemblyFunctionType CallbackCallerType(cArgs, cResults);
+
+    script->RegisterApiFunction("gnine_call_callback", CallbackCallerType, GnineCallFunction);
+    
     CWebAssemblyLoadState state = wasmModule->LoadScriptBinary(script, wasmBinary, bufferSize, filePath);
 
-    CWebAssemblyMemory* mem = script->GetMemory();
+    CWebAssemblyMemory*   memory = script->GetMemory();
+    CWebAssemblyFunction* getResourceName = script->GetExportedFunction("get_resource_name");
 
-    char* dataPointer = (char*)mem->GetBase() + 67112;
+    CWebAssemblyVariables fArgs, fResults;
 
+    CWebAssemblyFunction* printFunc = script->GetApiFunction("gnine_print_data");
+    
+    wasm_func_t* funcC = printFunc->GetFunctionContext();
+    wasm_ref_t*  ref = wasm_func_as_ref(funcC);
+
+    /*wasm_val_t v;
+    v.kind = WASM_ANYREF;
+    v.of.ref = ref;
+
+    CWebAssemblyVariable var;
+    var.Set(v);*/ 
+
+    fArgs.Push(ref);
+
+    getResourceName->Call(&fArgs, &fResults);
+
+    SString name = memory->UTF8ToString(fResults.GetFirst().GetInt32());
+
+    CLogger::LogPrintf("res name is d: %s\n", name.c_str());
+
+    /*char* dataPointer = (char*)mem->GetBase() + 67112;
+
+    //wasm_runtime_module_malloc(script->GetModule(), 300, NULL);
+    
     std::string data(dataPointer, 10);
 
     CLogger::LogPrintf("memory data is : %s\n", data.c_str());
 
+    void* memoryData = NULL;
+
+    CWebAssemblyMemoryPointerAddress modulePtr = mem->Malloc(5, &memoryData);
+
+    CLogger::LogPrintf("module allocating pointer is : %d and real memory data is : %d\n", modulePtr, memoryData);
+
+    mem->Free(modulePtr);*/
+
     free(wasmBinary);
+
+    delete wasmModule;
 
     if (state == CWebAssemblyLoadState::Failed)
     {

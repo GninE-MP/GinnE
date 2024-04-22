@@ -33,10 +33,19 @@
 
 #define WEB_ASSEMBLY_API_MODULE_NAME "env"
 
+#define WASM_MAIN_FUNCTION_NAME   "ModuleMain"
+#define WASM_MALLOC_FUNCTION_NAME "malloc"
+#define WASM_FREE_FUNCTION_NAME   "free"
+
+#define WASM_INTERNAL_FUNCTIONS_TABLE_EXPORT_NAME "__indirect_function_table"
+
+#define WEB_ASSEMBLY_NULL_PTR (0)
+
 #define WebAssemblyApi(name, envVariableName, argsVariableName, resultsVariableName) CWebAssemblyTrap* name(void* envVariableName, const CWebAssemblyValueVector* argsVariableName, CWebAssemblyValueVector* resultsVariableName)
 
-#define GetWebAssemblyApiEnviornment(env) ((CWebAssemblyContext*)env)
-#define GetWebAssemblyResource(env)       (((CWebAssemblyContext*)env)->GetResource())
+#define GetWebAssemblyScript(env) ((CWebAssemblyScript*)env)
+#define GetWebAssemblyContext(env) (((CWebAssemblyScript*)env)->GetStoreContext())
+#define GetWebAssemblyResource(env) ((((CWebAssemblyScript*)env)->GetStoreContext())->GetResource())
 
 typedef wasm_engine_t*                 CWebAssemblyEngineContext;
 typedef wasm_store_t*                  CWebAssemblyStoreContext;
@@ -55,13 +64,13 @@ typedef std::vector<CWebAssemblyValue> CWebAssemblyValueList;
 typedef wasm_func_t*                   CWebAssemblyFunctionContext;
 typedef wasm_functype_t*               CWebAssemblyFunctionTypeContext;
 typedef wasm_memory_t*                 CWebAssemblyMemoryContext;
+typedef uint32_t                       CWebAssemblyMemoryPointerAddress;
 
 typedef std::vector<CWebAssemblyExternContext> CWebAssemblyImports;
 
 class CWebAssemblyScript;
 typedef std::vector<CWebAssemblyScript*> CWebAssemblyScriptList;
 
-class CWebAssemblyContext;
-typedef CWebAssemblyContext* CWebAssemblyApiEnviornment;
+typedef CWebAssemblyScript* CWebAssemblyApiEnviornment;
 
 #endif

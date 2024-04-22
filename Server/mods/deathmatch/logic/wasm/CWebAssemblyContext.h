@@ -23,6 +23,8 @@
 class CWebAssemblyFunction;
 typedef CFastHashMap<SString, CWebAssemblyFunction*> CWebAssemblyFunctionMap;
 
+typedef std::vector<CWebAssemblyFunction*> CWebAssemblyInternalFunctions;
+
 enum class CWebAssemblyLoadState
 {
     Succeed,
@@ -115,6 +117,7 @@ private:
     CWebAssemblyScriptList m_lsScripts;
 };
 
+class CWebAssemblyVariables;
 class CWebAssemblyFunctionType;
 class CWebAssemblyMemory;
 
@@ -129,15 +132,20 @@ public:
 
     void CallMainFunction(int32_t argc = 0, char** argv = NULL);
 
+    void CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
+
     CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
 
     void RegisterApiFunction(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
     void RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
 
+    CWebAssemblyContext* GetStoreContext();
+
     CWebAssemblyModuleContext   GetModule();
     CWebAssemblyInstanceContext GetInstance();
 
     void BuildExportedFunctions();
+    void BuildInternalFunctions();
     void BuildMemory();
 
     CWebAssemblyExternMap&   GetExports();
@@ -145,6 +153,8 @@ public:
 
     CWebAssemblyExtern    GetExport(const SString& exportName);
     CWebAssemblyFunction* GetExportedFunction(const SString& functionName);
+
+    size_t GetInternalFunctionsCount();
 
     CWebAssemblyFunctionMap& GetApiFunctions();
     CWebAssemblyFunctionMap& GetGlobalFunctions();
@@ -160,12 +170,16 @@ public:
     CWebAssemblyFunction* GetApiFunction(const SString& functionName);
     CWebAssemblyFunction* GetGlobalFunction(const SString& functionName);
 
+    CWebAssemblyFunction* GetInternalFunction(const size_t& index);
+
     void DeleteExportedFunction(const SString& functionName);
 
     void DeleteApiFunction(const SString& functionName);
     void DeleteGlobalFunction(const SString& functionName);
 
     void ClearExportedFunctions();
+
+    void ClearInternalFunctions();
 
     void ClearApiFunctions();
     void ClearGlobalFunctions();
@@ -190,6 +204,8 @@ private:
     CWebAssemblyFunctionMap m_mpApiFunctions;
     CWebAssemblyFunctionMap m_mpGlobalFunctions;
 
+    CWebAssemblyInternalFunctions m_lsInternalFunctions;
+
     CWebAssemblyMemory* m_pMemory;
 };
 
@@ -204,8 +220,17 @@ public:
 
     void Destroy();
 
+    CWebAssemblyMemoryPointerAddress Malloc(const size_t& size, void** physicalPointer);
+    void                             Free(CWebAssemblyMemoryPointerAddress pointer);
+
+    CWebAssemblyMemoryPointerAddress StringToUTF8(const SString& str);
+    SString                          UTF8ToString(CWebAssemblyMemoryPointerAddress pointer, intptr_t size = -1);
+
     void*  GetBase();
     size_t GetSize();
+
+    uintptr_t GetMemoryPhysicalPointerAddress(CWebAssemblyMemoryPointerAddress pointer);
+    void*     GetMemoryPhysicalPointer(CWebAssemblyMemoryPointerAddress pointer);
 
     void                SetScript(CWebAssemblyScript* script);
     CWebAssemblyScript* GetScript();
