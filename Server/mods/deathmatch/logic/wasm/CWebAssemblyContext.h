@@ -94,7 +94,7 @@ public:
     void Destroy();
 
     CWebAssemblyScript*   CreateScript();
-    CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName);
+    CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName, bool executeMain = true);
 
     CWebAssemblyScriptList& GetScripts();
     void                    ClearScripts();
@@ -130,9 +130,9 @@ public:
 
     void Destroy();
 
-    void CallMainFunction(int32_t argc = 0, char** argv = NULL);
+    void CallMainFunction(const std::vector<SString>& argv = std::vector<SString>());
 
-    void CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
+    bool CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
 
     CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
 
@@ -220,7 +220,7 @@ public:
 
     void Destroy();
 
-    CWebAssemblyMemoryPointerAddress Malloc(const size_t& size, void** physicalPointer);
+    CWebAssemblyMemoryPointerAddress Malloc(const size_t& size, void** physicalPointer = NULL);
     void                             Free(CWebAssemblyMemoryPointerAddress pointer);
 
     CWebAssemblyMemoryPointerAddress StringToUTF8(const SString& str);

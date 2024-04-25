@@ -16,8 +16,10 @@ struct SResourceStartOptions
     bool bConfigs = true;
     bool bMaps = true;
     bool bScripts = true;
+    bool bWasmScripts = true;
     bool bHTML = true;
     bool bClientConfigs = true;
     bool bClientScripts = true;
+    bool bWasmClientScripts = true;
     bool bClientFiles = true;
 };

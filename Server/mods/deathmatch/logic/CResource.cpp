@@ -22,8 +22,11 @@
 #include "CResourceClientFileItem.h"
 #include "CResourceScriptItem.h"
 #include "CResourceClientScriptItem.h"
+#include "CResourceWasmScriptItem.h"
 #include "CAccessControlListManager.h"
 #include "CScriptDebugging.h"
+#include "wasm/CWebAssemblyContext.h"
+#include "wasm/CWebAssemblyVariable.h"
 #include "CMapManager.h"
 #include "CKeyBinds.h"
 #include "CIdArray.h"
@@ -124,6 +127,8 @@ bool CResource::Load()
     m_strResourceZip = PathJoin(m_strAbsPath, m_strResourceName + ".zip");
 
     m_pResourceManifest = nullptr;
+
+    m_pWebAssemblyContext = nullptr;
 
     if (m_bResourceIsZip)
     {
@@ -897,6 +902,8 @@ bool CResource::Start(std::list<CResource*>* pDependents, bool bManualStart, con
             (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_CONFIG && StartOptions.bConfigs) ||
             (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_SCRIPT && StartOptions.bScripts) ||
             (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_CLIENT_SCRIPT && StartOptions.bClientScripts) ||
+            (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_WASM_SCRIPT && StartOptions.bWasmScripts) ||
+            (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_WASM_CLIENT_SCRIPT && StartOptions.bWasmClientScripts) ||
             (pResourceFile->GetType() == CResourceFile::RESOURCE_FILE_TYPE_HTML && StartOptions.bHTML))
         {
             // Start. Failed?
@@ -1158,9 +1165,7 @@ bool CResource::CreateVM(bool bEnableOOP)
     m_pVM->LoadEmbeddedScripts();
     m_pVM->RegisterModuleFunctions();
 
-    // Create WebAssembly VM
-
-    //CLogger::LogPrintf("trying to create webassembly VM!\n");
+    m_pWebAssemblyContext = new CWebAssemblyContext(this);
 
     return true;
 }
@@ -1186,6 +1191,14 @@ bool CResource::DestroyVM()
     m_pResourceManager->NotifyResourceVMClose(this, m_pVM);
     g_pGame->GetLuaManager()->RemoveVirtualMachine(m_pVM);
     m_pVM = nullptr;
+
+    if (m_pWebAssemblyContext)
+    {
+        delete m_pWebAssemblyContext;
+
+        m_pWebAssemblyContext = nullptr;
+    }
+
     return true;
 }
 

@@ -401,6 +401,8 @@ CGame::~CGame()
     SAFE_RELEASE(m_pHqComms);
     CSimControl::Shutdown();
 
+    CWebAssemblyContext::DeleteWebAssemblyEngine();
+
     // Clear our global pointer
     g_pGame = NULL;
 
@@ -1039,9 +1041,6 @@ void CGame::Stop()
 
     // Unregister our packethandler
     g_pNetServer->RegisterPacketHandler(NULL);
-
-    // Destroy web assembly engine.
-    CWebAssemblyContext::DeleteWebAssemblyEngine();
 }
 
 // Handle logging output from the net module

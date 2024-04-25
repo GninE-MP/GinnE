@@ -36,6 +36,7 @@ class CAccount;
 class CLuaMain;
 class CResourceManager;
 class CChecksum;
+class CWebAssemblyContext;
 
 struct SVersion
 {
@@ -329,6 +330,8 @@ public:
 
     CResourceManifest* GetResourceManifest() const { return m_pResourceManifest; }
 
+    CWebAssemblyContext* GetResourceWebAssemblyContext() const { return m_pWebAssemblyContext; }
+
 public:
     static std::list<CResource*> m_StartedResources;
 
@@ -445,4 +448,6 @@ private:
     SString m_strResourceManifestPath;
 
     CResourceManifest* m_pResourceManifest;
+
+    CWebAssemblyContext* m_pWebAssemblyContext;
 };

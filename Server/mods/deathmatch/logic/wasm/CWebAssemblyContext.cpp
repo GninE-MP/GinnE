@@ -194,7 +194,7 @@ CWebAssemblyScript* CWebAssemblyContext::CreateScript()
     return new CWebAssemblyScript(this);
 } 
 
-CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName)
+CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName, bool executeMain)
 {
     if (!script)
     {
@@ -203,11 +203,11 @@ CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* 
 
     CWebAssemblyLoadState state = script->LoadBinary(binary, binarySize, fileName);
 
-    if (state == CWebAssemblyLoadState::Succeed)
+    if (state == CWebAssemblyLoadState::Succeed && executeMain)
     {
         m_lsScripts.push_back(script);
 
-        script->CallMainFunction();
+        script->CallMainFunction({ GetResource()->GetName(), fileName, std::to_string(m_lsScripts.size()) });
     }
 
     return state;
@@ -328,20 +328,43 @@ CWebAssemblyScript::~CWebAssemblyScript()
     Destroy();
 }
 
-void CWebAssemblyScript::CallMainFunction(int32_t argc, char** argv)
+void CWebAssemblyScript::CallMainFunction(const std::vector<SString>& argv)
 {
     CWebAssemblyFunction* mainFunction = GetExportedFunction(WASM_MAIN_FUNCTION_NAME);
 
     CWebAssemblyVariables args;
     CWebAssemblyVariables results;
 
+    void*                                         argvs = NULL;
+    CWebAssemblyMemoryPointerAddress              argvAddress = WEB_ASSEMBLY_NULL_PTR;
+    std::vector<CWebAssemblyMemoryPointerAddress> argvAddressList;
+
     if (!mainFunction)
     {
         goto Fail;
     }
 
-    args.Push(argc);
-    args.Push((int32_t)argv);
+    size_t argsLength = argv.size();
+
+    args.Push((int32_t)argsLength);
+
+    if (argsLength > 0)
+    {
+        argvAddress = m_pMemory->Malloc(argsLength * sizeof(CWebAssemblyMemoryPointerAddress), &argvs);
+
+        CWebAssemblyMemoryPointerAddress* argvList = (CWebAssemblyMemoryPointerAddress*)argvs;
+
+        for (size_t i = 0; i < argsLength; i++)
+        {
+            argvList[i] = m_pMemory->StringToUTF8(argv[i]);
+        }
+
+        args.Push((int32_t)argvAddress);
+    }
+    else
+    {
+        args.Push((int32_t)WEB_ASSEMBLY_NULL_PTR);
+    }
 
     if (!mainFunction->Call(&args, &results))
     {
@@ -358,28 +381,41 @@ void CWebAssemblyScript::CallMainFunction(int32_t argc, char** argv)
         }
     }
 
-    return;
+    goto CleanUp;
 
 Fail:
     if (mainFunction)
     {
         CLogger::ErrorPrintf("Couldn't call web assembly module function '%s'.\n", mainFunction->GetFunctionType().GenerateFunctionStructureText(WASM_MAIN_FUNCTION_NAME).c_str());
-        return;
+        goto CleanUp;
     }
 
     CLogger::ErrorPrintf("Couldn't call web assembly '%s' function.\n", WASM_MAIN_FUNCTION_NAME);
+
+CleanUp:
+    if (argvs)
+    {
+        CWebAssemblyMemoryPointerAddress* argvList = (CWebAssemblyMemoryPointerAddress*)argvs;
+
+        for (size_t i = 0; i < argsLength; i++)
+        {
+            m_pMemory->Free(argvList[i]);
+        }
+
+        m_pMemory->Free(argvAddress);
+    }
 }
 
-void CWebAssemblyScript::CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results)
+bool CWebAssemblyScript::CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results)
 {
     CWebAssemblyFunction* function = GetInternalFunction(index);
 
     if (!function)
     {
-        return;
+        return false;
     }
 
-    function->Call(args, results);
+    return function->Call(args, results);
 }
 
 void CWebAssemblyScript::Destroy()
@@ -1304,7 +1340,7 @@ SString CWebAssemblyMemory::UTF8ToString(CWebAssemblyMemoryPointerAddress pointe
 
     char* string = (char*)GetMemoryPhysicalPointer(pointer);
 
-    size_t length = strlen(string);
+    size_t length = size == -1 ? strlen(string) : size;
 
     if (length < 1)
     {

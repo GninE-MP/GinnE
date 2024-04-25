@@ -20,9 +20,11 @@
 #include "CResourceScriptItem.h"
 #include "CResourceClientFileItem.h"
 #include "CResourceClientScriptItem.h"
+#include "CResourceWasmScriptItem.h"
+#include "CResourceWasmClientScriptItem.h"
 
-#include "wasm/CWebAssemblyVariable.h"
-#include "wasm/CWebAssemblyContext.h"
+//#include "wasm/CWebAssemblyVariable.h"
+//#include "wasm/CWebAssemblyContext.h"
 
 #include "Utils.h"
 
@@ -307,6 +309,81 @@ void CResourceManifest::AddFile(CResourceManifest* manifest, const char* fileNam
             pResource->GetFiles().push_back(fileItem);
 
             pResource->GenerateChecksumForFile(fileItem).get();
+        }
+    }
+
+    delete node;
+}
+
+void CResourceManifest::AddWasmClientScript(CResourceManifest* manifest, const char* fileName)
+{
+    CXMLNode*       node = g_pServerInterface->GetXML()->CreateDummyNode();
+    CXMLAttributes& attributes = node->GetAttributes();
+
+    CXMLAttribute* cacheAttribute = attributes.Create("cache");
+    cacheAttribute->SetValue("false");
+
+    CResource* pResource = manifest->GetResource();
+
+    std::string fileNameFixed = fileName;
+    ReplaceOccurrencesInString(fileNameFixed, "\\", "/");
+
+    if (!pResource->IsFilenameUsed(fileNameFixed.c_str(), true))
+    {
+        SString fileFullPath;
+        if (IsValidFilePath(fileNameFixed.c_str()) && pResource->GetFilePath(fileNameFixed.c_str(), fileFullPath))
+        {
+            CResourceWasmClientScriptItem* scriptItem = new CResourceWasmClientScriptItem(pResource, fileNameFixed.c_str(), fileFullPath.c_str(), &attributes);
+
+            SString buffer;
+            FileLoad(fileFullPath.c_str(), buffer);
+
+            if (!buffer.empty())
+            {
+                FileSave(
+                    PathJoin(
+                        g_pServerInterface->GetServerModPath(),
+                        "resource-cache",
+                        "http-client-files-no-client-cache",
+                        pResource->GetName(),
+                        fileNameFixed
+                    ),
+                    buffer,
+                    true
+                );
+            }
+
+            manifest->GetResourceFiles().push_back(scriptItem);
+            pResource->GetFiles().push_back(scriptItem);
+
+            pResource->GenerateChecksumForFile(scriptItem).get();
+        }
+    }
+
+    delete node;
+}
+
+void CResourceManifest::AddWasmServerScript(CResourceManifest* manifest, const char* fileName)
+{
+    CXMLNode*       node = g_pServerInterface->GetXML()->CreateDummyNode();
+    CXMLAttributes& attributes = node->GetAttributes();
+
+    CResource* pResource = manifest->GetResource();
+
+    std::string fileNameFixed = fileName;
+    ReplaceOccurrencesInString(fileNameFixed, "\\", "/");
+
+    if (!pResource->IsFilenameUsed(fileNameFixed.c_str(), false))
+    {
+        SString fileFullPath;
+        if (IsValidFilePath(fileNameFixed.c_str()) && pResource->GetFilePath(fileNameFixed.c_str(), fileFullPath))
+        {
+            CResourceWasmScriptItem* scriptItem = new CResourceWasmScriptItem(pResource, fileNameFixed.c_str(), fileFullPath.c_str(), &attributes);
+
+            manifest->GetResourceFiles().push_back(scriptItem);
+            pResource->GetFiles().push_back(scriptItem);
+
+            pResource->GenerateChecksumForFile(scriptItem).get();
         }
     }
 
@@ -603,10 +680,47 @@ int CResourceManifest::Lua_WasmCompile(lua_State* luaVM)
 
 int CResourceManifest::Lua_WasmClient(lua_State* luaVM)
 {
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    if (lua_type(luaVM, -1) == LUA_TSTRING)
+    {
+        const char* fileName = lua_tostring(luaVM, -1);
+
+        AddWasmClientScript(pManifest, fileName);
+    }
+    else if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t len = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= len; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                const char* fileName = lua_tostring(luaVM, -1);
+
+                AddWasmClientScript(pManifest, fileName);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
     return 0;
 }
 
-WebAssemblyApi(GnineGetData, env, args, results)
+/*WebAssemblyApi(GnineGetData, env, args, results)
 {
     CResource* resource = GetWebAssemblyResource(env);
     CWebAssemblyScript* script = GetWebAssemblyScript(env);
@@ -661,7 +775,7 @@ WebAssemblyApi(GninePrintData, env, args, results)
     format += "\n";
 
     CLogger::LogPrintf(format.c_str());
-
+    
     return NULL;
 }
 
@@ -671,21 +785,20 @@ WebAssemblyApi(GnineCallFunction, env, args, results)
 
     int refAddress = args->data[0].of.i32;
 
+    CWebAssemblyMemoryPointerAddress arguments = args->data[1].of.i32;
+
     wasm_ref_t* ref = (wasm_ref_t*)((uintptr_t)refAddress);
 
     wasm_func_t* func = wasm_ref_as_func(ref);
 
     CWebAssemblyFunctionType fType;
     fType.ReadFunctionTypeContext(wasm_func_type(func));
-
+    
     CWebAssemblyFunction f;
     f.SetApiEnviornment(script);
     f.SetFunctionContext(func);
     f.SetFunctionType(fType);
     f.SetStore(script->GetStoreContext()->GetStore());
-
-
-    CLogger::LogPrintf("ref data is : %d\n", func);
 
     CWebAssemblyVariables fArgs;
 
@@ -697,12 +810,106 @@ WebAssemblyApi(GnineCallFunction, env, args, results)
 
     script->GetMemory()->Free(str);
 
+    struct Argument
+    {
+        CWebAssemblyMemoryPointerAddress value;
+        unsigned char                    type;
+    };
+
+    struct Arguments
+    {
+        CWebAssemblyMemoryPointerAddress args;
+        uint64_t                         length;
+    };
+
+    Arguments* wArgs = (Arguments*)script->GetMemory()->GetMemoryPhysicalPointer(arguments);
+
+    CWebAssemblyMemoryPointerAddress* argsPtrList = (CWebAssemblyMemoryPointerAddress*)script->GetMemory()->GetMemoryPhysicalPointer(wArgs->args);
+
+    for (uint64_t i = 0; i < wArgs->length; i++)
+    {
+        Argument* arg = (Argument*)script->GetMemory()->GetMemoryPhysicalPointer(argsPtrList[i]);
+
+        void* value = script->GetMemory()->GetMemoryPhysicalPointer(arg->value);
+
+        switch ((int)arg->type)
+        {
+            case 0: // null
+                CLogger::LogPrintf("%d) NULL\n", i);
+                break;
+            case 1: // i32
+                CLogger::LogPrintf("%d) i32 = %d\n", i, *(int32_t*)value);
+                break;
+            case 2: // i64
+                CLogger::LogPrintf("%d) i64 = %I64d\n", i, *(int64_t*)value);
+                break;
+            case 3: // f32
+                CLogger::LogPrintf("%d) f32 = %f\n", i, *(float*)value);
+                break;
+            case 4: // f64
+                CLogger::LogPrintf("%d) f64 = %g\n", i, *(double*)value);
+                break;
+            case 5: // str
+                CLogger::LogPrintf("%d) string = '%s'\n", i, script->GetMemory()->UTF8ToString(arg->value).c_str());
+                break;
+            case 6: // internal function
+                CLogger::LogPrintf("%d) internal function = %d\n", i, *(CWebAssemblyMemoryPointerAddress*)value);
+                break;
+            case 7: // pointer address
+                CLogger::LogPrintf("%d) pointer stack = %d, real = %d\n", i, *(CWebAssemblyMemoryPointerAddress*)value, script->GetMemory()->GetMemoryPhysicalPointer(*(CWebAssemblyMemoryPointerAddress*)value));
+                break;
+            case 8: // arglist
+                CLogger::LogPrintf("%d) we have an arg list!\n", i);
+                break;
+            default:
+                break;
+        }
+    }
+
     return NULL;
 }
-
+*/
 int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 {
-    if (lua_type(luaVM, -1) != LUA_TSTRING)
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    if (lua_type(luaVM, -1) == LUA_TSTRING)
+    {
+        const char* fileName = lua_tostring(luaVM, -1);
+        
+        AddWasmServerScript(pManifest, fileName);
+    }
+    else if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t len = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= len; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                const char* fileName = lua_tostring(luaVM, -1);
+
+                AddWasmServerScript(pManifest, fileName);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
+    return 0;
+    /*if (lua_type(luaVM, -1) != LUA_TSTRING)
     {
         CLogger::ErrorPrintf("`wasm_server` function expects a `string` as first argument.\n");
         return 0;
@@ -727,16 +934,16 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     SString path = "";
 
     bool exists = pResource->GetFilePath(filePath.c_str(), path);
-        
+    
     if (!exists)
     {
         CLogger::ErrorPrintf("File doesn't exist in resource[%s].\n", filePath.c_str());
         return 0;
     }
 
-    // create `CResourceWasmScriptItem` class!
+    // create `CResourceWasmScriptItem` class!*/ 
 
-    FILE* wasmFile = File::Fopen(path.c_str(), "rb");
+    /*FILE* wasmFile = File::Fopen(path.c_str(), "rb");
 
     if (!wasmFile)
     {
@@ -790,6 +997,7 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 
     //cArgs.PushAnyRef();
     cArgs.PushInt32();
+    cArgs.PushPointer();
     
     CWebAssemblyFunctionType CallbackCallerType(cArgs, cResults);
 
@@ -805,7 +1013,7 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     CWebAssemblyFunction* printFunc = script->GetApiFunction("gnine_print_data");
     
     wasm_func_t* funcC = printFunc->GetFunctionContext();
-    wasm_ref_t*  ref = wasm_func_as_ref(funcC);
+    wasm_ref_t*  ref = wasm_func_as_ref(funcC);*/ 
 
     /*wasm_val_t v;
     v.kind = WASM_ANYREF;
@@ -814,13 +1022,13 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     CWebAssemblyVariable var;
     var.Set(v);*/ 
 
-    fArgs.Push(ref);
+    /*fArgs.Push(ref);
 
     getResourceName->Call(&fArgs, &fResults);
 
     SString name = memory->UTF8ToString(fResults.GetFirst().GetInt32());
 
-    CLogger::LogPrintf("res name is d: %s\n", name.c_str());
+    CLogger::LogPrintf("res name is d: %s\n", name.c_str());*/ 
 
     /*char* dataPointer = (char*)mem->GetBase() + 67112;
 
@@ -838,7 +1046,7 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
 
     mem->Free(modulePtr);*/
 
-    free(wasmBinary);
+    /*free(wasmBinary);
 
     delete wasmModule;
 
@@ -846,8 +1054,8 @@ int CResourceManifest::Lua_WasmServer(lua_State* luaVM)
     {
         CLogger::LogPrintf("Error while loading web assembly module on server [\"%s\"].\n", filePath.c_str());
     }
-
-    return 0;
+    
+    return 0;*/
 }
 
 int CResourceManifest::Lua_WasmHasFileValidBinary(lua_State* luaVM)
