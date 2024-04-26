@@ -15,6 +15,8 @@
 #define C_WEB_ASSEMBLY_ARG_READER
 
 #include "WebAssemblyImports.h"
+#include "lua/CLuaFunctionParseHelpers.h"
+#include "lua/CLuaMain.h"
 
 class CWebAssemblyScript;
 
@@ -34,6 +36,8 @@ public:
     bool NextIsString();
     bool NextIsPointer();
     bool NextIsBoolean();
+    bool NextIsPointerAddress();
+    bool NextIsUserData();
 
     void ReadInt32(int32_t& out, int32_t defaultValue = 0);
     void ReadUInt32(uint32_t& out, uint32_t defaultValue = 0);
@@ -43,6 +47,7 @@ public:
     void ReadFloat64(float64_t& out, float64_t defaultValue = 0);
     void ReadString(SString& out, SString defaultValue = "", intptr_t size = -1);
     void ReadBoolean(bool& out, bool defaultValue = false);
+    void ReadPointerAddress(CWebAssemblyMemoryPointerAddress& out, CWebAssemblyMemoryPointerAddress defaultValue = WEB_ASSEMBLY_NULL_PTR);
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)
@@ -70,6 +75,40 @@ public:
         }
 
         out = (PTR*)(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr));
+    }
+
+    template<typename PTR>
+    void ReadUserData(PTR*& out, PTR* defaultValue = NULL)
+    {
+        CWebAssemblyUserData userdata;
+
+        #if IS_APP_ON_64_BIT_VERSION
+            ReadInt64(userdata);
+        #else
+            ReadInt32(userdata);
+        #endif
+
+        if (!userdata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        PTR* udata = (PTR*)(void*)userdata;
+
+        // to use `UserDataCast` check how they did pass elements to luaVM!
+        // i saw the pointer address and the element id is different
+        // i need to pass the element data when pushing userdata with `ReturnUserData`
+        /*lua_State* luaVM = m_pScript->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+        PTR* udata = (PTR*)UserDataCast(*((PTR**)(void*)userdata), luaVM);*/ 
+
+        if (!udata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        out = udata;
     }
 
     template<typename PTR>
@@ -104,24 +143,24 @@ public:
         memcpy(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr), (void*)value, size);
     }
 
-    void Return(const int32_t& value);
-    void Return(const uint32_t& value);
-    void Return(const int64_t& value);
-    void Return(const uint64_t& value);
-    void Return(const float32_t& value);
-    void Return(const float64_t& value);
-    void Return(const SString& value);
-    void Return(const bool& value);
+    CWebAssemblyTrap* Return(const int32_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const uint32_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const int64_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const uint64_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const float32_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const float64_t& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const SString& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(const bool& value, SString errorMessage = "");
 
     template<typename PTR>
-    void Return(PTR* ptr, intptr_t size = -1)
+    CWebAssemblyTrap* Return(PTR* ptr, intptr_t size = -1, SString errorMessage = "")
     {
         if (!ptr || size == 0)
         {
             m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
             m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
 
-            return;
+            return CreateTrap(errorMessage);
         }
 
         if (size == -1)
@@ -138,13 +177,21 @@ public:
             m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
             m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
 
-            return;
+            return CreateTrap(errorMessage);
         }
 
         memcpy(realPtr, (void*)ptr, size);
 
         m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
         m_pResults->data[0].of.i32 = ptrAddress;
+
+        return CreateTrap(errorMessage);
+    }
+
+    template<typename PTR>
+    CWebAssemblyTrap* ReturnUserData(PTR* userData, SString errorMessage = "")
+    {
+        return Return((CWebAssemblyUserData)(void*)(CWebAssemblyUserData*)userData, errorMessage);
     }
 
     bool Skip();
@@ -152,8 +199,13 @@ public:
 
     bool CanContinue();
 
+    CWebAssemblyTrap* CreateTrap(const SString& errorMessage);
+
     void                SetScript(CWebAssemblyScript* script);
     CWebAssemblyScript* GetScript();
+
+    void    SetFunctionName(const SString& functionName);
+    SString GetFunctionName();
 
     void    SetError(const SString& error);
     bool    HasError();
@@ -172,6 +224,7 @@ public:
 
 private:
     CWebAssemblyScript* m_pScript;
+    SString             m_strFunctionName;
 
     SString m_strError;
 

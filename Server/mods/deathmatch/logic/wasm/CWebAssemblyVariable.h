@@ -166,7 +166,7 @@ public:
     void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment environment);
     void Build();
 
-    bool Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results);
+    bool Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results, SString* errorMessage = NULL);
 
     void                        SetFunctionContext(const CWebAssemblyFunctionContext& context);
     CWebAssemblyFunctionContext GetFunctionContext();
@@ -183,6 +183,9 @@ public:
     void               SetStore(CWebAssemblyStore* store);
     CWebAssemblyStore* GetStore();
 
+    void    SetFunctionName(const SString& functionName);
+    SString GetFunctionName();
+
     void Free();
 
     operator bool();
@@ -195,6 +198,8 @@ private:
     CWebAssemblyApiEnviornment m_pEnvironment;
 
     CWebAssemblyStore* m_pStore;
+
+    SString m_strFunctionName;
 };
 
 #endif

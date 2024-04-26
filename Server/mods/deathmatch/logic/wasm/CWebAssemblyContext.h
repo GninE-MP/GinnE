@@ -187,6 +187,9 @@ public:
     void DeleteMemory();
 
     SString GetScriptFile();
+    SString GetResourcePath();
+
+    CWebAssemblyApiEnviornment CreateApiEnvironment(const SString& functionName);
 
     static bool IsExternValid(const CWebAssemblyExtern& waExtern);
 

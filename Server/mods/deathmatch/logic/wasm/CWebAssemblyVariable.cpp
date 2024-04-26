@@ -819,7 +819,7 @@ void CWebAssemblyFunction::Build()
     m_pContext = wasm_func_new_with_env(m_pStore->GetContext(), functionType, m_pCFunction, (void*)m_pEnvironment, NULL);
 }
 
-bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results)
+bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results, SString* errorMessage)
 {
     if (!m_pContext)
     {
@@ -890,7 +890,41 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
 
     if (trap)
     {
+        wasm_name_t message;
+        wasm_trap_message(trap, &message);
+
+        wasm_frame_t* frame = wasm_trap_origin(trap);
+
+        char frameData[0x5DC];
+        int  frameDataLength = 0;
+
+        if (frame)
+        {
+            frameDataLength = sprintf(frameData, "%p @ 0x%zx = %u.0x%zx: ", wasm_frame_instance(frame), wasm_frame_module_offset(frame), wasm_frame_func_index(frame), wasm_frame_func_offset(frame));
+
+            wasm_frame_delete(frame);
+        }
+        else
+        {
+            if (m_strFunctionName.empty())
+            {
+                frameDataLength = sprintf(frameData, " ");
+            }
+            else
+            {
+                frameDataLength = sprintf(frameData, "`%s`", m_strFunctionName.c_str());
+            }
+        }
+
+        *errorMessage = std::string(frameData, frameDataLength);
+
+        std::string messageData(message.data, message.num_elems);
+
+        *errorMessage += messageData.substr(sizeof("Exception: ") - 1);
+
         wasm_trap_delete(trap);
+        wasm_name_delete(&message);
+
         return false;
     }
 
@@ -944,6 +978,16 @@ CWebAssemblyStore* CWebAssemblyFunction::GetStore()
     return m_pStore;
 }
 
+void CWebAssemblyFunction::SetFunctionName(const SString& functionName)
+{
+    m_strFunctionName = functionName;
+}
+
+SString CWebAssemblyFunction::GetFunctionName()
+{
+    return m_strFunctionName;
+}
+
 void CWebAssemblyFunction::SetCFunction(CWebAssemblyCFunction cFunction)
 {
     m_pCFunction = cFunction;
@@ -962,6 +1006,11 @@ void CWebAssemblyFunction::Free()
     }
 
     wasm_func_delete(m_pContext);
+
+    if (m_pEnvironment)
+    {
+        delete m_pEnvironment;
+    }
 
     Drop();
 }

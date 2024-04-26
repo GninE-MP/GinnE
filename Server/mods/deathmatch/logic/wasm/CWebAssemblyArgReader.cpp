@@ -19,6 +19,7 @@
 CWebAssemblyArgReader::CWebAssemblyArgReader()
 {
     m_pScript = NULL;
+    m_strFunctionName = "";
 
     m_iIndex = -1;
 
@@ -28,7 +29,8 @@ CWebAssemblyArgReader::CWebAssemblyArgReader()
 
 CWebAssemblyArgReader::CWebAssemblyArgReader(void* env, const CWebAssemblyValueVector* args, CWebAssemblyValueVector* results)
 {
-    m_pScript = env ? GetWebAssemblyScript(env) : NULL;
+    m_pScript = env ? GetWebAssemblyEnvScript(env) : NULL;
+    m_strFunctionName = env ? GetWebAssemblyEnvFunctionName(env) : NULL;
 
     m_iIndex = -1;
 
@@ -99,6 +101,16 @@ bool CWebAssemblyArgReader::NextIsPointer()
 bool CWebAssemblyArgReader::NextIsBoolean()
 {
     return true;
+}
+
+bool CWebAssemblyArgReader::NextIsPointerAddress()
+{
+    return NextIsUInt32();
+}
+
+bool CWebAssemblyArgReader::NextIsUserData()
+{
+    return IsAppOn64BitVersion ? NextIsUInt64(): NextIsUInt32();
 }
 
 void CWebAssemblyArgReader::ReadInt32(int32_t& out, int32_t defaultValue)
@@ -272,58 +284,75 @@ void CWebAssemblyArgReader::ReadBoolean(bool& out, bool defaultValue)
     }
 }
 
-void CWebAssemblyArgReader::Return(const int32_t& value)
+void CWebAssemblyArgReader::ReadPointerAddress(CWebAssemblyMemoryPointerAddress& out, CWebAssemblyMemoryPointerAddress defaultValue)
+{
+    ReadUInt32(out, defaultValue);
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int32_t& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = value;
+
+    return CreateTrap(errorMessage);
 }
 
-void CWebAssemblyArgReader::Return(const uint32_t& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const uint32_t& value, SString errorMessage)
 {
-    Return((int32_t)value);
+    return Return((int32_t)value);
 }
 
-void CWebAssemblyArgReader::Return(const int64_t& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int64_t& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I64;
     m_pResults->data[0].of.i64 = value;
+
+    return CreateTrap(errorMessage);
 }
 
-void CWebAssemblyArgReader::Return(const uint64_t& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const uint64_t& value, SString errorMessage)
 {
-    Return((int64_t)value);
+    return Return((int64_t)value);
 }
 
-void CWebAssemblyArgReader::Return(const float32_t& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float32_t& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_F32;
     m_pResults->data[0].of.f32 = value;
+
+    return CreateTrap(errorMessage);
 }
 
-void CWebAssemblyArgReader::Return(const float64_t& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float64_t& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_F64;
     m_pResults->data[0].of.f64 = value;
+
+    return CreateTrap(errorMessage);
 }
 
-void CWebAssemblyArgReader::Return(const SString& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const SString& value, SString errorMessage)
 {
     if (value.empty())
     {
         m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
         m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
 
-        return;
+        return CreateTrap(errorMessage);
     }
 
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = m_pScript->GetMemory()->StringToUTF8(value);
+
+    return CreateTrap(errorMessage);
 }
 
-void CWebAssemblyArgReader::Return(const bool& value)
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(const bool& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = (int32_t)value;
+
+    return CreateTrap(errorMessage);
 }
 
 bool CWebAssemblyArgReader::Skip()
@@ -348,6 +377,38 @@ bool CWebAssemblyArgReader::CanContinue()
     return m_iIndex < (int)GetArgumentCount() - 1;
 }
 
+CWebAssemblyTrap* CWebAssemblyArgReader::CreateTrap(const SString& errorMessage)
+{
+    if (errorMessage.empty())
+    {
+        return NULL;
+    }
+
+    SString errorM = "";
+
+    if (!m_strFunctionName.empty())
+    {
+        errorM = "->`";
+        errorM += m_strFunctionName;
+        errorM += "`: ";
+    }
+    else
+    {
+        errorM = ": ";
+    }
+
+    errorM += errorMessage;
+    
+    wasm_name_t message;
+    wasm_name_new_from_string_nt(&message, errorM.c_str());
+
+    CWebAssemblyTrap* trap = wasm_trap_new(m_pScript->GetStoreContext()->GetStore()->GetContext(), &message);
+
+    wasm_name_delete(&message);
+
+    return trap;
+}
+
 void CWebAssemblyArgReader::SetScript(CWebAssemblyScript* script)
 {
     m_pScript = script;
@@ -356,6 +417,16 @@ void CWebAssemblyArgReader::SetScript(CWebAssemblyScript* script)
 CWebAssemblyScript* CWebAssemblyArgReader::GetScript()
 {
     return m_pScript;
+}
+
+void CWebAssemblyArgReader::SetFunctionName(const SString& functionName)
+{
+    m_strFunctionName = functionName;
+}
+
+SString CWebAssemblyArgReader::GetFunctionName()
+{
+    return m_strFunctionName;
 }
 
 void CWebAssemblyArgReader::SetError(const SString& error)

@@ -43,9 +43,19 @@
 
 #define WebAssemblyApi(name, envVariableName, argsVariableName, resultsVariableName) CWebAssemblyTrap* name(void* envVariableName, const CWebAssemblyValueVector* argsVariableName, CWebAssemblyValueVector* resultsVariableName)
 
-#define GetWebAssemblyScript(env) ((CWebAssemblyScript*)env)
-#define GetWebAssemblyContext(env) (((CWebAssemblyScript*)env)->GetStoreContext())
-#define GetWebAssemblyResource(env) ((((CWebAssemblyScript*)env)->GetStoreContext())->GetResource())
+#define GetWebAssemblyEnvObject(env) ((CWebAssemblyApiEnviornment)env)
+#define GetWebAssemblyEnvScript(env) (GetWebAssemblyEnvObject(env)->script)
+#define GetWebAssemblyEnvFunctionName(env) (GetWebAssemblyEnvObject(env)->functionName)
+#define GetWebAssemblyEnvContext(env) (GetWebAssemblyEnvScript(env)->GetStoreContext())
+#define GetWebAssemblyEnvResource(env) (GetWebAssemblyEnvContext(env)->GetResource())
+
+#define IsAppOn64BitVersion (sizeof(intptr_t) == 8)
+
+#if _WIN64
+#define IS_APP_ON_64_BIT_VERSION 1
+#else
+#define IS_APP_ON_64_BIT_VERSION 0
+#endif
 
 typedef wasm_engine_t*                 CWebAssemblyEngineContext;
 typedef wasm_store_t*                  CWebAssemblyStoreContext;
@@ -71,6 +81,21 @@ typedef std::vector<CWebAssemblyExternContext> CWebAssemblyImports;
 class CWebAssemblyScript;
 typedef std::vector<CWebAssemblyScript*> CWebAssemblyScriptList;
 
-typedef CWebAssemblyScript* CWebAssemblyApiEnviornment;
+class SString;
+
+struct CWebAssemblyApiEnvironmentObject
+{
+    CWebAssemblyScript* script;
+    SString             functionName;
+};
+
+typedef CWebAssemblyApiEnvironmentObject* CWebAssemblyApiEnviornment;
+
+/*struct CWebAssemblyUserData
+{
+    intptr_t ptr;
+};*/
+
+typedef intptr_t CWebAssemblyUserData;
 
 #endif

@@ -15,6 +15,10 @@
 
 #include "../wasm/WebAssemblyImports.h"
 
+#ifndef GninE_CLIENT
+    #include "CGame.h"
+#endif
+
 #define DEFINE_WASM_FUNCTION(functionName, envName, argsName, resultsName) static WebAssemblyApi(functionName, envName, argsName, resultsName)
 
 #define WASM_REGISTER_API(script, functions) \

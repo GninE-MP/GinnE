@@ -343,6 +343,8 @@ void CWebAssemblyScript::CallMainFunction(const std::vector<SString>& argv)
     CWebAssemblyMemoryPointerAddress              argvAddress = WEB_ASSEMBLY_NULL_PTR;
     std::vector<CWebAssemblyMemoryPointerAddress> argvAddressList;
 
+    SString errorMessage;
+
     if (!mainFunction)
     {
         goto Fail;
@@ -370,7 +372,7 @@ void CWebAssemblyScript::CallMainFunction(const std::vector<SString>& argv)
         args.Push((int32_t)WEB_ASSEMBLY_NULL_PTR);
     }
 
-    if (!mainFunction->Call(&args, &results))
+    if (!mainFunction->Call(&args, &results, &errorMessage))
     {
         goto Fail;
     }
@@ -388,6 +390,13 @@ void CWebAssemblyScript::CallMainFunction(const std::vector<SString>& argv)
     goto CleanUp;
 
 Fail:
+    if (!errorMessage.empty())
+    {
+        CLogger::ErrorPrintf("%s:%s\n", GetResourcePath().c_str(), errorMessage.c_str());
+
+        goto CleanUp;
+    }
+
     if (mainFunction)
     {
         CLogger::ErrorPrintf("Couldn't call web assembly module function '%s'.\n", mainFunction->GetFunctionType().GenerateFunctionStructureText(WASM_MAIN_FUNCTION_NAME).c_str());
@@ -742,8 +751,10 @@ void CWebAssemblyScript::RegisterApiFunction(const SString& functionName, CWebAs
         DeleteApiFunction(functionName);
     }
 
-    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), functionType, function, this);
+    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), functionType, function, CreateApiEnvironment(functionName));
     wasmFunction->Build();
+
+    wasmFunction->SetFunctionName(functionName);
 
     if (!wasmFunction || !wasmFunction->GetFunctionContext())
     {
@@ -765,7 +776,10 @@ void CWebAssemblyScript::RegisterGlobalFunctions(const SString& functionName, CW
         DeleteGlobalFunction(functionName);
     }
 
-    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), functionType, function, this);
+    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), functionType, function, CreateApiEnvironment(functionName));
+    wasmFunction->Build();
+
+    wasmFunction->SetFunctionName(functionName);
 
     if (!wasmFunction || !wasmFunction->GetFunctionContext())
     {
@@ -819,7 +833,8 @@ void CWebAssemblyScript::BuildExportedFunctions()
         function->SetStore(m_pContextStore->GetStore());
         function->SetFunctionType(functionType);
         function->SetFunctionContext(functionContext);
-        function->SetApiEnviornment(this);
+        function->SetApiEnviornment(CreateApiEnvironment(externName));
+        function->SetFunctionName(externName);
 
         m_mpExportedFunctions[externName] = function;
     }
@@ -869,7 +884,7 @@ void CWebAssemblyScript::BuildInternalFunctions()
         internalFunction->SetStore(m_pContextStore->GetStore());
         internalFunction->SetFunctionType(funcType);
         internalFunction->SetFunctionContext(wasmFunc);
-        internalFunction->SetApiEnviornment(this);
+        internalFunction->SetApiEnviornment(CreateApiEnvironment(""));
 
         m_lsInternalFunctions.push_back(internalFunction);
     }
@@ -1202,6 +1217,25 @@ void CWebAssemblyScript::DeleteMemory()
 SString CWebAssemblyScript::GetScriptFile()
 {
     return m_strScriptFile;
+}
+
+SString CWebAssemblyScript::GetResourcePath()
+{
+    SString result = m_pContextStore->GetResource()->GetName();
+    result += "\\";
+    result += m_strScriptFile;
+
+    return result;
+}
+
+CWebAssemblyApiEnviornment CWebAssemblyScript::CreateApiEnvironment(const SString& functionName)
+{
+    CWebAssemblyApiEnviornment env = new CWebAssemblyApiEnvironmentObject();
+
+    env->script = this;
+    env->functionName = functionName;
+
+    return env;
 }
 
 bool CWebAssemblyScript::IsExternValid(const CWebAssemblyExtern& waExtern)

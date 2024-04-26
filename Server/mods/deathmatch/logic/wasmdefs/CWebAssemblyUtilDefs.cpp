@@ -12,12 +12,26 @@
 #include "StdInc.h"
 #include "CWebAssemblyDefs.h"
 #include <SharedUtil.Memory.h>
+#include "CDummy.h"
 
 #include "../wasm/CWebAssemblyContext.h"
 #include "../wasm/CWebAssemblyVariable.h"
 #include "../wasm/CWebAssemblyArgReader.h"
 
 #include "CWebAssemblyUtilDefs.h"
+
+#ifndef GninE_CLIENT
+    #include "CRemoteCalls.h"
+#endif
+
+WebAssemblyApi(GRM, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    CElement* root = argStream.GetScript()->GetStoreContext()->GetResource()->GetResourceRootElement();
+
+    return argStream.ReturnUserData(root);
+}
 
 void CWebAssemblyUtilDefs::RegisterFunctionTypes()
 {
@@ -40,6 +54,8 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
 
     SetFunctionType("to_color", "iiiii");
     SetFunctionType("get_process_memory_stats", "b*");
+
+    SetFunctionType("get_root_element", "*");
 }
 
 void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -63,7 +79,9 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "debug_sleep", DebugSleep },
         
         { "to_color", ToColor },
-        { "get_process_memory_stats", GetProcessMemoryStats }
+        { "get_process_memory_stats", GetProcessMemoryStats },
+
+        { "get_root_element", GRM }
     };
 
     WASM_REGISTER_API(script, functions);
@@ -86,9 +104,7 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetTickCount_, env, args, results)
 {
     CWebAssemblyArgReader argStream(env, args, results);
 
-    argStream.Return(GetTickCount64_());
-
-    return NULL;
+    return argStream.Return(GetTickCount64_());
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetRealTime, env, args, results)
@@ -100,16 +116,20 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetRealTime, env, args, results)
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    argStream.ReadUInt32(ptr);
+    argStream.ReadPointerAddress(ptr);
 
     if (ptr == WEB_ASSEMBLY_NULL_PTR)
     {
-        argStream.Return(false);
-        return NULL;
+        return argStream.Return(false);
     }
 
     argStream.ReadInt64(timer);
     argStream.ReadBoolean(localTime);
+
+    if (timer < -1)
+    {
+        return argStream.Return(false, "seconds cannot be negative");
+    }
 
     if (timer == -1)
     {
@@ -120,8 +140,7 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetRealTime, env, args, results)
 
     if (timeData == NULL)
     {
-        argStream.Return(false);
-        return NULL;
+        return argStream.Return(false, "seconds is out of range");
     }
 
     struct
@@ -152,13 +171,25 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetRealTime, env, args, results)
 
     argStream.WritePointer(ptr, &time);
 
-    argStream.Return(true);
-
-    return NULL;
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetUserDataType, env, args, results)
 {
+    CElement* resRoot;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(resRoot);
+
+    if (!resRoot)
+    {
+        CLogger::LogPrintf("couldn't get resroot!\n");
+        return NULL;
+    }
+
+    CLogger::LogPrintf("resource root element type : [%s]\n", resRoot->GetTypeName().c_str());
+
     return NULL;
 }
 
@@ -204,7 +235,30 @@ WebAssemblyApi(CWebAssemblyUtilDefs::PregMatch, env, args, results)
 
 WebAssemblyApi(CWebAssemblyUtilDefs::DebugSleep, env, args, results)
 {
-    return NULL;
+    int ms;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadInt32(ms);
+
+#ifdef GninE_CLIENT
+    if (!g_pClientGame->GetDevelopmentMode())
+#else
+    if (!g_pGame->GetDevelopmentMode())
+#endif
+    {
+        return argStream.Return(false, "This function can only be used in development mode");
+    }
+
+#ifdef GninE_CLIENT
+    g_pClientGame->GetRemoteCalls()->ProcessQueuedFiles();
+#else
+    g_pGame->GetRemoteCalls()->ProcessQueuedFiles();
+#endif
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::ToColor, env, args, results)
@@ -223,9 +277,7 @@ WebAssemblyApi(CWebAssemblyUtilDefs::ToColor, env, args, results)
 
     unsigned long color = COLOR_RGBA(red, green, blue, alpha);
 
-    argStream.Return((int32_t)color);
-
-    return NULL;
+    return argStream.Return((int32_t)color);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetProcessMemoryStats, env, args, results)
@@ -234,15 +286,14 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetProcessMemoryStats, env, args, results)
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    argStream.ReadUInt32(ptr);
+    argStream.ReadPointerAddress(ptr);
 
     if (ptr == WEB_ASSEMBLY_NULL_PTR)
     {
-        argStream.Return(false);
-        return NULL;
+        return argStream.Return(false);
     }
 
-    ProcessMemoryStats memoryStats{};
+    ProcessMemoryStats memoryStats = { 0 };
 
     if (TryGetProcessMemoryStats(memoryStats))
     {
@@ -262,12 +313,8 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetProcessMemoryStats, env, args, results)
 
         argStream.WritePointer(ptr, &status);
 
-        argStream.Return(true);
-
-        return NULL;
+        return argStream.Return(true);
     }
 
-    argStream.Return(false);
-
-    return NULL;
+    return argStream.Return(false);
 }
