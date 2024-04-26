@@ -23,6 +23,8 @@ CResourceWasmClientScriptItem::CResourceWasmClientScriptItem(CResource* resource
 {
     m_type = RESOURCE_FILE_TYPE_WASM_CLIENT_SCRIPT;
 
+    m_strShortName = szShortName;
+
     // Check if this file should be cached by the client
     if (MapGet(m_attributeMap, "protected") == "true" || MapGet(m_attributeMap, "cache") == "false")
         m_bIsNoClientCache = true;

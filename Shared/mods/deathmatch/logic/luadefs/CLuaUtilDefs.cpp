@@ -138,6 +138,7 @@ int CLuaUtilDefs::GetCTime(lua_State* luaVM)
     if (argStream.NextCouldBeNumber())
     {
         argStream.ReadNumber(timer);
+        
         if (timer < 0)
         {
             argStream.SetCustomError("seconds cannot be negative");

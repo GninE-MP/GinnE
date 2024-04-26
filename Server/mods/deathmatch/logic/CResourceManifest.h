@@ -46,6 +46,8 @@ private:
     static void AddWasmClientScript(CResourceManifest* manifest, const char* fileName);
     static void AddWasmServerScript(CResourceManifest* manifest, const char* fileName);
 
+    static SString GetApplicationDirectory(char concatenator = '/');
+
     static int Lua_ClientScripts(lua_State* luaVM);
     static int Lua_ServerScripts(lua_State* luaVM);
     static int Lua_Files(lua_State* luaVM);

@@ -564,12 +564,12 @@ bool CWebAssemblyFunctionType::Compare(CWebAssemblyFunctionType functionType)
 {
     CWebAssemblyVariables& args = functionType.GetArguments();
     CWebAssemblyVariables& results = functionType.GetResults();
-
+    
     size_t argsLength = args.GetSize();
     size_t resultsLength = results.GetSize();
     size_t selfArgsLength = m_wavArgs.GetSize();
     size_t selfResultsLength = m_wavResults.GetSize();
-
+    
     if (argsLength != selfArgsLength)
     {
         return false;
@@ -579,7 +579,7 @@ bool CWebAssemblyFunctionType::Compare(CWebAssemblyFunctionType functionType)
     {
         return false;
     }
-
+    
     for (size_t i = 0; i < argsLength; i++)
     {
         if (args[i].GetType() != m_wavArgs[i].GetType())
@@ -587,15 +587,15 @@ bool CWebAssemblyFunctionType::Compare(CWebAssemblyFunctionType functionType)
             return false;
         }
     }
-
+    
     for (size_t i = 0; i < resultsLength; i++)
     {
-        if (results[i].GetType() != m_wavArgs[i].GetType())
+        if (results[i].GetType() != m_wavResults[i].GetType())
         {
             return false;
         }
     }
-
+    
     return true;
 }
 

@@ -15,6 +15,8 @@
 #include "CWebAssemblyContext.h"
 #include "CWebAssemblyVariable.h"
 
+#include "../wasmdefs/CWebAssemblyDefs.h"
+
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
 
 CWebAssemblyEngine::CWebAssemblyEngine()
@@ -267,6 +269,8 @@ void CWebAssemblyContext::InitializeWebAssemblyEngine()
     WebAssemblyEngine = new CWebAssemblyEngine();
     WebAssemblyEngine->Build();
 
+    CWebAssemblyDefs::RegisterApiFunctionTypes();
+
     CLogger::LogPrintf("Web assembly engine built.\n");
 }
 
@@ -463,7 +467,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     }
 
     m_strScriptFile = fileName;
-
+    
     CWebAssemblyStoreContext store = m_pContextStore->GetStore()->GetContext();
 
     if (!store)
@@ -476,6 +480,8 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     std::vector<CWebAssemblyExternContext> exports;
 
     CWebAssemblyExternContext* imports = NULL;
+    
+    wasm_exporttype_vec_t exportTypes = { 0 };
 
     wasm_byte_vec_t binaryBuffer;
     binaryBuffer.data = NULL;
@@ -505,27 +511,20 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     wasm_module_imports(m_pModule, &moduleImportTypes);
 
     size_t moduleImportTypesLength = moduleImportTypes.num_elems;
-    size_t moduleValidImportsLength = 0;
 
     if (moduleImportTypesLength > 0)
     {
+        imports = new CWebAssemblyExternContext[moduleImportTypesLength];
+
         for (size_t i = 0; i < moduleImportTypesLength; i++)
         {
             wasm_importtype_t* importType = moduleImportTypes.data[i];
 
-            SString moduleName = wasm_importtype_module(importType)->data;
-
-            if (moduleName == WEB_ASSEMBLY_API_MODULE_NAME)
+            if (wasm_importtype_is_linked(importType))
             {
-                moduleValidImportsLength++;
+                imports[i] = wasm_extern_new_empty(m_pContextStore->GetStore()->GetContext(), wasm_externtype_kind(wasm_importtype_type(importType)));
+                continue;
             }
-        }
-
-        imports = new CWebAssemblyExternContext[moduleValidImportsLength];
-
-        for (size_t i = 0; i < moduleImportTypesLength; i++)
-        {
-            wasm_importtype_t* importType = moduleImportTypes.data[i];
 
             SString moduleName = wasm_importtype_module(importType)->data;
             SString importName = wasm_importtype_name(importType)->data;
@@ -552,14 +551,14 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 }
 
                 CWebAssemblyFunction* apiFunction = m_mpApiFunctions[importName];
-
+                
                 apiFunctionType = apiFunction->GetFunctionType();
 
                 if (!apiFunctionType.Compare(importFuncType))
                 {
                     goto CheckGlobalFunctions;
                 }
-
+                
                 imports[i] = wasm_func_as_extern(apiFunction->GetFunctionContext());
 
                 continue;
@@ -592,10 +591,17 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 imports[i] = wasm_func_as_extern(globalFunction->GetFunctionContext());
 
                 continue;
-
+                
             ImportFail:
                 CLogger::ErrorPrintf("Couldn't import function '%s' in script[\"@%s/%s\"].\n", importName.c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+
+                imports[i] = wasm_extern_new_empty(m_pContextStore->GetStore()->GetContext(), wasm_externtype_kind(wasm_importtype_type(importType)));
+
                 goto Fail;
+            }
+            else
+            {
+                imports[i] = wasm_extern_new_empty(m_pContextStore->GetStore()->GetContext(), wasm_externtype_kind(wasm_importtype_type(importType)));                
             }
         }
     }
@@ -603,7 +609,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     wasm_importtype_vec_delete(&moduleImportTypes);
     moduleImportTypes.data = NULL;
 
-    wasm_extern_vec_t moduleImports = { sizeof(imports), imports, moduleValidImportsLength, sizeof(imports) / sizeof(*(imports)), 0 };
+    wasm_extern_vec_t moduleImports = { sizeof(imports), imports, moduleImportTypesLength, sizeof(imports) / sizeof(*(imports)), 0 };
 
     m_pInstance = wasm_instance_new(store, m_pModule, &moduleImports, &trap);
 
@@ -612,10 +618,12 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
         goto Fail;
     }
 
-    delete imports;
-    imports = NULL;
+    if (imports)
+    {
+        delete imports;
+        imports = NULL;
+    }
 
-    wasm_exporttype_vec_t exportTypes = { 0 };
     wasm_module_exports(m_pModule, &exportTypes);
 
     size_t length = exportTypes.num_elems;

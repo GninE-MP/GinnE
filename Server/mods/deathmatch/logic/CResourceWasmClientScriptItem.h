@@ -31,6 +31,8 @@ public:
     ResponseCode Request(HttpRequest* ipoHttpRequest, HttpResponse* ipoHttpResponse);
 
 private:
+    SString m_strShortName;
+
     bool    m_bIsNoClientCache;
     SString m_sourceCode;
 };

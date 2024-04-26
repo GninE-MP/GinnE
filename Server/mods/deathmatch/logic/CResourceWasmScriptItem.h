@@ -30,6 +30,8 @@ public:
     CWebAssemblyContext* GetWebAssemblyContext() { return m_pWasmContext; }
 
 private:
+    SString m_strShortName;
+
     CWebAssemblyContext* m_pWasmContext;
 };
 

@@ -23,8 +23,7 @@
 #include "CResourceWasmScriptItem.h"
 #include "CResourceWasmClientScriptItem.h"
 
-//#include "wasm/CWebAssemblyVariable.h"
-//#include "wasm/CWebAssemblyContext.h"
+#include "wasm/WebAssemblyImports.h"
 
 #include "Utils.h"
 
@@ -41,7 +40,29 @@
 #define WASM_COMPILER_FILE_NAME     "emcc.bat"
 #define WASM_COMPILER_PATH_IDENTIER "upstream\\emscripten"
 
+#define WASM_COMPILER_SETTING_FLAG "-s"
+#define WASM_COMPILER_OUT_FLAG     "-o"
+#define WASM_COMPILER_INCLUDE_FLAG "-I"
+#define WASM_COMPILER_MACRO_FLAG   "-D"
+
+#define WASM_COMPILER_DEFAULT_INCLUDE_DIR "mods/deathmatch/wasm/include"
+#define WASM_COMPILER_DEFAULT_OPTIMIZE_LEVEL "-Os"
+#define WASM_COMPILER_DEFAULT_DEVELOPMENT_LEVEL "-O0"
+
 #define WINDOWS_PATH_ENVIRONMENT_VARIABLE_NAME "PATH"
+
+std::unordered_map<SString, SString> DEFAULT_WASM_COMPILER_SETTINGS = {
+    { "STANDALONE_WASM", "1" },
+    { "TOTAL_STACK", "65536" },
+    { "TOTAL_MEMORY", "1048576" },
+    { "ERROR_ON_UNDEFINED_SYMBOLS", "0" }
+};
+
+std::vector<SString> DEFAULT_WASM_EXPORT_FUNCTIONS = {
+    WASM_MAIN_FUNCTION_NAME,
+    WASM_MALLOC_FUNCTION_NAME,
+    WASM_FREE_FUNCTION_NAME
+};
 
 CResourceManifest::CResourceManifest(CResource* resource, const SString& manifestFilePath)
 {
@@ -390,6 +411,45 @@ void CResourceManifest::AddWasmServerScript(CResourceManifest* manifest, const c
     delete node;
 }
 
+
+SString CResourceManifest::GetApplicationDirectory(char concatenator)
+{
+    SString result = "";
+
+    char name[256];
+
+    int byteSize = GetModuleFileName(NULL, name, sizeof(name));
+
+    if (byteSize < 1)
+    {
+        return result;
+    }
+
+    result = std::string(name, byteSize);
+
+    std::vector<SString> pathes;
+    result.Split("\\", pathes);
+
+    pathes.pop_back();
+
+    size_t length = pathes.size();
+
+    SString path = "";
+
+    for (size_t i = 0; i < length; i++)
+    {
+        path += pathes[i];
+        path += concatenator;
+    }
+
+    if (!path.empty())
+    {
+        path.pop_back();
+    }
+
+    return path;
+}
+
 int CResourceManifest::Lua_ClientScripts(lua_State* luaVM)
 {
     lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
@@ -675,6 +735,342 @@ int CResourceManifest::Lua_WasmCompilerInstalled(lua_State* luaVM)
 
 int CResourceManifest::Lua_WasmCompile(lua_State* luaVM)
 {
+    if (lua_type(luaVM, 1) != LUA_TTABLE)
+    {
+        CLogger::ErrorPrintf("`wasm_compile` function expected a 'table' value as first argument.\n");
+        return 0;
+    }
+
+    lua_getglobal(luaVM, RESOURCE_MAIN_MANIFEST_OBJECT_GLOBAL_NAME);
+
+    CResourceManifest* pManifest = (CResourceManifest*)lua_touserdata(luaVM, -1);
+
+    lua_pop(luaVM, 1);
+
+    if (!pManifest)
+    {
+        return 0;
+    }
+
+    CResource* pResource = pManifest->GetResource();
+
+    std::unordered_map<SString, SString> settings;
+    std::vector<SString>                 exports;
+    std::vector<SString>                 sources;
+
+    SString out = "";
+    SString optimizingLevel = WASM_COMPILER_DEFAULT_OPTIMIZE_LEVEL;
+
+    std::vector<SString> includeDirectories;
+
+    SString defaultDir = GetApplicationDirectory();
+    defaultDir += "/";
+    defaultDir += WASM_COMPILER_DEFAULT_INCLUDE_DIR;
+
+    includeDirectories.push_back(defaultDir);
+
+    SString command = WASM_COMPILER_COMMAND;
+    command += " --no-entry";
+
+    lua_pushstring(luaVM, "development");
+    lua_gettable(luaVM, -2);
+
+    if (lua_toboolean(luaVM, -1))
+    {
+        optimizingLevel = WASM_COMPILER_DEFAULT_DEVELOPMENT_LEVEL;
+    }
+
+    lua_pop(luaVM, 1);
+
+    for (const std::pair<SString, SString>& setting : DEFAULT_WASM_COMPILER_SETTINGS)
+    {
+        settings[setting.first] = setting.second;
+    }
+
+    for (const SString& functionName : DEFAULT_WASM_EXPORT_FUNCTIONS)
+    {
+        exports.push_back(functionName);
+    }
+
+    lua_pushstring(luaVM, "settings");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        lua_pushnil(luaVM);
+
+        while (lua_next(luaVM, -2))
+        {
+            SString key = lua_tostring(luaVM, -2);
+            SString value = lua_tostring(luaVM, -1);
+
+            settings[key] = value;
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
+    lua_pop(luaVM, 1);
+
+    lua_pushstring(luaVM, "exports");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t length = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= length; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                SString function = lua_tostring(luaVM, -1);
+
+                exports.push_back(function);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
+    lua_pop(luaVM, 1);
+
+    lua_pushstring(luaVM, "include");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t length = lua_objlen(luaVM, -1);
+
+        for (size_t i = 1; i <= length; i++)
+        {
+            lua_pushinteger(luaVM, i);
+            lua_gettable(luaVM, -2);
+
+            if (lua_type(luaVM, -1) == LUA_TSTRING)
+            {
+                SString directory = lua_tostring(luaVM, -1);
+
+                includeDirectories.push_back(directory);
+            }
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
+    lua_pop(luaVM, 1);
+
+    lua_pushstring(luaVM, "src");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) != LUA_TTABLE)
+    {
+        goto SourceFilesError;
+    }
+
+    size_t srcLength = lua_objlen(luaVM, -1);
+
+    if (srcLength < 1)
+    {
+        goto SourceFilesError;
+    }
+
+    for (size_t i = 1; i <= srcLength; i++)
+    {
+        lua_pushinteger(luaVM, i);
+        lua_gettable(luaVM, -2);
+
+        if (lua_type(luaVM, -1) == LUA_TSTRING)
+        {
+            SString src = lua_tostring(luaVM, -1);
+
+            SString path = "";
+
+            if (!pResource->GetFilePath(src.c_str(), path))
+            {
+                lua_pop(luaVM, 2);
+
+                CLogger::ErrorPrintf("`wasm_compile` source file doesn't exist['%s'].\n", src.c_str());
+
+                return 0;
+            }
+
+            size_t length = path.length();
+
+            for (size_t j = 0; j < length; j++)
+            {
+                if (path[j] == '\\')
+                {
+                    path[j] = '/';
+                }
+            }
+
+            sources.push_back(path);
+        }
+
+        lua_pop(luaVM, 1);
+    }
+
+    lua_pop(luaVM, 1);
+
+    lua_pushstring(luaVM, "out");
+    lua_gettable(luaVM, -2);
+
+    if (!(lua_type(luaVM, -1) == LUA_TSTRING && lua_strlen(luaVM, -1) > 0))
+    {
+        lua_pop(luaVM, 1);
+
+        CLogger::ErrorPrintf("`wasm_compile` '.out' property must be a string value.\n");
+
+        return 0;
+    }
+
+    SString* outPath = new SString();
+
+    pResource->GetFilePath(lua_tostring(luaVM, -1), *outPath);
+
+    {
+        size_t length = outPath->length();
+
+        for (size_t i = 0; i < length; i++)
+        {
+            if ((*outPath)[i] == '\\')
+            {
+                (*outPath)[i] = '/';
+            }
+        }
+    }
+
+    out = *outPath;
+
+    delete outPath;
+
+    lua_pop(luaVM, 1);
+
+    lua_pushstring(luaVM, "optimize_level");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) == LUA_TSTRING)
+    {
+        optimizingLevel = lua_tostring(luaVM, -1);
+    }
+
+    lua_pop(luaVM, 1);
+
+    for (const std::pair<SString, SString>& setting : settings)
+    {
+        command += " ";
+        command += WASM_COMPILER_SETTING_FLAG;
+        command += " \"";
+        command += setting.first;
+        command += "=";
+        command += setting.second;
+        command += "\"";
+    }
+
+    if (!exports.empty())
+    {
+        command += " ";
+        command += WASM_COMPILER_SETTING_FLAG;
+        command += " \"EXPORTED_FUNCTIONS=[";
+
+        for (const SString& function : exports)
+        {
+            command += "'_";
+            command += function;
+            command += "',";
+        }
+
+        command.pop_back();
+
+        command += "]\"";
+    }
+
+    command += " ";
+    command += optimizingLevel;
+
+    command += " ";
+    command += WASM_COMPILER_OUT_FLAG;
+    command += " \"";
+    command += out;
+    command += "\"";
+
+    for (const SString& src : sources)
+    {
+        command += " \"";
+        command += src;
+        command += "\"";
+    }
+
+    for (const SString& directory : includeDirectories)
+    {
+        command += " ";
+        command += WASM_COMPILER_INCLUDE_FLAG;
+        command += "\"";
+        command += directory;
+        command += "\"";
+    }
+
+    lua_pushstring(luaVM, "macro");
+    lua_gettable(luaVM, -2);
+
+    if (lua_type(luaVM, -1) == LUA_TTABLE)
+    {
+        size_t length = lua_objlen(luaVM, -1);
+
+        if (length > 0)
+        {
+            lua_pop(luaVM, 1);
+
+            CLogger::ErrorPrintf("`wasm_compile` '.macro' is a map table. It can't have number indexes!\n");
+
+            return 0;
+        }
+
+        lua_pushnil(luaVM);
+
+        while (lua_next(luaVM, -2))
+        {
+            if (lua_type(luaVM, -2) != LUA_TSTRING)
+            {
+                continue;
+            }
+            
+            SString name = lua_tostring(luaVM, -2);
+            SString value = lua_tostring(luaVM, -1);
+
+            command += " ";
+            command += WASM_COMPILER_MACRO_FLAG;
+            command += "\"";
+            command += name;
+            command += "=";
+            command += value;
+            command += "\"";
+
+            lua_pop(luaVM, 1);
+        }
+    }
+
+    lua_pop(luaVM, 1);
+
+    FILE* pipe = _popen(command.c_str(), "r");
+
+    if (!pipe)
+    {
+        return 0;
+    }
+
+    _pclose(pipe);
+
+    return 0;
+
+SourceFilesError:
+    lua_pop(luaVM, 1);
+
+    CLogger::ErrorPrintf("`wasm_compile` couldn't read source files! [`.src` must be a table value]\n");
+
     return 0;
 }
 

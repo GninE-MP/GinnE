@@ -14,11 +14,15 @@
 #include "CResource.h"
 #include "lua/CLuaMain.h"
 #include "wasm/CWebAssemblyContext.h"
+#include "wasm/CWebAssemblyVariable.h"
+#include "wasmdefs/CWebAssemblyDefs.h"
 
 CResourceWasmScriptItem::CResourceWasmScriptItem(CResource* resource, const char* szShortName, const char* szResourceFileName, CXMLAttributes* xmlAttributes)
     : CResourceFile(resource, szShortName, szResourceFileName, xmlAttributes)
 {
     m_type = RESOURCE_FILE_TYPE_WASM_SCRIPT;
+
+    m_strShortName = szShortName;
 
     m_pWasmContext = NULL;
 }
@@ -44,7 +48,9 @@ bool CResourceWasmScriptItem::Start()
             return false;
         }
 
-        CWebAssemblyLoadState state = m_pWasmContext->LoadScriptBinary(script, &buffer.at(0), iSize, m_strResourceFileName);
+        CWebAssemblyDefs::RegisterApi(script);
+
+        CWebAssemblyLoadState state = m_pWasmContext->LoadScriptBinary(script, &buffer.at(0), iSize, m_strShortName);
 
         return state == CWebAssemblyLoadState::Succeed;
     }
