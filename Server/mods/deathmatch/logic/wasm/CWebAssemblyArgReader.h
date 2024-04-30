@@ -17,6 +17,10 @@
 #include "WebAssemblyImports.h"
 #include "lua/CLuaFunctionParseHelpers.h"
 #include "lua/CLuaMain.h"
+#include "CBan.h"
+#include "CAccessControlList.h"
+#include "CAccessControlListGroup.h"
+#include "CDatabaseManager.h"
 
 class CWebAssemblyScript;
 
@@ -48,6 +52,9 @@ public:
     void ReadString(SString& out, SString defaultValue = "", intptr_t size = -1);
     void ReadBoolean(bool& out, bool defaultValue = false);
     void ReadPointerAddress(CWebAssemblyMemoryPointerAddress& out, CWebAssemblyMemoryPointerAddress defaultValue = WEB_ASSEMBLY_NULL_PTR);
+    void ReadFunction(CWebAssemblyFunction*& out, CWebAssemblyFunction* defaultValue = NULL);
+    void ReadVector2D(CVector2D& out, CVector2D defaultValue = CVector2D(0.0f, 0.0f));
+    void ReadVector3D(CVector& out, CVector defaultValue = CVector(0.0f, 0.0f, 0.0f));
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)
@@ -78,7 +85,7 @@ public:
     }
 
     template<typename PTR>
-    void ReadUserData(PTR*& out, PTR* defaultValue = NULL)
+    void ReadSystemPointer(PTR*& out, PTR* defaultValue = NULL)
     {
         CWebAssemblyUserData userdata;
 
@@ -96,12 +103,6 @@ public:
 
         PTR* udata = (PTR*)(void*)userdata;
 
-        // to use `UserDataCast` check how they did pass elements to luaVM!
-        // i saw the pointer address and the element id is different
-        // i need to pass the element data when pushing userdata with `ReturnUserData`
-        /*lua_State* luaVM = m_pScript->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
-        PTR* udata = (PTR*)UserDataCast(*((PTR**)(void*)userdata), luaVM);*/ 
-
         if (!udata)
         {
             out = defaultValue;
@@ -109,6 +110,35 @@ public:
         }
 
         out = udata;
+    }
+
+    template<typename PTR>
+    void ReadUserData(PTR*& out, PTR* defaultValue = NULL)
+    {
+        CWebAssemblyUserData userdata;
+
+        #if IS_APP_ON_64_BIT_VERSION
+            ReadInt64(userdata);
+        #else
+            ReadInt32(userdata);
+        #endif
+
+        if (!userdata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        lua_State* luaVM = m_pScript->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+        PTR* udata = (PTR*)UserDataCast((PTR*)(void*)userdata, luaVM);
+
+        if (!udata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        out = udata; 
     }
 
     template<typename PTR>
@@ -143,6 +173,7 @@ public:
         memcpy(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr), (void*)value, size);
     }
 
+    CWebAssemblyTrap* ReturnNull(SString errorMessage = "");
     CWebAssemblyTrap* Return(const int32_t& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const uint32_t& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const int64_t& value, SString errorMessage = "");
@@ -151,6 +182,18 @@ public:
     CWebAssemblyTrap* Return(const float64_t& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const SString& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const bool& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CElement* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CPlayer* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CResource* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CXMLNode* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CLuaTimer* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CAccount* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CAccessControlList* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CAccessControlListGroup* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CBan* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CTextDisplay* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CTextItem* value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CDbJobData* value, SString errorMessage = "");
 
     template<typename PTR>
     CWebAssemblyTrap* Return(PTR* ptr, intptr_t size = -1, SString errorMessage = "")
@@ -189,10 +232,112 @@ public:
     }
 
     template<typename PTR>
-    CWebAssemblyTrap* ReturnUserData(PTR* userData, SString errorMessage = "")
+    CWebAssemblyTrap* ReturnSystemPointer(PTR* userData, SString errorMessage = "")
     {
         return Return((CWebAssemblyUserData)(void*)(CWebAssemblyUserData*)userData, errorMessage);
     }
+
+    CWebAssemblyTrap* ReturnUserData(void* userdata, SString errorMessage = "")
+    {
+        if (!userdata)
+        {
+            return CreateTrap(errorMessage);
+        }
+
+        m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
+        m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
+
+        if (CElement* pEntity = UserDataCast((CElement*)userdata, NULL))
+        {
+            if (!pEntity)
+            {
+                return CreateTrap(errorMessage);
+            }
+
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pEntity->GetID().Value());
+
+            return CreateTrap(errorMessage);
+        }
+
+        lua_State* luaVM = m_pScript->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+
+        if (CPlayer* pEntity = UserDataCast((CPlayer*)userdata, NULL))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pEntity->GetID().Value());
+        }
+        else if (CResource* pResource = UserDataCast((CResource*)userdata, NULL))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pResource->GetScriptID());
+        }
+        else if (CXMLNode* pNode = UserDataCast((CXMLNode*)userdata, NULL))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pNode->GetID());
+        }
+        else if (CLuaTimer* pTimer = UserDataCast((CLuaTimer*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pTimer->GetScriptID());
+        }
+        else if (CAccount* pAccount = UserDataCast((CAccount*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pAccount->GetScriptID());
+        }
+        else if (CAccessControlList* pACL = UserDataCast((CAccessControlList*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pACL->GetScriptID());
+        }
+        else if (CAccessControlListGroup* pACLGroup = UserDataCast((CAccessControlListGroup*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pACLGroup->GetScriptID());
+        }
+        else if (CBan* pBan = UserDataCast((CBan*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pBan->GetScriptID());
+        }
+        else if (CTextDisplay* pTextDisplay = UserDataCast((CTextDisplay*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pTextDisplay->GetScriptID());
+        }
+        else if (CTextItem* pTextItem = UserDataCast((CTextItem*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pTextItem->GetScriptID());
+        }
+        else if (CDbJobData* pQuery = UserDataCast((CDbJobData*)userdata, luaVM))
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(pQuery->GetId());
+        }
+        else
+        {
+            m_pResults->data[0].of.i32 = (CWebAssemblyUserData)userdata;
+        }
+
+        return CreateTrap(errorMessage);
+    }
+
+    /*CWebAssemblyTrap* ReturnElement(CElement* element, SString errorMessage = "")
+    {
+        if (!element || element->IsBeingDeleted())
+        {
+            m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
+            m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
+
+            return CreateTrap(errorMessage);
+        }
+
+        ElementID eId = element->GetID();
+
+        if (eId == INVALID_ELEMENT_ID)
+        {
+            m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
+            m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
+
+            return CreateTrap(errorMessage);
+        }
+
+        m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
+        m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(eId.Value());
+
+        return CreateTrap(errorMessage);
+    }*/ 
 
     bool Skip();
     void Reset();

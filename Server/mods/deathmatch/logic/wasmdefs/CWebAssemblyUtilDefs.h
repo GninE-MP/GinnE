@@ -30,10 +30,6 @@ public:
     DEFINE_WASM_FUNCTION(GetEasingValue, env, args, results);
     DEFINE_WASM_FUNCTION(InterpolateBetween, env, args, results);
 
-    DEFINE_WASM_FUNCTION(PregFind, env, args, results);
-    DEFINE_WASM_FUNCTION(PregReplace, env, args, results);
-    DEFINE_WASM_FUNCTION(PregMatch, env, args, results);
-
     DEFINE_WASM_FUNCTION(DebugSleep, env, args, results);
 
     DEFINE_WASM_FUNCTION(ToColor, env, args, results);

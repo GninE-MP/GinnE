@@ -289,6 +289,89 @@ void CWebAssemblyArgReader::ReadPointerAddress(CWebAssemblyMemoryPointerAddress&
     ReadUInt32(out, defaultValue);
 }
 
+void CWebAssemblyArgReader::ReadFunction(CWebAssemblyFunction*& out, CWebAssemblyFunction* defaultValue)
+{
+    if (!out)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    if (!Skip())
+    {
+        out = defaultValue;
+        return;
+    }
+
+    CWebAssemblyMemoryPointerAddress functionPtr = m_pArgs->data[m_iIndex].of.i32;
+
+    if (functionPtr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    out = m_pScript->GetInternalFunction(functionPtr);
+}
+
+void CWebAssemblyArgReader::ReadVector2D(CVector2D& out, CVector2D defaultValue)
+{
+    CWebAssemblyMemoryPointerAddress ptr;
+
+    ReadPointerAddress(ptr);
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    struct V
+    {
+        float32_t x;
+        float32_t y;
+    };
+
+    V* value = (V*)(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr));
+
+    out.fX = value->x;
+    out.fY = value->y;
+}
+
+void CWebAssemblyArgReader::ReadVector3D(CVector& out, CVector defaultValue)
+{
+    CWebAssemblyMemoryPointerAddress ptr;
+
+    ReadPointerAddress(ptr);
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    struct V
+    {
+        float32_t x;
+        float32_t y;
+        float32_t z;
+    };
+
+    V* value = (V*)(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr));
+
+    out.fX = value->x;
+    out.fY = value->y;
+    out.fZ = value->z;
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::ReturnNull(SString errorMessage)
+{
+    m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
+    m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
+
+    return CreateTrap(errorMessage);
+}
+
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int32_t& value, SString errorMessage)
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
@@ -353,6 +436,126 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const bool& value, SString error
     m_pResults->data[0].of.i32 = (int32_t)value;
 
     return CreateTrap(errorMessage);
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CElement* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetID().Value()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CPlayer* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetID().Value()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CResource* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CXMLNode* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CLuaTimer* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccount* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlList* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlListGroup* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CBan* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextDisplay* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextItem* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetScriptID()));
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CDbJobData* value, SString errorMessage)
+{
+    if (!value)
+    {
+        return ReturnNull(errorMessage);
+    }
+
+    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetId()));
 }
 
 bool CWebAssemblyArgReader::Skip()

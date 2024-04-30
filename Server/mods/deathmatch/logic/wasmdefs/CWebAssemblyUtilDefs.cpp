@@ -13,6 +13,7 @@
 #include "CWebAssemblyDefs.h"
 #include <SharedUtil.Memory.h>
 #include "CDummy.h"
+#include "Utils.h"
 
 #include "../wasm/CWebAssemblyContext.h"
 #include "../wasm/CWebAssemblyVariable.h"
@@ -24,38 +25,23 @@
     #include "CRemoteCalls.h"
 #endif
 
-WebAssemblyApi(GRM, env, args, results)
-{
-    CWebAssemblyArgReader argStream(env, args, results);
-
-    CElement* root = argStream.GetScript()->GetStoreContext()->GetResource()->GetResourceRootElement();
-
-    return argStream.ReturnUserData(root);
-}
-
 void CWebAssemblyUtilDefs::RegisterFunctionTypes()
 {
     SetFunctionType("print_data", "vs");
     SetFunctionType("get_tick_count", "l");
     SetFunctionType("get_real_time", "bilb");
-    SetFunctionType("get_userdata_type", "i*si"); // int(bytes read) void*(pointer) char*(out_string) uint(max_size)
-    SetFunctionType("get_color_from_string", "bs*"); // bool(succeed) const char*(color_code) Color*(out_color)
+    SetFunctionType("get_userdata_type", "i*si");
+    SetFunctionType("get_color_from_string", "bs*");
     
     SetFunctionType("get_distance_between_points_2D", "f**");
     SetFunctionType("get_distance_between_points_3D", "f**");
     SetFunctionType("get_easing_value", "ffsfff");
-    SetFunctionType("interpolate_between", "b**fsfff*");
-
-    SetFunctionType("preg_find", "bssi");
-    SetFunctionType("preg_replace", "issssii");
-    SetFunctionType("preg_match", "iss*iii");
+    SetFunctionType("interpolate_between", "b***fsfff");
 
     SetFunctionType("debug_sleep", "bi");
 
     SetFunctionType("to_color", "iiiii");
     SetFunctionType("get_process_memory_stats", "b*");
-
-    SetFunctionType("get_root_element", "*");
 }
 
 void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -72,16 +58,10 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "get_easing_value", GetEasingValue },
         { "interpolate_between", InterpolateBetween },
 
-        { "preg_find", PregFind },
-        { "preg_replace", PregReplace },
-        { "preg_match", PregMatch },
-        
         { "debug_sleep", DebugSleep },
         
         { "to_color", ToColor },
-        { "get_process_memory_stats", GetProcessMemoryStats },
-
-        { "get_root_element", GRM }
+        { "get_process_memory_stats", GetProcessMemoryStats }
     };
 
     WASM_REGISTER_API(script, functions);
@@ -176,61 +156,169 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetRealTime, env, args, results)
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetUserDataType, env, args, results)
 {
-    CElement* resRoot;
+    void*                            userdata;
+    CWebAssemblyMemoryPointerAddress typeNamePtr;
+    uint32_t                         maxBytes;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    argStream.ReadUserData(resRoot);
+    argStream.ReadSystemPointer(userdata);
+    argStream.ReadPointerAddress(typeNamePtr);
+    argStream.ReadUInt32(maxBytes, 0xffffffff);
 
-    if (!resRoot)
+    if (typeNamePtr == WEB_ASSEMBLY_NULL_PTR)
     {
-        CLogger::LogPrintf("couldn't get resroot!\n");
-        return NULL;
+        return argStream.Return(0);
     }
 
-    CLogger::LogPrintf("resource root element type : [%s]\n", resRoot->GetTypeName().c_str());
+    if (!userdata)
+    {
+        return argStream.Return(0);
+    }
 
-    return NULL;
+    lua_State* luaVM = argStream.GetScript()->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+    SString typeName = GetUserDataClassName(userdata, luaVM, false);
+
+    typeName = typeName.empty() ? "userdata" : typeName;
+
+    size_t bytesCount = typeName.size();
+    size_t totalSize = std::min(bytesCount, maxBytes);
+
+    argStream.WritePointer(typeNamePtr, typeName.data(), totalSize);
+
+    return argStream.Return(totalSize);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetColorFromString, env, args, results)
 {
-    return NULL;
+    SString                          colorCode;
+    CWebAssemblyMemoryPointerAddress ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadString(colorCode);
+    argStream.ReadPointerAddress(ptr);
+
+    if (colorCode.empty())
+    {
+        return argStream.Return(false);
+    }
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        uint8_t b;
+        uint8_t g;
+        uint8_t r;
+        uint8_t a;
+    } colorData;
+    memset((void*)&colorData, 0, sizeof(colorData));
+
+    if (!XMLColorToInt(colorCode, colorData.r, colorData.g, colorData.b, colorData.a))
+    {
+        return argStream.Return(false);
+    }
+
+    argStream.WritePointer(ptr, &colorData);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetDistanceBetweenPoints2D, env, args, results)
 {
-    return NULL;
+    CVector2D p1;
+    CVector2D p2;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadVector2D(p1);
+    argStream.ReadVector2D(p2);
+
+    return argStream.Return(DistanceBetweenPoints2D(p1, p2));
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetDistanceBetweenPoints3D, env, args, results)
 {
-    return NULL;
+    CVector p1;
+    CVector p2;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadVector3D(p1);
+    argStream.ReadVector3D(p2);
+
+    return argStream.Return(DistanceBetweenPoints3D(p1, p2));
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetEasingValue, env, args, results)
 {
-    return NULL;
+    float32_t progress;
+    SString   easingTypeString;
+    float32_t easingPeriod;
+    float32_t easingAmplitude;
+    float32_t easingOvershoot;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadFloat32(progress);
+    argStream.ReadString(easingTypeString);
+    argStream.ReadFloat32(easingPeriod);
+    argStream.ReadFloat32(easingAmplitude);
+    argStream.ReadFloat32(easingOvershoot);
+
+    CEasingCurve::eType easingType;
+
+    StringToEnum(easingTypeString, easingType);
+
+    CEasingCurve easingCurve(easingType);
+    easingCurve.SetParams(easingPeriod, easingAmplitude, easingOvershoot);
+    float32_t curve = easingCurve.ValueForProgress(progress);
+
+    return argStream.Return(curve);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::InterpolateBetween, env, args, results)
 {
-    return NULL;
-}
+    CVector                          p1;
+    CVector                          p2;
+    CWebAssemblyMemoryPointerAddress outPoint;
+    float32_t                        progress;
+    SString                          easingTypeString;
+    float32_t                        easingPeriod;
+    float32_t                        easingAmplitude;
+    float32_t                        easingOvershoot;
 
-WebAssemblyApi(CWebAssemblyUtilDefs::PregFind, env, args, results)
-{
-    return NULL;
-}
+    CWebAssemblyArgReader argStream(env, args, results);
 
-WebAssemblyApi(CWebAssemblyUtilDefs::PregReplace, env, args, results)
-{
-    return NULL;
-}
+    argStream.ReadVector3D(p1);
+    argStream.ReadVector3D(p2);
+    argStream.ReadPointerAddress(outPoint);
+    argStream.ReadFloat32(progress);
+    argStream.ReadString(easingTypeString);
+    argStream.ReadFloat32(easingPeriod);
+    argStream.ReadFloat32(easingAmplitude);
+    argStream.ReadFloat32(easingOvershoot);
 
-WebAssemblyApi(CWebAssemblyUtilDefs::PregMatch, env, args, results)
-{
-    return NULL;
+    CEasingCurve::eType easingType;
+    StringToEnum(easingTypeString, easingType);
+
+    CVector vecResult = TInterpolation<CVector>::Interpolate(p1, p2, progress, easingType, easingPeriod, easingAmplitude, easingOvershoot);
+
+    struct 
+    {
+        float32_t x;
+        float32_t y;
+        float32_t z;
+    } out;
+    memset((void*)&out, 0, sizeof(out));
+
+    argStream.WritePointer(outPoint, &out);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::DebugSleep, env, args, results)

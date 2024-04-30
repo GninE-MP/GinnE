@@ -16,6 +16,8 @@
 
 #include "CResourceFile.h"
 
+struct lua_State;
+
 class CWebAssemblyContext;
 
 class CResourceWasmScriptItem : public CResourceFile
@@ -33,6 +35,8 @@ private:
     SString m_strShortName;
 
     CWebAssemblyContext* m_pWasmContext;
+
+    static int Lua_CallWebAssemblyFunction(lua_State* luaVM);
 };
 
 #endif
