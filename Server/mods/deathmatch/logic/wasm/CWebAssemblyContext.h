@@ -104,6 +104,19 @@ public:
 
     CWebAssemblyStore* GetStore();
 
+    void                  SetGlobalFunction(const SString& name, CWebAssemblyFunction* function);
+    CWebAssemblyFunction* GetGlobalFunction(const SString& name);
+
+    CWebAssemblyFunctionMap& GetGlobalFunctions();
+
+    bool DoesGlobalFunctionExist(const SString& name);
+
+    void RemoveGlobalFunction(const SString& name);
+    void ClearGlobalFunctions();
+
+    bool                DoesPointerBelongToContext(void* ptr);
+    CWebAssemblyScript* FindPointerScript(void* ptr);
+
     static void                InitializeWebAssemblyEngine();
     static void                DeleteWebAssemblyEngine();
     static CWebAssemblyEngine* GetWebAssemblyEngine();
@@ -115,6 +128,8 @@ private:
     CWebAssemblyStore* m_pStore;
 
     CWebAssemblyScriptList m_lsScripts;
+
+    CWebAssemblyFunctionMap m_mpGlobalFunctions;
 };
 
 class CWebAssemblyVariables;
@@ -137,7 +152,7 @@ public:
     CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
 
     void RegisterApiFunction(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
-    void RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
+    void RegisterGlobalFunction(const SString& functionName, CWebAssemblyFunction* function, bool isLuaFunction = false);
 
     CWebAssemblyContext* GetStoreContext();
 
@@ -184,6 +199,9 @@ public:
     void ClearApiFunctions();
     void ClearGlobalFunctions();
 
+    void InsertSharedGlobalFunctions();
+    void ClearSharedGlobalFunctions();
+
     void DeleteMemory();
 
     SString GetScriptFile();
@@ -210,6 +228,9 @@ private:
     CWebAssemblyInternalFunctions m_lsInternalFunctions;
 
     CWebAssemblyMemory* m_pMemory;
+
+    static WebAssemblyApi(Wasm_CallSharedImportedFunction, env, args, results);
+    static WebAssemblyApi(Wasm_CallLuaImportedFunction, env, args, results);
 };
 
 class CWebAssemblyMemory
@@ -240,6 +261,8 @@ public:
 
     void                      SetContext(CWebAssemblyMemoryContext context);
     CWebAssemblyMemoryContext GetContext();
+
+    bool DoesPointerBelongToMemory(void* ptr);
 
 private:
     CWebAssemblyScript* m_pScript;

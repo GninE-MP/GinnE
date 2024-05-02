@@ -14,6 +14,7 @@
 
 #include "CWebAssemblyContext.h"
 #include "CWebAssemblyVariable.h"
+#include "CWebAssemblyArgReader.h"
 
 #include "../wasmdefs/CWebAssemblyDefs.h"
 
@@ -182,6 +183,7 @@ CWebAssemblyContext::~CWebAssemblyContext()
 void CWebAssemblyContext::Destroy()
 {
     ClearScripts();
+    ClearGlobalFunctions();
 
     if (m_pStore)
     {
@@ -255,6 +257,107 @@ CResource* CWebAssemblyContext::GetResource()
 CWebAssemblyStore* CWebAssemblyContext::GetStore()
 {
     return m_pStore;
+}
+
+void CWebAssemblyContext::SetGlobalFunction(const SString& functionName, CWebAssemblyFunction* function)
+{
+    if (functionName.empty())
+    {
+        return;
+    }
+
+    if (!function)
+    {
+        return;
+    }
+
+    m_mpGlobalFunctions[functionName] = function;
+}
+
+CWebAssemblyFunction* CWebAssemblyContext::GetGlobalFunction(const SString& functionName)
+{
+    if (!DoesGlobalFunctionExist(functionName))
+    {
+        return NULL;
+    }
+
+    return m_mpGlobalFunctions[functionName];
+}
+
+CWebAssemblyFunctionMap& CWebAssemblyContext::GetGlobalFunctions()
+{
+    return m_mpGlobalFunctions;
+}
+
+bool CWebAssemblyContext::DoesGlobalFunctionExist(const SString& functionName)
+{
+    return m_mpGlobalFunctions.find(functionName) != m_mpGlobalFunctions.end();
+}
+
+void CWebAssemblyContext::RemoveGlobalFunction(const SString& functionName)
+{
+    if (!DoesGlobalFunctionExist(functionName))
+    {
+        return;
+    }
+
+    m_mpGlobalFunctions.erase(functionName);
+}
+
+void CWebAssemblyContext::ClearGlobalFunctions()
+{
+    if (m_mpGlobalFunctions.empty())
+    {
+        return;
+    }
+
+    m_mpGlobalFunctions.clear();
+}
+
+bool CWebAssemblyContext::DoesPointerBelongToContext(void* ptr)
+{
+    if (!ptr)
+    {
+        return false;
+    }
+
+    if (m_lsScripts.empty())
+    {
+        return false;
+    }
+
+    for (CWebAssemblyScript* script : m_lsScripts)
+    {
+        if (script->GetMemory()->DoesPointerBelongToMemory(ptr))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+CWebAssemblyScript* CWebAssemblyContext::FindPointerScript(void* ptr)
+{
+    if (!ptr)
+    {
+        return NULL;
+    }
+
+    if (m_lsScripts.empty())
+    {
+        return NULL;
+    }
+
+    for (CWebAssemblyScript* script : m_lsScripts)
+    {
+        if (script->GetMemory()->DoesPointerBelongToMemory(ptr))
+        {
+            return script;
+        }
+    }
+
+    return NULL;
 }
 
 void CWebAssemblyContext::InitializeWebAssemblyEngine()
@@ -433,6 +536,8 @@ bool CWebAssemblyScript::CallInternalFunction(const size_t& index, CWebAssemblyV
 
 void CWebAssemblyScript::Destroy()
 {
+    ClearSharedGlobalFunctions();
+
     ClearExportedFunctions();
     ClearInternalFunctions();
     ClearApiFunctions();
@@ -551,7 +656,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
 
                 if (!DoesApiFunctionExist(importName))
                 {
-                    if (!DoesGlobalFunctionExist(importName))
+                    if (!m_pContextStore->DoesGlobalFunctionExist(importName))
                     {
                         goto ImportFail;
                     }
@@ -569,11 +674,11 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 }
                 
                 imports[i] = wasm_func_as_extern(apiFunction->GetFunctionContext());
-
+                
                 continue;
 
             CheckGlobalFunctions:
-                if (!DoesGlobalFunctionExist(importName))
+                if (!m_pContextStore->DoesGlobalFunctionExist(importName))
                 {
                     if (apiFunction)
                     {
@@ -587,7 +692,8 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                     goto ImportFail;
                 }
 
-                CWebAssemblyFunction* globalFunction = m_mpGlobalFunctions[importName];
+                //CWebAssemblyFunction* globalFunction = m_mpGlobalFunctions[importName];
+                CWebAssemblyFunction* globalFunction = m_pContextStore->GetGlobalFunction(importName);
 
                 globalFunctionType = globalFunction->GetFunctionType();
 
@@ -597,16 +703,41 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                     goto Fail;
                 }
 
+                RegisterGlobalFunction(importName, globalFunction, false);
+
+                if (!DoesGlobalFunctionExist(importName))
+                {
+                    goto ImportFail;
+                }
+
+                globalFunction = GetGlobalFunction(importName);
+
                 imports[i] = wasm_func_as_extern(globalFunction->GetFunctionContext());
 
                 continue;
                 
             ImportFail:
-                CLogger::ErrorPrintf("Couldn't import function '%s' in script[\"@%s/%s\"].\n", importName.c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+                CWebAssemblyFunction dummyFunction;
+
+                dummyFunction.SetFunctionType(importFuncType);
+
+                RegisterGlobalFunction(importName, &dummyFunction, true);
+
+                if (!DoesGlobalFunctionExist(importName))
+                {
+                    goto Fail;
+                }
+
+                CWebAssemblyFunction* luaFunctionCaller = GetGlobalFunction(importName);
+
+                imports[i] = wasm_func_as_extern(luaFunctionCaller->GetFunctionContext());
+
+                // we are replacing lua functions instead of all not imported functions!
+                /*CLogger::ErrorPrintf("Couldn't import function '%s' in script[\"@%s/%s\"].\n", importName.c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
 
                 imports[i] = wasm_extern_new_empty(m_pContextStore->GetStore()->GetContext(), wasm_externtype_kind(wasm_importtype_type(importType)));
 
-                goto Fail;
+                goto Fail;*/
             }
             else
             {
@@ -699,6 +830,8 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     BuildInternalFunctions();
     BuildMemory();
 
+    InsertSharedGlobalFunctions();
+
     return CWebAssemblyLoadState::Succeed;
 
 Fail:
@@ -764,7 +897,132 @@ void CWebAssemblyScript::RegisterApiFunction(const SString& functionName, CWebAs
     m_mpApiFunctions[functionName] = wasmFunction;
 }
 
-void CWebAssemblyScript::RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function)
+void CWebAssemblyScript::RegisterGlobalFunction(const SString& functionName, CWebAssemblyFunction* function, bool isLuaFunction)
+{
+    if (functionName.empty())
+    {
+        return;
+    }
+
+    if (isLuaFunction)
+    {
+        if (!function)
+        {
+            return;
+        }
+
+        if (DoesGlobalFunctionExist(functionName))
+        {
+            DeleteGlobalFunction(functionName);
+        }
+
+        CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), function->GetFunctionType(), Wasm_CallLuaImportedFunction, CreateApiEnvironment(functionName));
+        wasmFunction->Build();
+
+        wasmFunction->SetFunctionName(functionName);
+
+        if (!wasmFunction || !wasmFunction->GetFunctionContext())
+        {
+            return;
+        } 
+
+        m_mpGlobalFunctions[functionName] = wasmFunction;
+
+        return;
+    }
+
+    if (!function)
+    {
+        return;
+    }
+
+    if (DoesGlobalFunctionExist(functionName))
+    {
+        DeleteGlobalFunction(functionName);
+    }
+
+    CWebAssemblyApiEnviornment sharedEnv = CreateApiEnvironment(functionName);
+    
+    struct Env
+    {
+        CWebAssemblyFunction*      function;
+        CWebAssemblyApiEnviornment sharedEnv;
+    };
+
+    Env* env = new Env();
+    env->function = function;
+    env->sharedEnv = sharedEnv;
+
+    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), function->GetFunctionType(), Wasm_CallSharedImportedFunction, NULL);
+    wasmFunction->Build((void*)env);
+
+    wasmFunction->SetFunctionName(functionName);
+    wasmFunction->SetApiEnviornment(sharedEnv);
+
+    if (!wasmFunction || !wasmFunction->GetFunctionContext())
+    {
+        return;
+    }
+
+    m_mpGlobalFunctions[functionName] = wasmFunction;
+}
+
+WebAssemblyApi(CWebAssemblyScript::Wasm_CallSharedImportedFunction, env, args, results)
+{
+    struct Env
+    {
+        CWebAssemblyFunction*      function;
+        CWebAssemblyApiEnviornment sharedEnv;
+    };
+
+    Env* enviornment = (Env*)env;
+
+    CWebAssemblyFunction* function = enviornment->function;
+
+    CWebAssemblyArgReader argStream(enviornment->sharedEnv, args, results);
+
+    if (!function || !(*function))
+    {
+        return argStream.ReturnNull("Couldn't call function.\n");
+    }
+    
+    CWebAssemblyVariables funcArgs, funcResults;
+
+    for (size_t i = 0; i < args->num_elems; i++)
+    {
+        funcArgs.Push(args->data[i]);
+    }
+
+    SString errorMessage = "";
+
+    if (!function->Call(&funcArgs, &funcResults, &errorMessage))
+    {
+        if (!errorMessage.empty())
+        {
+            //CLogger::ErrorPrintf("%s:%s\n", enviornment->sharedEnv->script->GetResourcePath().c_str(), errorMessage.c_str());
+
+            return argStream.ReturnNull(errorMessage);
+        }
+    }
+
+    if (funcResults.GetSize() < 1)
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return(funcResults.GetFirst());
+
+    return NULL;
+}
+
+WebAssemblyApi(CWebAssemblyScript::Wasm_CallLuaImportedFunction, env, args, results)
+{
+    CLogger::LogPrintf("calling lua shared function in import from wasm!\n");
+
+    return NULL;
+}
+
+/*void CWebAssemblyScript::RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function)
 {
     if (functionName.empty())
     {
@@ -787,7 +1045,7 @@ void CWebAssemblyScript::RegisterGlobalFunctions(const SString& functionName, CW
     }
 
     m_mpGlobalFunctions[functionName] = wasmFunction;
-}
+}*/ 
 
 CWebAssemblyContext* CWebAssemblyScript::GetStoreContext()
 {
@@ -1203,6 +1461,47 @@ void CWebAssemblyScript::ClearGlobalFunctions()
     m_mpGlobalFunctions.clear();
 }
 
+void CWebAssemblyScript::InsertSharedGlobalFunctions()
+{
+    if (m_mpExportedFunctions.empty())
+    {
+        return;
+    }
+
+    for (const std::pair<SString, CWebAssemblyFunction*>& item : m_mpExportedFunctions)
+    {
+        SString               name = item.first;
+        CWebAssemblyFunction* function = item.second;
+
+        if (name == WASM_MAIN_FUNCTION_NAME || name == WASM_MALLOC_FUNCTION_NAME || name == WASM_FREE_FUNCTION_NAME)
+        {
+            continue;
+        }
+
+        m_pContextStore->SetGlobalFunction(name, function);
+    }
+}
+
+void CWebAssemblyScript::ClearSharedGlobalFunctions()
+{
+    CWebAssemblyFunctionMap& globalFunctions = m_pContextStore->GetGlobalFunctions();
+
+    if (globalFunctions.empty())
+    {
+        return;
+    }
+
+    for (std::pair<SString, CWebAssemblyFunction*> item : globalFunctions)
+    {
+        CWebAssemblyFunction* function = item.second;
+
+        if (function->GetApiEnviornment()->script == this)
+        {
+            globalFunctions.erase(item.first);
+        }
+    }
+}
+
 void CWebAssemblyScript::DeleteMemory()
 {
     if (!m_pMemory)
@@ -1452,4 +1751,17 @@ void CWebAssemblyMemory::SetContext(CWebAssemblyMemoryContext context)
 CWebAssemblyMemoryContext CWebAssemblyMemory::GetContext()
 {
     return m_pContext;
+}
+
+bool CWebAssemblyMemory::DoesPointerBelongToMemory(void* ptr)
+{
+    if (!ptr)
+    {
+        return false;
+    }
+
+    intptr_t address = (intptr_t)ptr;
+    intptr_t base = (intptr_t)GetBase();
+
+    return address >= base && address <= (base + GetSize());
 }

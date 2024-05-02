@@ -20,6 +20,15 @@ public:
     static void RegisterFunctions(CWebAssemblyScript* script);
 
     DEFINE_WASM_FUNCTION(PrintData, env, args, results);
+
+    DEFINE_WASM_FUNCTION(GetSharedPointerAddress, env, args, results);
+    DEFINE_WASM_FUNCTION(GetPointerFromSharedPointer, env, args, results);
+    DEFINE_WASM_FUNCTION(DoesSharedPointerAddressBelongToThisModule, env, args, results);
+    DEFINE_WASM_FUNCTION(DoesSharedPointerAddressBelongToThisResource, env, args, results);
+    DEFINE_WASM_FUNCTION(ReadSharedPointerAddress, env, args, results);
+    DEFINE_WASM_FUNCTION(WriteSharedPointerAddress, env, args, results);
+    DEFINE_WASM_FUNCTION(GetMaxSharedPointerSize, env, args, results);
+
     DEFINE_WASM_FUNCTION(GetTickCount_, env, args, results);
     DEFINE_WASM_FUNCTION(GetRealTime, env, args, results);
     DEFINE_WASM_FUNCTION(GetUserDataType, env, args, results);

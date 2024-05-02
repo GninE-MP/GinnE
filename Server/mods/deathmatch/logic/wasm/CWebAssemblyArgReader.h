@@ -182,6 +182,7 @@ public:
     CWebAssemblyTrap* Return(const float64_t& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const SString& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const bool& value, SString errorMessage = "");
+    CWebAssemblyTrap* Return(CWebAssemblyVariable value, SString errorMessage = "");
     CWebAssemblyTrap* Return(CElement* value, SString errorMessage = "");
     CWebAssemblyTrap* Return(CPlayer* value, SString errorMessage = "");
     CWebAssemblyTrap* Return(CResource* value, SString errorMessage = "");

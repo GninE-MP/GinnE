@@ -121,6 +121,17 @@ void CWebAssemblyDefs::PushType(CWebAssemblyVariables* vars, const char& flag)
         case 'b': // int32 - bool
             vars->PushInt32();
             break;
+        case 'x': // int32 - pointer size
+            vars->PushInt32();
+            break;
+        case 'z': // intptr - app architecture size [x86, x64]
+            #if IS_APP_ON_64_BIT_VERSION
+                vars->PushInt64();
+            #else
+                vars->PushInt32();
+            #endif
+
+            break;
         default:
             break;
     }

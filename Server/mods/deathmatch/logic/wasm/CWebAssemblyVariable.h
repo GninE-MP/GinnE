@@ -164,7 +164,7 @@ public:
     void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType);
     void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction);
     void Build(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment environment);
-    void Build();
+    void Build(void* customEnvironment = NULL);
 
     bool Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results, SString* errorMessage = NULL);
 
@@ -196,6 +196,7 @@ private:
     CWebAssemblyCFunction       m_pCFunction;
 
     CWebAssemblyApiEnviornment m_pEnvironment;
+    void*                      m_pCustomEnv;
 
     CWebAssemblyStore* m_pStore;
 

@@ -27,7 +27,19 @@
 
 void CWebAssemblyUtilDefs::RegisterFunctionTypes()
 {
+    // function signiture tutorial:
+    // "[return]...args";
+
     SetFunctionType("print_data", "vs");
+
+    SetFunctionType("get_shared_pointer_address", "z*");
+    SetFunctionType("get_pointer_from_shared_pointer", "*z");
+    SetFunctionType("does_shared_pointer_address_belong_to_this_module", "bz");
+    SetFunctionType("does_shared_pointer_address_belong_to_this_resource", "bz");
+    SetFunctionType("read_shared_pointer_address", "xz*x");
+    SetFunctionType("write_shared_pointer_address", "xz*x");
+    SetFunctionType("get_max_shared_pointer_size", "xz");
+
     SetFunctionType("get_tick_count", "l");
     SetFunctionType("get_real_time", "bilb");
     SetFunctionType("get_userdata_type", "i*si");
@@ -48,6 +60,15 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
 {
     CWebAssemblyCFunctionMap functions = {
         { "print_data", PrintData },
+
+        { "get_shared_pointer_address", GetSharedPointerAddress },
+        { "get_pointer_from_shared_pointer", GetPointerFromSharedPointer },
+        { "does_shared_pointer_address_belong_to_this_module", DoesSharedPointerAddressBelongToThisModule },
+        { "does_shared_pointer_address_belong_to_this_resource", DoesSharedPointerAddressBelongToThisResource },
+        { "read_shared_pointer_address", ReadSharedPointerAddress },
+        { "write_shared_pointer_address", WriteSharedPointerAddress },
+        { "get_max_shared_pointer_size", GetMaxSharedPointerSize },
+
         { "get_tick_count", GetTickCount_ },
         { "get_real_time", GetRealTime },
         { "get_userdata_type", GetUserDataType },
@@ -78,6 +99,190 @@ WebAssemblyApi(CWebAssemblyUtilDefs::PrintData, env, args, results)
     CLogger::LogPrintf("INFO: %s\n", str.c_str());
 
     return NULL;
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetSharedPointerAddress, env, args, results)
+{
+    CWebAssemblyMemoryPointerAddress ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadPointerAddress(ptr);
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CWebAssemblyMemory* memory = argStream.GetScript()->GetMemory();
+
+    void* pPtr = memory->GetMemoryPhysicalPointer(ptr);
+
+    if (!memory->DoesPointerBelongToMemory(pPtr))
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.ReturnSystemPointer(pPtr);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetPointerFromSharedPointer, env, args, results)
+{
+    void* ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+
+    if (!ptr)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CWebAssemblyMemory* memory = argStream.GetScript()->GetMemory();
+
+    if (!memory->DoesPointerBelongToMemory(ptr))
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return((CWebAssemblyUserData)((CWebAssemblyMemoryPointerAddress)(((intptr_t)ptr) - ((intptr_t)memory->GetBase()))));
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::DoesSharedPointerAddressBelongToThisModule, env, args, results)
+{
+    void* ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+
+    return argStream.Return(argStream.GetScript()->GetMemory()->DoesPointerBelongToMemory(ptr));
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::DoesSharedPointerAddressBelongToThisResource, env, args, results)
+{
+    void* ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+
+    return argStream.Return(argStream.GetScript()->GetStoreContext()->DoesPointerBelongToContext(ptr));
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::ReadSharedPointerAddress, env, args, results)
+{
+    void*                            ptr;
+    CWebAssemblyMemoryPointerAddress dataPtr;
+    int32_t                          size;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+    argStream.ReadPointerAddress(dataPtr);
+    argStream.ReadInt32(size);
+
+    if (size < 1)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyScript* script = argStream.GetScript()->GetStoreContext()->FindPointerScript(ptr);
+
+    if (!script)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    intptr_t ptrAddress = (intptr_t)ptr;
+    intptr_t memBaseAddress = (intptr_t)memory->GetBase();
+    intptr_t memEndAddress = ((intptr_t)memory->GetBase()) + memory->GetSize();
+    intptr_t maxReadSize = memEndAddress - ptrAddress;
+
+    size = std::min(size, (int32_t)maxReadSize);
+
+    if (size < 1)
+    {
+        return argStream.Return(0);
+    }
+
+    argStream.WritePointer(dataPtr, ptr, size);
+
+    return argStream.Return(size);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::WriteSharedPointerAddress, env, args, results)
+{
+    void*                            ptr;
+    CWebAssemblyMemoryPointerAddress dataPtr;
+    int32_t                          size;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+    argStream.ReadPointerAddress(dataPtr);
+    argStream.ReadInt32(size);
+
+    if (size < 1)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyScript* script = argStream.GetScript()->GetStoreContext()->FindPointerScript(ptr);
+
+    if (!script)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    intptr_t ptrAddress = (intptr_t)ptr;
+    intptr_t memBaseAddress = (intptr_t)memory->GetBase();
+    intptr_t memEndAddress = ((intptr_t)memory->GetBase()) + memory->GetSize();
+    intptr_t maxReadSize = memEndAddress - ptrAddress;
+
+    size = std::min(size, (int32_t)maxReadSize);
+
+    if (size < 1)
+    {
+        return argStream.Return(0);
+    }
+
+    memcpy(ptr, memory->GetMemoryPhysicalPointer(dataPtr), size);
+
+    return argStream.Return(size);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetMaxSharedPointerSize, env, args, results)
+{
+    void* ptr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(ptr);
+
+    CWebAssemblyScript* script = argStream.GetScript()->GetStoreContext()->FindPointerScript(ptr);
+
+    if (!script)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    intptr_t address = (intptr_t)ptr;
+    intptr_t memoryEndPointer = ((intptr_t)memory->GetBase()) + memory->GetSize();
+
+    if (address > memoryEndPointer)
+    {
+        return argStream.Return(0);
+    }
+
+    return argStream.Return(memoryEndPointer - address);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetTickCount_, env, args, results)

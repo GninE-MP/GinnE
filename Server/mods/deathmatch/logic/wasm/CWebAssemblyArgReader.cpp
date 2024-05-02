@@ -110,7 +110,11 @@ bool CWebAssemblyArgReader::NextIsPointerAddress()
 
 bool CWebAssemblyArgReader::NextIsUserData()
 {
-    return IsAppOn64BitVersion ? NextIsUInt64(): NextIsUInt32();
+    #if IS_APP_ON_64_BIT_VERSION
+        return NextIsUInt64();
+    #else
+        return NextIsUInt32();
+    #endif
 }
 
 void CWebAssemblyArgReader::ReadInt32(int32_t& out, int32_t defaultValue)
@@ -434,6 +438,13 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const bool& value, SString error
 {
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = (int32_t)value;
+
+    return CreateTrap(errorMessage);
+}
+
+CWebAssemblyTrap* CWebAssemblyArgReader::Return(CWebAssemblyVariable value, SString errorMessage)
+{
+    m_pResults->data[0] = value.GetValue();
 
     return CreateTrap(errorMessage);
 }

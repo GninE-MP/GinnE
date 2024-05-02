@@ -672,25 +672,28 @@ void CWebAssemblyFunctionType::FreeWebAssemblyFunctionTypeContext(CWebAssemblyFu
 
 CWebAssemblyFunction::CWebAssemblyFunction()
 {
-    m_pContext = NULL;
-    m_pCFunction = NULL;
-    m_pEnvironment = NULL;
-    m_pStore = NULL;
+    Drop();
 }
 
 CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store)
 {
+    Drop();
+
     SetStore(store);
 }
 
 CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType)
 {
+    Drop();
+
     SetStore(store);
     SetFunctionType(functionType);
 }
 
 CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction)
 {
+    Drop();
+
     SetStore(store);
     SetFunctionType(functionType);
     SetCFunction(cFunction);
@@ -698,6 +701,8 @@ CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssembl
 
 CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction cFunction, CWebAssemblyApiEnviornment enviornment)
 {
+    Drop();
+
     SetStore(store);
     SetFunctionType(functionType);
     SetCFunction(cFunction);
@@ -706,11 +711,9 @@ CWebAssemblyFunction::CWebAssemblyFunction(CWebAssemblyStore* store, CWebAssembl
 
 CWebAssemblyFunction::CWebAssemblyFunction(const CWebAssemblyFunctionContext& context)
 {
-    SetFunctionContext(context);
+    Drop();
 
-    m_pCFunction = NULL;
-    m_pEnvironment = NULL;
-    m_pStore = NULL;
+    SetFunctionContext(context);
 }
 
 CWebAssemblyFunction::~CWebAssemblyFunction()
@@ -754,6 +757,7 @@ void CWebAssemblyFunction::Drop()
 
     m_pCFunction = NULL;
     m_pEnvironment = NULL;
+    m_pCustomEnv = NULL;
     m_pStore = NULL;
 }
 
@@ -791,7 +795,7 @@ void CWebAssemblyFunction::Build(CWebAssemblyStore* store, CWebAssemblyFunctionT
     Build();
 }
 
-void CWebAssemblyFunction::Build()
+void CWebAssemblyFunction::Build(void* customEnviornment)
 {
     if (!m_pStore)
     {
@@ -803,7 +807,9 @@ void CWebAssemblyFunction::Build()
         return;
     }
 
-    if (!m_pEnvironment)
+    void* env = !customEnviornment ? (void*)m_pEnvironment : customEnviornment;
+
+    if (!env)
     {
         return;
     }
@@ -816,7 +822,12 @@ void CWebAssemblyFunction::Build()
         return;
     }
 
-    m_pContext = wasm_func_new_with_env(m_pStore->GetContext(), functionType, m_pCFunction, (void*)m_pEnvironment, NULL);
+    if (customEnviornment)
+    {
+        m_pCustomEnv = customEnviornment;
+    }
+
+    m_pContext = wasm_func_new_with_env(m_pStore->GetContext(), functionType, m_pCFunction, env, NULL);
 }
 
 bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariables* results, SString* errorMessage)
@@ -912,7 +923,7 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
             }
             else
             {
-                frameDataLength = sprintf(frameData, "`%s`", m_strFunctionName.c_str());
+                frameDataLength = sprintf(frameData, " `%s`", m_strFunctionName.c_str());
             }
         }
 
@@ -1012,6 +1023,11 @@ void CWebAssemblyFunction::Free()
         delete m_pEnvironment;
     }
 
+    if (m_pCustomEnv)
+    {
+        delete m_pCustomEnv;
+    } 
+    
     Drop();
 }
 

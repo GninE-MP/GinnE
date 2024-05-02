@@ -37,6 +37,7 @@ private:
     CWebAssemblyContext* m_pWasmContext;
 
     static int Lua_CallWebAssemblyFunction(lua_State* luaVM);
+    static int Lua_UTF8ToString(lua_State* luaVM);
 };
 
 #endif

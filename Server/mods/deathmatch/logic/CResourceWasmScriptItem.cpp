@@ -71,7 +71,8 @@ bool CResourceWasmScriptItem::Start()
             lua_pushuserdata(luaVM, function);
             lua_setfield(luaVM, -2, WASM_LUA_FUNCTION_FIELD_NAME);
 
-            // add wasmUTF8ToString and wasmStringToUTF8 -- functions! to function table!
+            lua_pushcfunction(luaVM, Lua_UTF8ToString);
+            lua_setfield(luaVM, -2, "utf8ToString");
 
             lua_newtable(luaVM);
 
@@ -93,7 +94,6 @@ bool CResourceWasmScriptItem::Stop()
 {
     return true;
 }
-
 
 int CResourceWasmScriptItem::Lua_CallWebAssemblyFunction(lua_State* luaVM)
 {
@@ -182,6 +182,32 @@ int CResourceWasmScriptItem::Lua_CallWebAssemblyFunction(lua_State* luaVM)
             }
         }
 
+        if (functionArgsCount - (argsCount - 1) > 0)
+        {
+            for (int i = (argsCount - 1); i < functionArgsCount; i++)
+            {
+                CWebAssemblyVariableKind kind = functionArgs.Get(i).GetType();
+
+                switch (kind)
+                {
+                    case C_WASM_VARIABLE_TYPE_I32:
+                        args.PushInt32();
+                        break;
+                    case C_WASM_VARIABLE_TYPE_I64:
+                        args.PushInt64();
+                        break;
+                    case C_WASM_VARIABLE_TYPE_F32:
+                        args.PushFloat32();
+                        break;
+                    case C_WASM_VARIABLE_TYPE_F64:
+                        args.PushFloat64();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
         SString errorMessage;
 
         if (!function->Call(&args, &results, &errorMessage))
@@ -219,5 +245,44 @@ int CResourceWasmScriptItem::Lua_CallWebAssemblyFunction(lua_State* luaVM)
         return results.GetSize();
     }
     
+    return 0;
+}
+
+int CResourceWasmScriptItem::Lua_UTF8ToString(lua_State* luaVM)
+{
+    if (lua_type(luaVM, 1) == LUA_TTABLE && lua_type(luaVM, 2) == LUA_TNUMBER)
+    {
+        CWebAssemblyFunction* function = NULL;
+
+        lua_getfield(luaVM, 1, WASM_LUA_FUNCTION_FIELD_NAME);
+
+        if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
+        {
+            function = (CWebAssemblyFunction*)lua_touserdata(luaVM, -1);
+        }
+
+        lua_pop(luaVM, 1);
+
+        if (!function)
+        {
+            return 0;
+        }
+
+        CWebAssemblyMemory* memory = function->GetApiEnviornment()->script->GetMemory();
+
+        lua_Integer ptrInt = lua_tointeger(luaVM, 2);
+
+        if (ptrInt == WEB_ASSEMBLY_NULL_PTR)
+        {
+            return 0;
+        }
+
+        SString str = memory->UTF8ToString(ptrInt);
+
+        lua_pushlstring(luaVM, str.c_str(), str.size());
+
+        return 1;
+    }
+
     return 0;
 }
