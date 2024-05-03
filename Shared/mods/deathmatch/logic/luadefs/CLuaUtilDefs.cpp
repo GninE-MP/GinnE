@@ -14,6 +14,7 @@
 #include "Utils.h"
 #include <lua/CLuaFunctionParser.h>
 #include <SharedUtil.Memory.h>
+//#include "../wasm/CWebAssemblyContext.h"
 
 #ifndef GninE_CLIENT
     #include "CRemoteCalls.h"
@@ -73,6 +74,8 @@ void CLuaUtilDefs::LoadFunctions()
         {"gettok", GetTok},
         {"tocolor", tocolor},
         {"getProcessMemoryStats", ArgumentParser<GetProcessMemoryStats>},
+
+        //{"wasmUTF8ToString", WasmUTF8ToString}
     };
 
     // Add functions
@@ -739,3 +742,6 @@ int CLuaUtilDefs::tocolor(lua_State* luaVM)
     lua_pushnumber(luaVM, static_cast<lua_Number>(ulColor));
     return 1;
 }
+
+/*
+*/

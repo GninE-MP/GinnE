@@ -18,6 +18,9 @@
 
 #include "../wasmdefs/CWebAssemblyDefs.h"
 
+#include "CScriptArgReader.h"
+#include "luadefs/CLuaDefs.h"
+
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
 
 CWebAssemblyEngine::CWebAssemblyEngine()
@@ -247,6 +250,39 @@ void CWebAssemblyContext::ClearScripts()
 void CWebAssemblyContext::SetResource(CResource* resource)
 {
     m_pResource = resource;
+
+    if (!resource)
+    {
+        return;
+    }
+
+
+}
+
+int CWebAssemblyContext::WasmUTF8ToString(lua_State* luaVM)
+{
+    CWebAssemblyUserData ptr;
+    CWebAssemblyUserData maxSize;
+
+    CScriptArgReader argStream(luaVM);
+
+    argStream.ReadNumber(ptr);
+    argStream.ReadNumber(maxSize, 0xffffffff);
+
+    // we need lua manager here! and we have to get it from pGame!
+    /*
+    CResource* resource = m_pLuaManager->GetVirtualMachine(luaVM)->GetResource();
+
+    CWebAssemblyScript* script = resource->GetResourceWebAssemblyContext()->FindPointerScript((void*)ptr);
+
+    if (!script)
+    {
+        return 0;
+    }
+
+    CLogger::LogPrintf("script is : '%s'\n", script->GetResourcePath().c_str());
+    */
+    return 0;
 }
 
 CResource* CWebAssemblyContext::GetResource()
@@ -692,7 +728,6 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                     goto ImportFail;
                 }
 
-                //CWebAssemblyFunction* globalFunction = m_mpGlobalFunctions[importName];
                 CWebAssemblyFunction* globalFunction = m_pContextStore->GetGlobalFunction(importName);
 
                 globalFunctionType = globalFunction->GetFunctionType();
@@ -731,13 +766,6 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 CWebAssemblyFunction* luaFunctionCaller = GetGlobalFunction(importName);
 
                 imports[i] = wasm_func_as_extern(luaFunctionCaller->GetFunctionContext());
-
-                // we are replacing lua functions instead of all not imported functions!
-                /*CLogger::ErrorPrintf("Couldn't import function '%s' in script[\"@%s/%s\"].\n", importName.c_str(), m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
-
-                imports[i] = wasm_extern_new_empty(m_pContextStore->GetStore()->GetContext(), wasm_externtype_kind(wasm_importtype_type(importType)));
-
-                goto Fail;*/
             }
             else
             {
@@ -999,8 +1027,6 @@ WebAssemblyApi(CWebAssemblyScript::Wasm_CallSharedImportedFunction, env, args, r
     {
         if (!errorMessage.empty())
         {
-            //CLogger::ErrorPrintf("%s:%s\n", enviornment->sharedEnv->script->GetResourcePath().c_str(), errorMessage.c_str());
-
             return argStream.ReturnNull(errorMessage);
         }
     }
@@ -1011,41 +1037,114 @@ WebAssemblyApi(CWebAssemblyScript::Wasm_CallSharedImportedFunction, env, args, r
     }
 
     return argStream.Return(funcResults.GetFirst());
-
-    return NULL;
 }
 
 WebAssemblyApi(CWebAssemblyScript::Wasm_CallLuaImportedFunction, env, args, results)
 {
-    CLogger::LogPrintf("calling lua shared function in import from wasm!\n");
+    CWebAssemblyMemoryPointerAddress ptr;
+    uint32_t                         maxSize;
 
-    return NULL;
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    size_t argCount = argStream.GetArgumentCount() - 2;
+
+    argStream.Skip(argCount);
+
+    bool canWriteResult = argStream.CanContinue();
+
+    if (canWriteResult)
+    {
+        argStream.ReadPointerAddress(ptr);
+        argStream.ReadUInt32(maxSize);
+    }
+
+    CLuaArguments luaArguments;
+
+    for (int i = 0; i < argCount; i++)
+    {
+        CWebAssemblyValue arg = args->data[i];
+
+        switch (arg.kind)
+        {
+            case C_WASM_VARIABLE_TYPE_I32:
+                luaArguments.PushNumber((double)arg.of.i32);
+                break;
+            case C_WASM_VARIABLE_TYPE_I64:
+                luaArguments.PushNumber((double)arg.of.i64);
+                break;
+            case C_WASM_VARIABLE_TYPE_F32:
+                luaArguments.PushNumber((double)arg.of.f32);
+                break;
+            case C_WASM_VARIABLE_TYPE_F64:
+                luaArguments.PushNumber((double)arg.of.f64);
+                break;
+            default:
+                break;
+        }
+    }
+
+    lua_State* luaVM = argStream.GetScript()->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+
+    lua_getglobal(luaVM, argStream.GetFunctionName().c_str());
+
+    luaArguments.PushArguments(luaVM);
+
+    if (lua_pcall(luaVM, luaArguments.Count(), canWriteResult ? 1 : 0, 0) != 0)
+    {
+        SString errorMessage = lua_tostring(luaVM, -1);
+
+        lua_pop(luaVM, 1);
+
+        return argStream.ReturnNull(errorMessage);
+    }
+
+    if (canWriteResult)
+    {
+        int bytesWrote = 0;
+
+        if (ptr != WEB_ASSEMBLY_NULL_PTR)
+        {
+            int type = lua_type(luaVM, -1);
+
+            if (type == LUA_TBOOLEAN)
+            {
+                bool result = lua_toboolean(luaVM, -1);
+
+                bytesWrote = std::min((uint32_t)sizeof(result), maxSize);
+
+                argStream.WritePointer(ptr, &result, bytesWrote);
+            }
+            else if (type == LUA_TNUMBER)
+            {
+                double result = lua_tonumber(luaVM, -1);
+
+                bytesWrote = std::min((uint32_t)sizeof(result), maxSize);
+
+                argStream.WritePointer(ptr, &result, bytesWrote);
+            }
+            else if (type == LUA_TSTRING)
+            {
+                const char* result = lua_tostring(luaVM, -1);
+
+                uint32_t stringSize = lua_strlen(luaVM, -1) + 1;
+
+                bytesWrote = std::min(stringSize, maxSize);
+
+                argStream.WritePointer(ptr, result, bytesWrote);
+
+                char endCharacter = '\0';
+
+                argStream.WritePointer(ptr + stringSize, &endCharacter);
+            }
+        }
+
+        lua_pop(luaVM, 1);
+
+        return argStream.Return(bytesWrote);
+    }
+
+    return argStream.ReturnNull();
 }
-
-/*void CWebAssemblyScript::RegisterGlobalFunctions(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function)
-{
-    if (functionName.empty())
-    {
-        return;
-    }
-
-    if (DoesGlobalFunctionExist(functionName))
-    {
-        DeleteGlobalFunction(functionName);
-    }
-
-    CWebAssemblyFunction* wasmFunction = new CWebAssemblyFunction(m_pContextStore->GetStore(), functionType, function, CreateApiEnvironment(functionName));
-    wasmFunction->Build();
-
-    wasmFunction->SetFunctionName(functionName);
-
-    if (!wasmFunction || !wasmFunction->GetFunctionContext())
-    {
-        return;
-    }
-
-    m_mpGlobalFunctions[functionName] = wasmFunction;
-}*/ 
 
 CWebAssemblyContext* CWebAssemblyScript::GetStoreContext()
 {

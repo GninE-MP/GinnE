@@ -52,4 +52,6 @@ public:
     // Utility functions
     LUA_DECLARE(GetTok);
     LUA_DECLARE(tocolor);
+
+    //LUA_DECLARE(WasmUTF8ToString);
 };

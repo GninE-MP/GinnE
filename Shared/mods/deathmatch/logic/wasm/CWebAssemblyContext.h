@@ -130,8 +130,6 @@ private:
     CWebAssemblyScriptList m_lsScripts;
 
     CWebAssemblyFunctionMap m_mpGlobalFunctions;
-
-    static int WasmUTF8ToString(lua_State* luaVM);
 };
 
 class CWebAssemblyVariables;

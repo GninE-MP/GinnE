@@ -569,14 +569,14 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CDbJobData* value, SString error
     return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetId()));
 }
 
-bool CWebAssemblyArgReader::Skip()
+bool CWebAssemblyArgReader::Skip(int count)
 {
     if (!CanContinue())
     {
         return false;
     }
 
-    m_iIndex++;
+    m_iIndex += count;
 
     return true;
 }

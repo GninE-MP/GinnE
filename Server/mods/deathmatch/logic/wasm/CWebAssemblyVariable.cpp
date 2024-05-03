@@ -923,7 +923,7 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
             }
             else
             {
-                frameDataLength = sprintf(frameData, " `%s`", m_strFunctionName.c_str());
+                frameDataLength = sprintf(frameData, "`%s`", m_strFunctionName.c_str());
             }
         }
 
@@ -931,7 +931,7 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
 
         std::string messageData(message.data, message.num_elems);
 
-        *errorMessage += messageData.substr(sizeof("Exception: ") - 1);
+        *errorMessage += messageData.substr(sizeof("Exception:") - 1);
 
         wasm_trap_delete(trap);
         wasm_name_delete(&message);
