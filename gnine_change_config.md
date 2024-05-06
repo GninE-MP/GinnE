@@ -3,7 +3,7 @@ As you can see GninE is a full copy of 'MTA BLUE' project.
 So when it wants to open the game it can't do it properly.
 We need to change some configs that tells to windows that this is GninE wants to open GTA San Andreas.
 To do this we need to change some files and configs that i will describe them on this article.
-Note: These changes is only for developers because players can use the installer application which we will create for theme to install this data and its configs to make them launcher work properly!
+Note: These changes is only for developers because players can use the installer application which we will create for them to install this data and its configs to make the launcher work properly!
 
 # Changes
 1. [win_install_data.bat]() : install data downloads some data files like .dll libraries or ... from 'MTA BLUE' servers. This will create a folder called `mta` in `Bin` directory. So we must copy some of (not all of them because some of them aren't flexable with `GninE` application) its files to `GninE` directory in `Bin` directory. Also there are some files that we must change there name, which you can see in the following box:
