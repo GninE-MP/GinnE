@@ -173,6 +173,8 @@ public:
         memcpy(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr), (void*)value, size);
     }
 
+    bool HasResult();
+
     CWebAssemblyTrap* ReturnNull(SString errorMessage = "");
     CWebAssemblyTrap* Return(const int32_t& value, SString errorMessage = "");
     CWebAssemblyTrap* Return(const uint32_t& value, SString errorMessage = "");
@@ -199,6 +201,11 @@ public:
     template<typename PTR>
     CWebAssemblyTrap* Return(PTR* ptr, intptr_t size = -1, SString errorMessage = "")
     {
+        if (!HasResult())
+        {
+            return CreateTrap(errorMessage);
+        }
+
         if (!ptr || size == 0)
         {
             m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
@@ -235,11 +242,21 @@ public:
     template<typename PTR>
     CWebAssemblyTrap* ReturnSystemPointer(PTR* userData, SString errorMessage = "")
     {
+        if (!HasResult())
+        {
+            return CreateTrap(errorMessage);
+        }
+
         return Return((CWebAssemblyUserData)(void*)(CWebAssemblyUserData*)userData, errorMessage);
     }
 
     CWebAssemblyTrap* ReturnUserData(void* userdata, SString errorMessage = "")
     {
+        if (!HasResult())
+        {
+            return CreateTrap(errorMessage);
+        }
+
         if (!userdata)
         {
             return CreateTrap(errorMessage);

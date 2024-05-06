@@ -16,17 +16,20 @@
 #include "../wasm/CWebAssemblyVariable.h"
 
 #include "CWebAssemblyUtilDefs.h"
+#include "CWebAssemblyElementDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
 void CWebAssemblyDefs::RegisterApiFunctionTypes()
 {
     CWebAssemblyUtilDefs::RegisterFunctionTypes();
+    CWebAssemblyElementDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
 {
     CWebAssemblyUtilDefs::RegisterFunctions(script);
+    CWebAssemblyElementDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)
@@ -125,6 +128,22 @@ void CWebAssemblyDefs::PushType(CWebAssemblyVariables* vars, const char& flag)
             vars->PushInt32();
             break;
         case 'z': // intptr - app architecture size [x86, x64]
+            #if IS_APP_ON_64_BIT_VERSION
+                vars->PushInt64();
+            #else
+                vars->PushInt32();
+            #endif
+
+            break;
+        case 'u':
+            #if IS_APP_ON_64_BIT_VERSION
+                vars->PushInt64();
+            #else
+                vars->PushInt32();
+            #endif
+            
+            break;
+        case 'e':
             #if IS_APP_ON_64_BIT_VERSION
                 vars->PushInt64();
             #else

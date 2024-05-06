@@ -117,9 +117,10 @@ public:
     bool                DoesPointerBelongToContext(void* ptr);
     CWebAssemblyScript* FindPointerScript(void* ptr);
 
-    static void                InitializeWebAssemblyEngine();
+    static void                InitializeWebAssemblyEngine(CGame* pGameObject);
     static void                DeleteWebAssemblyEngine();
     static CWebAssemblyEngine* GetWebAssemblyEngine();
+    static CGame*              GetGameObject();
 
     static bool IsWebAssemblyBinary(const char* binary);
 
@@ -257,6 +258,8 @@ public:
 
     uintptr_t GetMemoryPhysicalPointerAddress(CWebAssemblyMemoryPointerAddress pointer);
     void*     GetMemoryPhysicalPointer(CWebAssemblyMemoryPointerAddress pointer);
+
+    CWebAssemblyMemoryPointerAddress GetMemoryPointerAddressByPhysicalAddress(void* pointer);
 
     void                SetScript(CWebAssemblyScript* script);
     CWebAssemblyScript* GetScript();

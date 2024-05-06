@@ -1011,7 +1011,7 @@ bool CGame::Start(int iArgumentCount, char* szArguments[])
     }
 
     // Initializing web assembly engine.
-    CWebAssemblyContext::InitializeWebAssemblyEngine();
+    CWebAssemblyContext::InitializeWebAssemblyEngine(this);
 
     // Done
     // If you're ever going to change this message, update the "server ready" determination

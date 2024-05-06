@@ -106,16 +106,16 @@ public:
 
     virtual bool IsPerPlayerEntity() { return false; };
 
-    CElement* FindChild(const char* szName, unsigned int uiIndex, bool bRecursive);
-    CElement* FindChildByType(const char* szType, unsigned int uiIndex, bool bRecursive);
-    void      FindAllChildrenByType(const char* szType, lua_State* pLua);
-    void      GetChildren(lua_State* pLua);
-    void      GetChildrenByType(const char* szType, lua_State* pLua);
-    bool      IsMyChild(CElement* pElement, bool bRecursive);
-    bool      IsMyParent(CElement* pElement, bool bRecursive);
-    void      ClearChildren();
-    void      GetDescendantsByType(std::vector<CElement*>& outResult, EElementType elementType);
-    void      GetDescendantsByTypeSlow(std::vector<CElement*>& outResult, uint uiTypeHash);
+    CElement*         FindChild(const char* szName, unsigned int uiIndex, bool bRecursive);
+    CElement*         FindChildByType(const char* szType, unsigned int uiIndex, bool bRecursive);
+    void              FindAllChildrenByType(const char* szType, lua_State* pLua);
+    void              GetChildren(lua_State* pLua);
+    void              GetChildrenByType(const char* szType, lua_State* pLua);
+    bool              IsMyChild(CElement* pElement, bool bRecursive);
+    bool              IsMyParent(CElement* pElement, bool bRecursive);
+    void              ClearChildren();
+    void              GetDescendantsByType(std::vector<CElement*>& outResult, EElementType elementType);
+    void              GetDescendantsByTypeSlow(std::vector<CElement*>& outResult, uint uiTypeHash);
     template <class T>
     void GetDescendantsByType(std::vector<T>& outResult, EElementType elementType)
     {

@@ -368,8 +368,18 @@ void CWebAssemblyArgReader::ReadVector3D(CVector& out, CVector defaultValue)
     out.fZ = value->z;
 }
 
+bool CWebAssemblyArgReader::HasResult()
+{
+    return m_pResults && m_pResults->size > 0;
+}
+
 CWebAssemblyTrap* CWebAssemblyArgReader::ReturnNull(SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
 
@@ -378,6 +388,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::ReturnNull(SString errorMessage)
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int32_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = value;
 
@@ -386,11 +401,21 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int32_t& value, SString er
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const uint32_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     return Return((int32_t)value);
 }
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int64_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I64;
     m_pResults->data[0].of.i64 = value;
 
@@ -399,11 +424,21 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const int64_t& value, SString er
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const uint64_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     return Return((int64_t)value);
 }
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float32_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_F32;
     m_pResults->data[0].of.f32 = value;
 
@@ -412,6 +447,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float32_t& value, SString 
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float64_t& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_F64;
     m_pResults->data[0].of.f64 = value;
 
@@ -420,6 +460,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const float64_t& value, SString 
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const SString& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (value.empty())
     {
         m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
@@ -436,6 +481,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const SString& value, SString er
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(const bool& value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
     m_pResults->data[0].of.i32 = (int32_t)value;
 
@@ -444,6 +494,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(const bool& value, SString error
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CWebAssemblyVariable value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     m_pResults->data[0] = value.GetValue();
 
     return CreateTrap(errorMessage);
@@ -451,6 +506,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CWebAssemblyVariable value, SStr
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CElement* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -461,6 +521,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CElement* value, SString errorMe
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CPlayer* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -471,6 +536,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CPlayer* value, SString errorMes
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CResource* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -481,6 +551,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CResource* value, SString errorM
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CXMLNode* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -491,6 +566,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CXMLNode* value, SString errorMe
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CLuaTimer* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -501,6 +581,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CLuaTimer* value, SString errorM
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccount* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -511,6 +596,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccount* value, SString errorMe
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlList* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -521,6 +611,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlList* value, SStri
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlListGroup* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -531,6 +626,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CAccessControlListGroup* value, 
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CBan* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -541,6 +641,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CBan* value, SString errorMessag
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextDisplay* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -551,6 +656,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextDisplay* value, SString err
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextItem* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);
@@ -561,6 +671,11 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CTextItem* value, SString errorM
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CDbJobData* value, SString errorMessage)
 {
+    if (!HasResult())
+    {
+        return CreateTrap(errorMessage);
+    }
+
     if (!value)
     {
         return ReturnNull(errorMessage);

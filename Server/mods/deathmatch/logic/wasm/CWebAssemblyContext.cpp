@@ -21,6 +21,7 @@
 #include "CScriptArgReader.h"
 #include "luadefs/CLuaDefs.h"
 
+CGame*              pGame = NULL;
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
 
 CWebAssemblyEngine::CWebAssemblyEngine()
@@ -256,33 +257,58 @@ void CWebAssemblyContext::SetResource(CResource* resource)
         return;
     }
 
+    lua_State* luaVM = resource->GetVirtualMachine()->GetVM();
 
+    if (!luaVM)
+    {
+        return;
+    }
+
+    lua_pushcfunction(luaVM, WasmUTF8ToString);
+    lua_setglobal(luaVM, "wasmUtf8ToString");
 }
 
 int CWebAssemblyContext::WasmUTF8ToString(lua_State* luaVM)
 {
     CWebAssemblyUserData ptr;
-    CWebAssemblyUserData maxSize;
+    intptr_t             maxSize;
 
     CScriptArgReader argStream(luaVM);
 
     argStream.ReadNumber(ptr);
-    argStream.ReadNumber(maxSize, 0xffffffff);
+    argStream.ReadNumber(maxSize, -1);
 
-    // we need lua manager here! and we have to get it from pGame!
-    /*
-    CResource* resource = m_pLuaManager->GetVirtualMachine(luaVM)->GetResource();
+    void* ptrAddress = (void*)ptr;
 
-    CWebAssemblyScript* script = resource->GetResourceWebAssemblyContext()->FindPointerScript((void*)ptr);
-
-    if (!script)
+    if (!ptrAddress)
     {
         return 0;
     }
 
-    CLogger::LogPrintf("script is : '%s'\n", script->GetResourcePath().c_str());
-    */
-    return 0;
+    CWebAssemblyContext* wasmContext = pGame->GetLuaManager()->GetVirtualMachineResource(luaVM)->GetResourceWebAssemblyContext();
+
+    if (!wasmContext)
+    {
+        return 0;
+    }
+
+    CWebAssemblyScript* script = wasmContext->FindPointerScript(ptrAddress);
+
+    if (!script)
+    {
+        pGame->GetScriptDebugging()->LogError(luaVM, "This memory pointer doesn't belong to this resource!");
+        return 0;
+    }
+
+    CWebAssemblyMemory* memory = script->GetMemory();
+
+    CWebAssemblyMemoryPointerAddress modulePtrAddress = memory->GetMemoryPointerAddressByPhysicalAddress(ptrAddress);
+
+    SString data = memory->UTF8ToString(modulePtrAddress, maxSize);
+
+    lua_pushlstring(luaVM, data.data(), data.length());
+
+    return 1;
 }
 
 CResource* CWebAssemblyContext::GetResource()
@@ -396,12 +422,14 @@ CWebAssemblyScript* CWebAssemblyContext::FindPointerScript(void* ptr)
     return NULL;
 }
 
-void CWebAssemblyContext::InitializeWebAssemblyEngine()
+void CWebAssemblyContext::InitializeWebAssemblyEngine(CGame* pGameObject)
 {
     if (WebAssemblyEngine)
     {
         DeleteWebAssemblyEngine();
     }
+
+    pGame = pGameObject;
 
     CLogger::LogPrintf("Building new web assembly engine...\n");
 
@@ -430,6 +458,11 @@ void CWebAssemblyContext::DeleteWebAssemblyEngine()
 CWebAssemblyEngine* CWebAssemblyContext::GetWebAssemblyEngine()
 {
     return WebAssemblyEngine;
+}
+
+CGame* CWebAssemblyContext::GetGameObject()
+{
+    return pGame;
 }
 
 bool CWebAssemblyContext::IsWebAssemblyBinary(const char* binary)
@@ -1830,6 +1863,16 @@ void* CWebAssemblyMemory::GetMemoryPhysicalPointer(CWebAssemblyMemoryPointerAddr
     }
 
     return (void*)((byte_t*)GetBase() + pointer);
+}
+
+CWebAssemblyMemoryPointerAddress CWebAssemblyMemory::GetMemoryPointerAddressByPhysicalAddress(void* pointer)
+{
+    if (!DoesPointerBelongToMemory(pointer))
+    {
+        return WEB_ASSEMBLY_NULL_PTR;
+    }
+
+    return ((uintptr_t)pointer) - ((uintptr_t)GetBase());
 }
 
 void CWebAssemblyMemory::SetScript(CWebAssemblyScript* script)
