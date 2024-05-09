@@ -1599,19 +1599,25 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementAttachedOffsets, env, args, re
     } offset;
     memset(&offset, 0, sizeof(offset));
 
-    offset.x = posOffset.fX;
-    offset.y = posOffset.fY;
-    offset.z = posOffset.fZ;
+    if (posOffsetPtr != WEB_ASSEMBLY_NULL_PTR)
+    {
+        offset.x = posOffset.fX;
+        offset.y = posOffset.fY;
+        offset.z = posOffset.fZ;
 
-    argStream.WritePointer(posOffsetPtr, &offset);
-    
-    offset.x = rotOffset.fX;
-    offset.y = rotOffset.fY;
-    offset.z = rotOffset.fZ;
+        argStream.WritePointer(posOffsetPtr, &offset);
+    }
 
-    argStream.WritePointer(rotOffsetPtr, &offset);
+    if (rotOffsetPtr != WEB_ASSEMBLY_NULL_PTR)
+    {
+        offset.x = rotOffset.fX;
+        offset.y = rotOffset.fY;
+        offset.z = rotOffset.fZ;
 
-    return argStream.Return(true);
+        argStream.WritePointer(rotOffsetPtr, &offset);
+    }
+
+    return argStream.Return(!(posOffsetPtr == WEB_ASSEMBLY_NULL_PTR || rotOffsetPtr == WEB_ASSEMBLY_NULL_PTR));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementID, env, args, results)
