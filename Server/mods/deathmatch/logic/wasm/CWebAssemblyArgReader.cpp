@@ -516,7 +516,7 @@ CWebAssemblyTrap* CWebAssemblyArgReader::Return(CElement* value, SString errorMe
         return ReturnNull(errorMessage);
     }
 
-    return Return((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(value->GetID().Value()));
+    return Return(ELEMENT_TO_WASM_USERDATA(value));
 }
 
 CWebAssemblyTrap* CWebAssemblyArgReader::Return(CPlayer* value, SString errorMessage)

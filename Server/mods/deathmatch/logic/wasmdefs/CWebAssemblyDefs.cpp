@@ -135,7 +135,7 @@ void CWebAssemblyDefs::PushType(CWebAssemblyVariables* vars, const char& flag)
             #endif
 
             break;
-        case 'u':
+        case 'u': // intptr - userdata
             #if IS_APP_ON_64_BIT_VERSION
                 vars->PushInt64();
             #else
@@ -143,7 +143,7 @@ void CWebAssemblyDefs::PushType(CWebAssemblyVariables* vars, const char& flag)
             #endif
             
             break;
-        case 'e':
+        case 'e': // element - userdata
             #if IS_APP_ON_64_BIT_VERSION
                 vars->PushInt64();
             #else

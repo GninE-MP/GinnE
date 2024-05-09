@@ -22,6 +22,8 @@
 #include "CAccessControlListGroup.h"
 #include "CDatabaseManager.h"
 
+#define ELEMENT_TO_WASM_USERDATA(element) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((element)->GetID().Value()))
+
 class CWebAssemblyScript;
 
 class CWebAssemblyArgReader

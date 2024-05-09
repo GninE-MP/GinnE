@@ -242,8 +242,12 @@ protected:
 
     CElement* FindChildIndex(const char* szName, unsigned int uiIndex, unsigned int& uiCurrentIndex, bool bRecursive);
     CElement* FindChildByTypeIndex(unsigned int uiTypeHash, unsigned int uiIndex, unsigned int& uiCurrentIndex, bool bRecursive);
-    void      FindAllChildrenByTypeIndex(unsigned int uiTypeHash, lua_State* pLua, unsigned int& uiIndex);
 
+public:
+    void      FindAllChildrenByTypeIndex(unsigned int uiTypeHash, lua_State* pLua, unsigned int& uiIndex);
+    void      FindAllChildrenByTypeIndex(unsigned int uiTypeHash, std::vector<CElement*>& outList);
+
+protected:
     void CallEventNoParent(const char* szName, const CLuaArguments& Arguments, CElement* pSource, CPlayer* pCaller = NULL);
     void CallParentEvent(const char* szName, const CLuaArguments& Arguments, CElement* pSource, CPlayer* pCaller = NULL);
 
@@ -294,6 +298,8 @@ private:
     static bool IsFromRoot(CElement* pEntity);
     static void AddEntityFromRoot(unsigned int uiTypeHash, CElement* pEntity, bool bDebugCheck = true);
     static void RemoveEntityFromRoot(unsigned int uiTypeHash, CElement* pEntity);
+
+public:
     static void GetEntitiesFromRoot(unsigned int uiTypeHash, lua_State* pLua);
     static void GetEntitiesFromRoot(unsigned int uiTypeHash, std::vector<CElement*>& outResult);
 

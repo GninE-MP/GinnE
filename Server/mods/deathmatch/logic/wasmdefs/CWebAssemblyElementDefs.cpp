@@ -17,6 +17,7 @@
 #include "Utils.h"
 #include "CColShape.h"
 #include "CMarker.h"
+#include "CSpatialDatabase.h"
 
 #include "../wasm/CWebAssemblyContext.h"
 #include "../wasm/CWebAssemblyVariable.h"
@@ -47,33 +48,33 @@ void CWebAssemblyElementDefs::RegisterFunctionTypes()
     SetFunctionType("get_element_id", "xesx");
     SetFunctionType("get_element_parent", "ee");
     SetFunctionType("get_element_matrix", "be*b");
-    SetFunctionType("get_element_position", "");
-    SetFunctionType("get_element_rotation", "");
-    SetFunctionType("get_element_velocity", "");
-    SetFunctionType("get_element_turn_velocity", "");
-    SetFunctionType("get_elements_by_type", "");
+    SetFunctionType("get_element_position", "be*");
+    SetFunctionType("get_element_rotation", "be*s");
+    SetFunctionType("get_element_velocity", "be*");
+    SetFunctionType("get_element_turn_velocity", "be*");
+    SetFunctionType("get_elements_by_type", "ise*i");
     SetFunctionType("get_element_type", "xesx");
-    SetFunctionType("get_element_interior", "");
-    SetFunctionType("get_elements_within_col_shape", "");
-    SetFunctionType("get_elements_within_range", "");
-    SetFunctionType("get_element_dimension", "");
-    SetFunctionType("get_element_zone_name", "");
-    SetFunctionType("get_element_col_shape", "");
-    SetFunctionType("get_element_alpha", "");
-    SetFunctionType("is_element_double_sided", "");
-    SetFunctionType("get_element_health", "");
-    SetFunctionType("get_element_model", "");
-    SetFunctionType("get_element_syncer", "");
-    SetFunctionType("get_element_collisions_enabled", "");
-    SetFunctionType("get_low_lod_element", "");
+    SetFunctionType("get_element_interior", "ie");
+    SetFunctionType("get_elements_within_col_shape", "ies*i");
+    SetFunctionType("get_elements_within_range", "i*f*isii");
+    SetFunctionType("get_element_dimension", "ie");
+    SetFunctionType("get_element_zone_name", "xesxb");
+    SetFunctionType("get_element_col_shape", "ee");
+    SetFunctionType("get_element_alpha", "ie");
+    SetFunctionType("is_element_double_sided", "be");
+    SetFunctionType("get_element_health", "fe");
+    SetFunctionType("get_element_model", "ie");
+    SetFunctionType("get_element_syncer", "ee");
+    SetFunctionType("get_element_collisions_enabled", "be");
+    SetFunctionType("get_low_lod_element", "ee");
 
-    SetFunctionType("attach_elements", "");
-    SetFunctionType("detach_elements", "");
-    SetFunctionType("is_element_attached", "");
-    SetFunctionType("get_attached_elements", "");
-    SetFunctionType("get_element_attached_to", "");
-    SetFunctionType("set_element_attached_offsets", "");
-    SetFunctionType("get_element_attached_offsets", "");
+    SetFunctionType("attach_elements", "bee**");
+    SetFunctionType("detach_elements", "bee");
+    SetFunctionType("is_element_attached", "be");
+    SetFunctionType("get_attached_elements", "ie*i");
+    SetFunctionType("get_element_attached_to", "ee");
+    SetFunctionType("set_element_attached_offsets", "be**");
+    SetFunctionType("get_element_attached_offsets", "be**");
     SetFunctionType("get_element_data", "");
     SetFunctionType("get_all_element_data", "");
     SetFunctionType("has_element_data", "");
@@ -380,7 +381,7 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementChildren, env, args, results)
     {
         for (uint32_t i = 0; iter != element->IterEnd() && childrenCount < maxSize; iter++, childrenCount++, i++)
         {
-            CWebAssemblyUserData udata = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((*iter)->GetID().Value());
+            CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(*iter);
 
             argStream.WritePointer(childrenPtr + (i * sizeof(CWebAssemblyUserData)), &udata);
         }
@@ -396,7 +397,7 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementChildren, env, args, results)
                 continue;
             }
 
-            CWebAssemblyUserData udata = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((*iter)->GetID().Value());
+            CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(*iter);
 
             argStream.WritePointer(childrenPtr + (i * sizeof(CWebAssemblyUserData)), &udata);
 
@@ -613,30 +614,158 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementMatrix, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementPosition, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress ptr;
+    
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(ptr);
+    
+    if (!element || ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(false);
+    }
+
+    CVector position;
+
+    if (!CStaticFunctionDefinitions::GetElementPosition(element, position))
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        float x;
+        float y;
+        float z;
+    } pos;
+    memset(&pos, 0, sizeof(pos));
+
+    pos.x = position.fX;
+    pos.y = position.fY;
+    pos.z = position.fZ;
+
+    argStream.WritePointer(ptr, &pos);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementRotation, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress ptr;
+    SString                          rotationOrderString;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(ptr);
+    argStream.ReadString(rotationOrderString);
+
+    if (!element || ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(false);
+    }
+
+    eEulerRotationOrder rotationOrder = EULER_DEFAULT;
+    
+    StringToEnum(rotationOrderString, rotationOrder);
+
+    CVector rotation;
+
+    if (!CStaticFunctionDefinitions::GetElementRotation(element, rotation, rotationOrder))
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        float x;
+        float y;
+        float z;
+    } pos;
+    memset(&pos, 0, sizeof(pos));
+
+    pos.x = rotation.fX;
+    pos.y = rotation.fY;
+    pos.z = rotation.fZ;
+
+    argStream.WritePointer(ptr, &pos);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementVelocity, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress ptr;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    CVector velocity;
+
+    if (!CStaticFunctionDefinitions::GetElementVelocity(element, velocity))
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        float x;
+        float y;
+        float z;
+    } out;
+    memset(&out, 0, sizeof(out));
+
+    out.x = velocity.fX;
+    out.y = velocity.fY;
+    out.z = velocity.fZ;
+
+    argStream.WritePointer(ptr, &out);
+    
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementTurnVelocity, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress ptr;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(ptr);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    CVector turnVelocity;
+
+    if (!CStaticFunctionDefinitions::GetElementTurnVelocity(element, turnVelocity))
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        float x;
+        float y;
+        float z;
+    } outVelocity;
+
+    argStream.WritePointer(ptr, &outVelocity);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementType, env, args, results)
@@ -678,81 +807,390 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementType, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementsByType, env, args, results)
 {
+    SString                          elementType;
+    CElement*                        startAt;
+    CWebAssemblyMemoryPointerAddress ptr;
+    uint32_t                         maxSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadString(elementType);
+    argStream.ReadUserData(startAt);
+    argStream.ReadPointerAddress(ptr);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+
+    CElement* root = CStaticFunctionDefinitions::GetRootElement();
+
+    if (!startAt)
+    {
+        startAt = root;
+    }
+
+    uint32_t elementCount = 0;
+    uint32_t typeHash = CElement::GetTypeHashFromString(elementType);
+
+    if (startAt == root)
+    {
+        CElementListSnapshot elements;
+
+        startAt->GetEntitiesFromRoot(typeHash, elements);
+
+        size_t count = elements.size();
+
+        for (size_t i = 0; i < count && i < maxSize; i++)
+        {
+            CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(elements[i]);
+
+            argStream.WritePointer(ptr + (i * sizeof(udata)), &udata);
+        }
+
+        elementCount = std::min(count, maxSize);
+    }
+    else
+    {
+        CElementListSnapshot elements;
+
+        startAt->FindAllChildrenByTypeIndex(typeHash, elements);
+
+        size_t count = elements.size();
+
+        for (size_t i = 0; i < count && i < maxSize; i++)
+        {
+            CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(elements[i]);
+
+            argStream.WritePointer(ptr + (i * sizeof(udata)), &udata);
+        }
+
+        elementCount = std::min(count, maxSize);
+    }
+
+    return argStream.Return(elementCount);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementInterior, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(-1);
+    }
+
+    uint8_t interior;
+
+    if (!CStaticFunctionDefinitions::GetElementInterior(element, interior))
+    {
+        return argStream.Return(-1);
+    }
+
+    return argStream.Return((int32_t)interior);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementsWithinColShape, env, args, results)
 {
-
+    CColShape*                       colShape;
+    SString                          elementType;
+    CWebAssemblyMemoryPointerAddress listPtr;
+    uint32_t                         maxSize;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(colShape);
+    argStream.ReadString(elementType);
+    argStream.ReadPointerAddress(listPtr);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+
+    if (!colShape || listPtr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+
+    uint32_t elementCount = 0;
+
+    std::list<CElement*>::iterator iter = colShape->CollidersBegin();
+
+    for (; iter != colShape->CollidersEnd() && elementCount < maxSize; iter++)
+    {
+        CElement* element = *iter;
+
+        if (elementType.empty() || elementType != element->GetTypeName())
+        {
+            continue;
+        }
+
+        if (element->IsBeingDeleted())
+        {
+            continue;
+        }
+
+        CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(element);
+
+        argStream.WritePointer(listPtr + (elementCount * sizeof(CWebAssemblyUserData)), &udata);
+
+        elementCount++;
+    }
+
+    return argStream.Return(elementCount);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementsWithinRange, env, args, results)
 {
+    CVector                          pos;
+    float32_t                        radius;
+    CWebAssemblyMemoryPointerAddress listPtr;
+    uint32_t                         maxSize;
+    SString                          elementType;
+    int32_t                          interior;
+    int32_t                          dimension;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadVector3D(pos);
+    argStream.ReadFloat32(radius);
+    argStream.ReadPointerAddress(listPtr);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+    argStream.ReadString(elementType);
+    argStream.ReadInt32(interior, -1);
+    argStream.ReadInt32(dimension, -1);
+
+    if (!listPtr)
+    {
+        return argStream.Return(0);
+    }
+
+    uint32_t typeHash = !elementType.empty() ? CElement::GetTypeHashFromString(elementType) : 0;
+
+    CElementResult result;
+    GetSpatialDatabase()->SphereQuery(result, CSphere { pos, radius });
+
+    uint32_t elementCount = 0;
+
+    CElementResult::iterator iter = result.begin();
+
+    float radiusSq = radius * radius;
+
+    for (; iter != result.end() && elementCount < maxSize; iter++)
+    {
+        CElement* element = *iter;
+
+        if (typeHash && typeHash != element->GetTypeHash())
+        {
+            continue;
+        }
+
+        if (interior != -1 && interior != (int32_t)element->GetInterior())
+        {
+            continue;
+        }
+
+        if (dimension != -1 && dimension != (int32_t)element->GetDimension())
+        {
+            continue;
+        }
+
+        if ((element->GetPosition() - pos).LengthSquared() > radiusSq)
+        {
+            continue;
+        }
+
+        CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(element);
+
+        argStream.WritePointer(listPtr + (elementCount * sizeof(CWebAssemblyUserData)), &udata);
+
+        elementCount++;
+    }
+    
+    return argStream.Return(elementCount);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementDimension, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(-1);
+    }
+
+    if (IS_OBJECT(element) && CStaticFunctionDefinitions::IsObjectVisibleInAllDimensions(element))
+    {
+        return argStream.Return(-1);
+    }
+
+    uint16_t dimension;
+
+    if (!CStaticFunctionDefinitions::GetElementDimension(element, dimension))
+    {
+        return argStream.Return(-1);
+    }
+
+    return argStream.Return((int32_t)dimension);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementZoneName, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress ptr;
+    uint32_t                         maxSize;
+    bool                             citiesOnly;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(ptr);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+    argStream.ReadBoolean(citiesOnly);
+
+    if (!element)
+    {
+        return argStream.Return(0);
+    }
+
+    SString zoneName;
+
+    if (!CStaticFunctionDefinitions::GetElementZoneName(element, zoneName, citiesOnly))
+    {
+        return argStream.Return(0);
+    }
+
+    if (zoneName.empty())
+    {
+        return argStream.Return(0);
+    }
+
+    size_t size = zoneName.size();
+
+    argStream.WritePointer(ptr, zoneName.data(), size);
+
+    return argStream.Return(size);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementColShape, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CColShape* colShape = CStaticFunctionDefinitions::GetElementColShape(element);
+
+    if (!colShape)
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return((CElement*)colShape);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementAlpha, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(0);
+    }
+
+    uint8_t alpha;
+
+    if (!CStaticFunctionDefinitions::GetElementAlpha(element, alpha))
+    {
+        return argStream.Return(0);
+    }
+
+    return argStream.Return((uint32_t)alpha);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementDoubleSided, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    bool isDoubleSided;
+
+    if (!CStaticFunctionDefinitions::IsElementDoubleSided(element, isDoubleSided))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(isDoubleSided);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementHealth, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(0.0f);
+    }
+
+    float32_t health;
+
+    if (!CStaticFunctionDefinitions::GetElementHealth(element, health))
+    {
+        return argStream.Return(0.0f);
+    }
+
+    return argStream.Return(health);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementModel, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(0);
+    }
+
+    uint16_t model;
+
+    if (!CStaticFunctionDefinitions::GetElementModel(element, model))
+    {
+        return argStream.Return(0);
+    }
+
+    return argStream.Return((uint32_t)model);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementInWater, env, args, results)
@@ -780,16 +1218,41 @@ WebAssemblyApi(CWebAssemblyElementDefs::IsElementInWater, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementSyncer, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CElement* syncer = NULL;
+
+    if (!CStaticFunctionDefinitions::GetElementSyncer(syncer))
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return(syncer);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementCollisionsEnabled, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::GetElementCollisionsEnabled(element));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementFrozen, env, args, results)
@@ -817,9 +1280,25 @@ WebAssemblyApi(CWebAssemblyElementDefs::IsElementFrozen, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetLowLODElement, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CElement* lowLODElement = NULL;
+    
+    if (!CStaticFunctionDefinitions::GetLowLodElement(element, lowLODElement))
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return(lowLODElement);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementLowLOD, env, args, results)
@@ -947,51 +1426,192 @@ WebAssemblyApi(CWebAssemblyElementDefs::HasElementDataSubscriber, env, args, res
 
 WebAssemblyApi(CWebAssemblyElementDefs::AttachElements, env, args, results)
 {
+    CElement* element;
+    CElement* targetElement;
+    CVector   posOffset;
+    CVector   rotOffset;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(targetElement);
+    argStream.ReadVector3D(posOffset, posOffset);
+    argStream.ReadVector3D(rotOffset, rotOffset);
+
+    if (!element || !targetElement)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::AttachElements(element, targetElement, posOffset, rotOffset))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::DetachElements, env, args, results)
 {
+    CElement* element;
+    CElement* targetElement;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(targetElement);
+
+    if (!CStaticFunctionDefinitions::DetachElements(element, targetElement))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementAttached, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::IsElementAttached(element));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetAttachedElements, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress listPtr;
+    uint32_t                         maxSize;
+    
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(listPtr);
+    argStream.ReadUInt32(maxSize);
+
+    if (!element || listPtr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+
+    uint32_t elementsCount = 0;
+
+    std::list<CElement*>::const_iterator iter = element->AttachedElementsBegin();
+
+    for (; iter != element->AttachedElementsEnd() && elementsCount < maxSize; iter++)
+    {
+        CWebAssemblyUserData udata = ELEMENT_TO_WASM_USERDATA(*iter);
+
+        argStream.WritePointer(listPtr + (elementsCount * sizeof(CWebAssemblyUserData)), &udata);
+
+        elementsCount++;
+    }
+
+    return argStream.Return(elementsCount);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementAttachedTo, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CElement* attachedTo = CStaticFunctionDefinitions::GetElementAttachedTo(element);
+
+    if (!attachedTo)
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return(attachedTo);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementAttachedOffsets, env, args, results)
 {
+    CElement* element;
+    CVector   posOffset;
+    CVector   rotOffset;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadVector3D(posOffset, posOffset);
+    argStream.ReadVector3D(rotOffset, rotOffset);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::SetElementAttachedOffsets(element, posOffset, rotOffset))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementAttachedOffsets, env, args, results)
 {
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress posOffsetPtr;
+    CWebAssemblyMemoryPointerAddress rotOffsetPtr;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(posOffsetPtr);
+    argStream.ReadPointerAddress(rotOffsetPtr);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    CVector posOffset;
+    CVector rotOffset;
+
+    if (!CStaticFunctionDefinitions::GetElementAttachedOffsets(element, posOffset, rotOffset))
+    {
+        return argStream.Return(false);
+    }
+
+    struct
+    {
+        float32_t x;
+        float32_t y;
+        float32_t z;
+    } offset;
+    memset(&offset, 0, sizeof(offset));
+
+    offset.x = posOffset.fX;
+    offset.y = posOffset.fY;
+    offset.z = posOffset.fZ;
+
+    argStream.WritePointer(posOffsetPtr, &offset);
+    
+    offset.x = rotOffset.fX;
+    offset.y = rotOffset.fY;
+    offset.z = rotOffset.fZ;
+
+    argStream.WritePointer(rotOffsetPtr, &offset);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementID, env, args, results)

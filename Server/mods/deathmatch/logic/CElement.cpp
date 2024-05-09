@@ -1006,6 +1006,21 @@ void CElement::FindAllChildrenByTypeIndex(unsigned int uiTypeHash, lua_State* pL
     }
 }
 
+void CElement::FindAllChildrenByTypeIndex(unsigned int uiTypeHash, std::vector<CElement*>& outList)
+{
+    if (uiTypeHash == m_uiTypeHash)
+    {
+        outList.push_back(this);
+    }
+
+    CChildListType::const_iterator iter = m_Children.begin();
+
+    for (; iter != m_Children.end(); iter++)
+    {
+        (*iter)->FindAllChildrenByTypeIndex(uiTypeHash, outList);
+    }
+}
+
 void CElement::CallEventNoParent(const char* szName, const CLuaArguments& Arguments, CElement* pSource, CPlayer* pCaller)
 {
     // Call it on us if this isn't the same class it was raised on
