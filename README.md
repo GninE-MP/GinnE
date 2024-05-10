@@ -28,7 +28,7 @@ Using a framework based on resources has a number of advantages. It allows conte
 
 ## Development
 
-Our project's code repository can be found on the [gnine/GninEsa-blue](https://github.com/gnine/GninEsa-blue/) Git repository at [GitHub](https://github.com/). We are always looking for new developers, so if you're interested, here are some useful links:
+Our project's code repository can be found on the [GninE-MP/GinnE](https://github.com/GninE-MP/GinnE/) Git repository at [GitHub](https://github.com/). We are always looking for new developers, so if you're interested, here are some useful links:
 
 * [Coding guidelines](https://github.com/multitheftauto/mtasa-blue/blob/master/CONTRIBUTING.md#contributors-guide)
 * [Nightly Builds](https://nightly.gnine.com/) (In progress!)
