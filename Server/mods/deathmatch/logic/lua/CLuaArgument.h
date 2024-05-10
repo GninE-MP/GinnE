@@ -53,6 +53,13 @@ public:
 
     int GetType() const { return m_iType; };
 
+    void SetBoolean(bool value);
+    void SetNumber(lua_Number value);
+    void SetString(std::string string);
+    void SetUserData(void* userData);
+    void SetFunctionResource(CResource* resource);
+    void SetFunctionReference(int functionRef);
+
     bool               GetBoolean() const { return m_bBoolean; };
     lua_Number         GetNumber() const { return m_Number; };
     const std::string& GetString() { return m_strString; };
@@ -86,7 +93,7 @@ private:
     int            m_iFunctionRef;
     bool           m_bWeakTableRef;
 
-#ifdef MTA_DEBUG
+#ifdef GninE_DEBUG
     std::string m_strFilename;
     int         m_iLine;
 #endif

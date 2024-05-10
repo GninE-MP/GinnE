@@ -1169,6 +1169,40 @@ bool CLuaArgument::ReadFromJSONObject(json_object* object, std::vector<CLuaArgum
     return true;
 }
 
+void CLuaArgument::SetBoolean(bool value)
+{
+    m_iType = LUA_TBOOLEAN;
+    m_bBoolean = value;
+}
+
+void CLuaArgument::SetNumber(lua_Number value)
+{
+    m_iType = LUA_TNUMBER;
+    m_Number = value;
+}
+
+void CLuaArgument::SetString(std::string string)
+{
+    m_iType = LUA_TSTRING;
+    m_strString = string;
+}
+
+void CLuaArgument::SetUserData(void* userData)
+{
+    m_iType = LUA_TUSERDATA;
+    m_pUserData = userData;
+}
+
+void CLuaArgument::SetFunctionResource(CResource* resource)
+{
+    m_pResource = resource;
+}
+
+void CLuaArgument::SetFunctionReference(int functionRef)
+{
+    m_iFunctionRef = functionRef;
+}
+
 int CLuaArgument::CallFunction(lua_State* luaVM)
 {
     if (lua_type(luaVM, 1) == LUA_TTABLE)

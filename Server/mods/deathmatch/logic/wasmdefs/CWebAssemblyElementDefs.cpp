@@ -75,10 +75,11 @@ void CWebAssemblyElementDefs::RegisterFunctionTypes()
     SetFunctionType("get_element_attached_to", "ee");
     SetFunctionType("set_element_attached_offsets", "be**");
     SetFunctionType("get_element_attached_offsets", "be**");
+
     SetFunctionType("get_element_data", "");
     SetFunctionType("get_all_element_data", "");
     SetFunctionType("has_element_data", "");
-    SetFunctionType("set_element_data", "");
+    SetFunctionType("set_element_data", "besb*x");
     SetFunctionType("remove_element_data", "");
     SetFunctionType("add_element_data_subscriber", "");
     SetFunctionType("remove_element_data_subscriber", "");
@@ -1391,9 +1392,41 @@ WebAssemblyApi(CWebAssemblyElementDefs::HasElementData, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementData, env, args, results)
 {
+    CElement*                        element;
+    SString                          key;
+    bool                             syncMode;
+    CWebAssemblyMemoryPointerAddress dataPtr;
+    uint32_t                         maxSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadBoolean(syncMode, true);
+    argStream.ReadPointerAddress(dataPtr);
+    argStream.ReadUInt32(maxSize);
+
+    if (!element || dataPtr == WEB_ASSEMBLY_NULL_PTR || key.empty())
+    {
+        return argStream.Return(false);
+    }
+
+    ESyncType syncType = syncMode ? ESyncType::BROADCAST : ESyncType::LOCAL;
+
+    if (key.length() > MAX_CUSTOMDATA_NAME_LENGTH)
+    {
+        key = key.Left(MAX_CUSTOMDATA_NAME_LENGTH);
+    }
+
+    CLuaArgument arg;
+    arg.SetString("this is a web assembly data!");
+
+    if (!CStaticFunctionDefinitions::SetElementData(element, key.c_str(), arg, syncType))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::RemoveElementData, env, args, results)
