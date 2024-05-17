@@ -117,6 +117,11 @@ bool CWebAssemblyArgReader::NextIsUserData()
     #endif
 }
 
+bool CWebAssemblyArgReader::NextIsInternalFunctionHash()
+{
+    return NextIsUserData();
+}
+
 void CWebAssemblyArgReader::ReadInt32(int32_t& out, int32_t defaultValue)
 {
     if (!Skip())
@@ -295,11 +300,11 @@ void CWebAssemblyArgReader::ReadPointerAddress(CWebAssemblyMemoryPointerAddress&
 
 void CWebAssemblyArgReader::ReadFunction(CWebAssemblyFunction*& out, CWebAssemblyFunction* defaultValue)
 {
-    if (!out)
+    /*if (!out)
     {
         out = defaultValue;
         return;
-    }
+    }*/
 
     if (!Skip())
     {
@@ -366,6 +371,38 @@ void CWebAssemblyArgReader::ReadVector3D(CVector& out, CVector defaultValue)
     out.fX = value->x;
     out.fY = value->y;
     out.fZ = value->z;
+}
+
+void CWebAssemblyArgReader::ReadInternalFunctionHash(uintptr_t& out, uintptr_t defaultValue)
+{
+    uintptr_t indexOrHash;
+
+    #if IS_APP_ON_64_BIT_VERSION
+        ReadUInt64(indexOrHash);
+    #else
+        ReadUInt32(indexOrHash);
+    #endif
+
+    if (indexOrHash < 1)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    CWebAssemblyScript* script = GetScript();
+
+    if (indexOrHash > 0 && indexOrHash < script->GetInternalFunctionsCount())
+    {
+        out = script->GetInternalFunctionHash(indexOrHash);
+    }
+    else if (indexOrHash == 0)
+    {
+        out = defaultValue;
+    }
+    else
+    {
+        out = indexOrHash;
+    }
 }
 
 bool CWebAssemblyArgReader::HasResult()

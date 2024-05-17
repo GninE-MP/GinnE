@@ -845,12 +845,21 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
     if (args)
     {
         args->WriteValueList(&argsValues);
+    }
+    
+    int difference = (int)argsValues.size() - (int)functionArguments.GetSize();
 
-        int difference = (int)argsValues.size() - (int)functionArguments.GetSize();
+    if (difference > 0)
+    {
+        for (int i = 0; i < difference; i++, argsValues.pop_back());
+    }
+    else if (difference < 0)
+    {
+        int count = functionArguments.GetSize();
 
-        if (difference > 0)
-        {
-            for (int i = 0; i < difference; i++, argsValues.pop_back());
+        for (int i = std::abs(difference) - 1; i < count; i++)
+        {            
+            argsValues.push_back(functionArguments[i].GetValue());
         }
     }
 
@@ -872,9 +881,11 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
         wasm_val_vec_new(&resultsVector, resultsValues.size(), resultsValues.data());
     }
 
-    if (args)
+    size_t argsValuesLength = argsValues.size();
+
+    if (argsValuesLength > 0)
     {
-        wasm_val_vec_new(&argsVector, argsValues.size(), argsValues.data());
+        wasm_val_vec_new(&argsVector, argsValuesLength, argsValues.data());
     }
 
     CWebAssemblyTrap* trap = wasm_func_call(m_pContext, &argsVector, &resultsVector);

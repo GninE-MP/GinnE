@@ -43,4 +43,10 @@ public:
 
     DEFINE_WASM_FUNCTION(ToColor, env, args, results);
     DEFINE_WASM_FUNCTION(GetProcessMemoryStats, env, args, results);
+
+    DEFINE_WASM_FUNCTION(CallCallable, env, args, results);
+    DEFINE_WASM_FUNCTION(IsValidCallable, env, args, results);
+    DEFINE_WASM_FUNCTION(GetCallableDeclaration, env, args, results);
+    DEFINE_WASM_FUNCTION(GetCallableResource, env, args, results);
+    DEFINE_WASM_FUNCTION(FreeCallableResult, env, args, results);
 };

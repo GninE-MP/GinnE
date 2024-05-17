@@ -151,6 +151,7 @@ public:
     void CallMainFunction(const std::vector<SString>& argv = std::vector<SString>());
 
     bool CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
+    bool CallInternalFunctionByHash(const uintptr_t& hash, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
 
     CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
 
@@ -189,6 +190,12 @@ public:
     CWebAssemblyFunction* GetGlobalFunction(const SString& functionName);
 
     CWebAssemblyFunction* GetInternalFunction(const size_t& index);
+    CWebAssemblyFunction* GetInternalFunctionByHash(const uintptr_t& hash);
+    size_t                GetInternalFunctionIndexByHash(const uintptr_t& hash);
+
+    uintptr_t GetInternalFunctionHash(const size_t& index);
+    
+    bool IsValidInternalFunctionHash(const uintptr_t& hash);
 
     void DeleteExportedFunction(const SString& functionName);
 

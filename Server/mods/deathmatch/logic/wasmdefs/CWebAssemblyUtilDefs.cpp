@@ -54,6 +54,12 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
 
     SetFunctionType("to_color", "iiiii");
     SetFunctionType("get_process_memory_stats", "b*");
+
+    SetFunctionType("call_callable", "*u*");
+    SetFunctionType("is_valid_callable", "bu");
+    SetFunctionType("get_callable_declaration", "iu*i");
+    SetFunctionType("get_callable_resource", "uu");
+    SetFunctionType("free_callable_result", "v*");
 }
 
 void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -82,7 +88,13 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "debug_sleep", DebugSleep },
         
         { "to_color", ToColor },
-        { "get_process_memory_stats", GetProcessMemoryStats }
+        { "get_process_memory_stats", GetProcessMemoryStats },
+
+        { "call_callable", CallCallable },
+        { "is_valid_callable", IsValidCallable },
+        { "get_callable_declaration", GetCallableDeclaration },
+        { "get_callable_resource", GetCallableResource },
+        { "free_callable_result", FreeCallableResult }
     };
 
     WASM_REGISTER_API(script, functions);
@@ -610,4 +622,47 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetProcessMemoryStats, env, args, results)
     }
 
     return argStream.Return(false);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::CallCallable, env, args, results)
+{
+    uintptr_t functionHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadInternalFunctionHash(functionHash, 3133);
+
+    argStream.GetScript()->CallInternalFunctionByHash(functionHash, NULL, NULL);
+
+    return argStream.ReturnNull();
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::IsValidCallable, env, args, results)
+{
+    uintptr_t functionHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.ReturnNull();
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableDeclaration, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.ReturnNull();
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableResource, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.ReturnNull();
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::FreeCallableResult, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.ReturnNull();
 }

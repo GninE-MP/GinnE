@@ -39,6 +39,9 @@ class CTextDisplay;
 class CTextItem;
 class CDbJobData;
 
+class CWebAssemblyVariables;
+class CWebAssemblyMemory;
+
 class CLuaArguments;
 
 class CLuaArguments
@@ -94,6 +97,9 @@ public:
     json_object* WriteToJSONArray(bool bSerialize);
     bool         ReadFromJSONObject(json_object* object, std::vector<CLuaArguments*>* pKnownTables = NULL);
     bool         ReadFromJSONArray(json_object* object, std::vector<CLuaArguments*>* pKnownTables = NULL);
+
+    void WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern = NULL, CWebAssemblyMemory* wasmMemory = NULL);
+    void ReadWebAssemblyVariables(CWebAssemblyVariables* vars);
 
     unsigned int                               Count() const { return static_cast<unsigned int>(m_Arguments.size()); };
     std::vector<CLuaArgument*>::const_iterator IterBegin() const { return m_Arguments.begin(); };

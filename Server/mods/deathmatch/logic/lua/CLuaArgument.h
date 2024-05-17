@@ -27,6 +27,45 @@ class CResource;
 
 #define LUA_TTABLEREF    9
 #define LUA_TSTRING_LONG 10
+#define LUA_CALLABLE 0xfac
+
+class CWebAssemblyFunction;
+class CWebAssemblyVariables;
+
+class CCallable
+{
+public:
+    CCallable();
+    CCallable(CWebAssemblyFunction* function);
+    CCallable(CResource* resource, int luaFunctionRef);
+    ~CCallable() = default;
+
+    bool Call(CLuaArguments* args, CLuaArguments* results, SString* errorMessage = NULL) const; // args! CLuaArguments
+
+    void Drop();
+
+    void       SetLuaResource(CResource* resource);
+    CResource* GetLuaResource() const;
+
+    void SetLuaFunctionRef(int luaFunctionRef);
+    int  GetLuaFunctionRef() const;
+
+    void                  SetWasmFunction(CWebAssemblyFunction* function);
+    CWebAssemblyFunction* GetWasmFunction() const;
+
+    void SetIsWasmFunctionState(bool state);
+
+    bool IsWasmFunction() const;
+
+    bool operator==(CCallable target) const;
+
+private:
+    CResource* m_pLuaResource;
+    int        m_iLuaFunctionRef;
+
+    CWebAssemblyFunction* m_pWasmFunction;
+    bool                  m_bIsWasmFunction;
+};
 
 class CLuaArgument
 {
@@ -57,17 +96,15 @@ public:
     void SetNumber(lua_Number value);
     void SetString(std::string string);
     void SetUserData(void* userData);
-    void SetFunctionResource(CResource* resource);
-    void SetFunctionReference(int functionRef);
+    void SetCallable(CCallable callable);
 
     bool               GetBoolean() const { return m_bBoolean; };
     lua_Number         GetNumber() const { return m_Number; };
     const std::string& GetString() { return m_strString; };
     void*              GetUserData() const { return m_pUserData; };
-    CResource*         GetFunctionResource() const { return m_pResource; };
-    int                GetFunctionReference() const { return m_iFunctionRef; };
     CElement*          GetElement() const;
     bool               GetAsString(SString& strBuffer);
+    CCallable          GetCallable() const { return m_Callable; }
 
     bool         ReadFromBitStream(NetBitStreamInterface& bitStream, std::vector<CLuaArguments*>* pKnownTables = NULL);
     bool         WriteToBitStream(NetBitStreamInterface& bitStream, CFastHashMap<CLuaArguments*, unsigned long>* pKnownTables = NULL) const;
@@ -89,9 +126,9 @@ private:
     std::string    m_strString;
     void*          m_pUserData;
     CLuaArguments* m_pTableData;
-    CResource*     m_pResource;
-    int            m_iFunctionRef;
     bool           m_bWeakTableRef;
+
+    CCallable      m_Callable;
 
 #ifdef GninE_DEBUG
     std::string m_strFilename;

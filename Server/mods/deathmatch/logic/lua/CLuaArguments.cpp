@@ -21,6 +21,9 @@
 #include "CAccessControlList.h"
 #include "CAccessControlListGroup.h"
 
+#include "wasm/CWebAssemblyVariable.h"
+#include "wasm/CWebAssemblyContext.h"
+
 #ifndef WIN32
 #include <clocale>
 #endif
@@ -824,6 +827,105 @@ bool CLuaArguments::ReadFromJSONArray(json_object* object, std::vector<CLuaArgum
     //    else
     //        g_pGame->GetScriptDebugging()->LogError ( "Could not parse invalid JSON object.");
     return false;
+}
+
+void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern, CWebAssemblyMemory* memory)
+{
+    if (!vars)
+    {
+        return;
+    }
+
+    int argsSize = m_Arguments.size();
+    int typePatternSize = typePattern ? typePattern->GetSize() : argsSize;
+
+    for (int i = 0; i < argsSize && i < typePatternSize; i++)
+    {
+        CLuaArgument* arg = m_Arguments[i];
+
+        CWebAssemblyVariable pattern = typePattern ? typePattern->Get(i) : CWebAssemblyVariable((int32_t)0);
+
+        CWebAssemblyValue value = pattern.GetValue();
+
+        #define SET_VALUE(val) \
+            if (typePattern) \
+            { \
+                switch (value.kind) \
+                { \
+                    case C_WASM_VARIABLE_TYPE_I32: \
+                        value.of.i32 = (int32_t)val; \
+                        break; \
+                    case C_WASM_VARIABLE_TYPE_I64: \
+                        value.of.i64 = (int64_t)val; \
+                        break; \
+                    case C_WASM_VARIABLE_TYPE_F32: \
+                        value.of.f32 = (float32_t)val; \
+                        break; \
+                    case C_WASM_VARIABLE_TYPE_F64: \
+                        value.of.f64 = (float64_t)val; \
+                        break; \
+                    default: \
+                        break; \
+                } \
+                vars->Push(value); \
+            } \
+            else \
+
+        switch (arg->GetType())
+        {
+            case LUA_TNIL:
+                SET_VALUE(WEB_ASSEMBLY_NULL_PTR)
+                {
+                    vars->Push((int32_t)WEB_ASSEMBLY_NULL_PTR);
+                }
+
+                break;
+            case LUA_TBOOLEAN:
+                SET_VALUE(arg->GetBoolean())
+                {
+                    vars->Push((int32_t)arg->GetBoolean());
+                }
+
+                break;
+            case LUA_TNUMBER:
+                SET_VALUE(arg->GetNumber())
+                {
+                    vars->Push((float64_t)arg->GetNumber());
+                }
+
+                break;
+            case LUA_TSTRING:
+                if (memory)
+                {
+                    vars->Push((int32_t)memory->StringToUTF8(arg->GetString()));
+                }
+
+                break;
+            case LUA_TUSERDATA:
+            case LUA_TLIGHTUSERDATA:
+                vars->Push((CWebAssemblyUserData)arg->GetUserData());
+
+                break;
+            case LUA_TTABLE:
+                break;
+            case LUA_TFUNCTION:
+                break;
+            default:
+                break;
+        }
+
+        #undef SET_VALUE
+    }
+}
+
+void CLuaArguments::ReadWebAssemblyVariables(CWebAssemblyVariables* vars)
+{
+    if (!vars)
+    {
+        return;
+    }
+
+
 }
 
 bool CLuaArguments::IsEqualTo(const CLuaArguments& compareTo, std::set<const CLuaArguments*>* knownTables) const

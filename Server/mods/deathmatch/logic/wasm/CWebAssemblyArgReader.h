@@ -44,6 +44,7 @@ public:
     bool NextIsBoolean();
     bool NextIsPointerAddress();
     bool NextIsUserData();
+    bool NextIsInternalFunctionHash();
 
     void ReadInt32(int32_t& out, int32_t defaultValue = 0);
     void ReadUInt32(uint32_t& out, uint32_t defaultValue = 0);
@@ -57,6 +58,7 @@ public:
     void ReadFunction(CWebAssemblyFunction*& out, CWebAssemblyFunction* defaultValue = NULL);
     void ReadVector2D(CVector2D& out, CVector2D defaultValue = CVector2D(0.0f, 0.0f));
     void ReadVector3D(CVector& out, CVector defaultValue = CVector(0.0f, 0.0f, 0.0f));
+    void ReadInternalFunctionHash(uintptr_t& out, uintptr_t defaultValue = NULL);
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)
@@ -332,32 +334,6 @@ public:
 
         return CreateTrap(errorMessage);
     }
-
-    /*CWebAssemblyTrap* ReturnElement(CElement* element, SString errorMessage = "")
-    {
-        if (!element || element->IsBeingDeleted())
-        {
-            m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
-            m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
-
-            return CreateTrap(errorMessage);
-        }
-
-        ElementID eId = element->GetID();
-
-        if (eId == INVALID_ELEMENT_ID)
-        {
-            m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
-            m_pResults->data[0].of.i32 = WEB_ASSEMBLY_NULL_PTR;
-
-            return CreateTrap(errorMessage);
-        }
-
-        m_pResults->data[0].kind = C_WASM_VARIABLE_TYPE_I32;
-        m_pResults->data[0].of.i32 = (CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(eId.Value());
-
-        return CreateTrap(errorMessage);
-    }*/ 
 
     bool Skip(int count = 1);
     void Reset();

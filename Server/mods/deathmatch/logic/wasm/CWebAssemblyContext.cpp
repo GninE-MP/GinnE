@@ -603,6 +603,18 @@ bool CWebAssemblyScript::CallInternalFunction(const size_t& index, CWebAssemblyV
     return function->Call(args, results);
 }
 
+bool CWebAssemblyScript::CallInternalFunctionByHash(const uintptr_t& hash, CWebAssemblyVariables* args, CWebAssemblyVariables* results)
+{
+    CWebAssemblyFunction* function = GetInternalFunctionByHash(hash);
+
+    if (!function)
+    {
+        return false;
+    }
+
+    return function->Call(args, results);
+}
+
 void CWebAssemblyScript::Destroy()
 {
     ClearSharedGlobalFunctions();
@@ -1429,6 +1441,47 @@ CWebAssemblyFunction* CWebAssemblyScript::GetInternalFunction(const size_t& inde
     }
 
     return m_lsInternalFunctions[index];
+}
+
+CWebAssemblyFunction* CWebAssemblyScript::GetInternalFunctionByHash(const uintptr_t& hash)
+{
+    size_t index = GetInternalFunctionIndexByHash(hash);
+
+    if (index < 1)
+    {
+        return NULL;
+    }
+
+    return GetInternalFunction(index);
+}
+
+uintptr_t CWebAssemblyScript::GetInternalFunctionHash(const size_t& index)
+{
+    if (index < 1 || index > GetInternalFunctionsCount())
+    {
+        return 0;
+    }
+
+    return (uintptr_t)(GetMemory()->GetBase()) + (uintptr_t)index;
+}
+
+size_t CWebAssemblyScript::GetInternalFunctionIndexByHash(const uintptr_t& hash)
+{
+    CWebAssemblyMemory* memory = GetMemory();
+
+    if (!memory->DoesPointerBelongToMemory((void*)hash))
+    {
+        return 0;
+    }
+
+    return hash - (uintptr_t)memory->GetBase();
+}
+
+bool CWebAssemblyScript::IsValidInternalFunctionHash(const uintptr_t& hash)
+{
+    size_t index = GetInternalFunctionIndexByHash(hash);
+
+    return GetMemory()->DoesPointerBelongToMemory((void*)hash) && index > 0 && index < GetInternalFunctionsCount();
 }
 
 void CWebAssemblyScript::DeleteExportedFunction(const SString& functionName)

@@ -136,7 +136,7 @@ public:
     bool Compare(CWebAssemblyFunctionType functionType);
 
     SString GenerateFunctionStructureText(const SString& functionName);
-
+    
     static void FreeWebAssemblyFunctionTypeContext(CWebAssemblyFunctionTypeContext context);
 
 private:

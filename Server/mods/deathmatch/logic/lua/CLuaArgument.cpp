@@ -19,6 +19,9 @@
 #include "CResourceManager.h"
 #include "CScriptArgReader.h"
 
+#include "wasm/CWebAssemblyVariable.h"
+#include "wasm/CWebAssemblyContext.h"
+
 extern CGame* g_pGame;
 
 #ifndef VERIFY_ELEMENT
@@ -32,21 +35,190 @@ extern CGame* g_pGame;
 
 using namespace std;
 
+CCallable::CCallable()
+{
+    Drop();
+}
+
+CCallable::CCallable(CWebAssemblyFunction* function)
+{
+    Drop();
+
+    SetWasmFunction(function);
+
+    SetIsWasmFunctionState(false);
+}
+
+CCallable::CCallable(CResource* resource, int luaFunctionRef)
+{
+    Drop();
+
+    SetLuaResource(resource);
+    SetLuaFunctionRef(luaFunctionRef);
+
+    SetIsWasmFunctionState(false);
+}
+
+bool CCallable::Call(CLuaArguments* args, CLuaArguments* results, SString* errorMessage) const
+{
+    if (m_bIsWasmFunction)
+    {
+        if (!m_pWasmFunction)
+        {
+            return false;
+        }
+
+        CWebAssemblyVariables wArgs, wResults;
+
+        if (args)
+        {
+            args->WriteWebAssemblyVariables(&wArgs, &m_pWasmFunction->GetFunctionType().GetArguments(), m_pWasmFunction->GetApiEnviornment()->script->GetMemory());
+        }
+
+        bool callResult = m_pWasmFunction->Call(&wArgs, &wResults, errorMessage);
+
+        if (results)
+        {
+            results->ReadWebAssemblyVariables(&wResults);
+        }
+
+        return callResult;
+    }
+
+    if (!m_pLuaResource)
+    {
+        return false;
+    }
+
+    lua_State* luaVM = m_pLuaResource->GetVirtualMachine()->GetVM();
+
+    if (!luaVM)
+    {
+        return false;
+    }
+
+    int top = lua_gettop(luaVM);
+
+    CScriptArgReader argStream(luaVM);
+    argStream.m_iIndex = top + 1;
+
+    lua_getref(luaVM, m_iLuaFunctionRef);
+
+    if (lua_type(luaVM, -1) != LUA_TFUNCTION)
+    {
+        return false;
+    }
+
+    int argsCount = 0;
+
+    if (args)
+    {
+        argsCount = args->Count();
+
+        args->PushArguments(luaVM);
+    }
+
+    if (lua_pcall(luaVM, argsCount, LUA_MULTRET, 0) != 0)
+    {
+        *errorMessage = lua_tostring(luaVM, -1);
+
+        lua_pop(luaVM, 1);
+    }
+
+    int returnCount = lua_gettop(luaVM) - top;
+
+    if (returnCount > 0)
+    {
+        if (results)
+        {
+            argStream.ReadLuaArguments(*results);
+        }
+    }
+
+    return true;
+}
+
+void CCallable::Drop()
+{
+    m_bIsWasmFunction = false;
+    m_iLuaFunctionRef = 0;
+    m_pLuaResource = NULL;
+    m_pWasmFunction = NULL;
+}
+
+void CCallable::SetLuaResource(CResource* resource)
+{
+    m_pLuaResource = resource;
+}
+
+CResource* CCallable::GetLuaResource() const
+{
+    return m_pLuaResource;
+}
+
+void CCallable::SetLuaFunctionRef(int luaFunctionRef)
+{
+    m_iLuaFunctionRef = luaFunctionRef;
+}
+
+int CCallable::GetLuaFunctionRef() const
+{
+    return m_iLuaFunctionRef;
+}
+
+void CCallable::SetWasmFunction(CWebAssemblyFunction* function)
+{
+    m_pWasmFunction = function;
+}
+
+CWebAssemblyFunction* CCallable::GetWasmFunction() const
+{
+    return m_pWasmFunction;
+}
+
+void CCallable::SetIsWasmFunctionState(bool state)
+{
+    m_bIsWasmFunction = state;
+}
+
+bool CCallable::IsWasmFunction() const
+{
+    return m_bIsWasmFunction;
+}
+
+
+bool CCallable::operator==(CCallable target) const
+{
+    if (m_bIsWasmFunction != target.IsWasmFunction())
+    {
+        return false;
+    }
+
+    return (
+        m_bIsWasmFunction ?
+        (
+            m_pWasmFunction == target.GetWasmFunction()
+        ) :
+        (
+            m_pLuaResource == target.GetLuaResource() &&
+            m_iLuaFunctionRef == target.GetLuaFunctionRef()
+        )
+    );
+}
+
 CLuaArgument::CLuaArgument()
 {
     m_iType = LUA_TNIL;
     m_pTableData = NULL;
     m_pUserData = NULL;
-    m_pResource = nullptr;
-    m_iFunctionRef = -1;
+    m_Callable = CCallable();
 }
 
 CLuaArgument::CLuaArgument(const CLuaArgument& Argument, CFastHashMap<CLuaArguments*, CLuaArguments*>* pKnownTables)
 {
     // Initialize and call our = on the argument
     m_pTableData = NULL;
-    m_pResource = nullptr;
-    m_iFunctionRef = -1;
+    m_Callable = CCallable();
     CopyRecursive(Argument, pKnownTables);
 }
 
@@ -54,8 +226,8 @@ CLuaArgument::CLuaArgument(lua_State* luaVM, int iArgument, CFastHashMap<const v
 {
     // Read the argument out of the lua VM
     m_pTableData = NULL;
-    m_pResource = nullptr;
-    m_iFunctionRef = -1;
+    m_Callable = CCallable();
+
     Read(luaVM, iArgument, pKnownTables);
 }
 
@@ -124,8 +296,8 @@ void CLuaArgument::CopyRecursive(const CLuaArgument& Argument, CFastHashMap<CLua
 
         case LUA_TFUNCTION:
         {
-            m_iFunctionRef = Argument.m_iFunctionRef;
-            m_pResource = Argument.m_pResource;
+            m_Callable = Argument.m_Callable;
+
             break;
         }
 
@@ -223,11 +395,25 @@ void CLuaArgument::Read(lua_State* luaVM, int iArgument, CFastHashMap<const void
                     {
                         if (lua_type(luaVM, -1) == LUA_TNUMBER)
                         {
-                            m_pResource = lua_toresource(luaVM, -2);
-                            m_iFunctionRef = lua_tonumber(luaVM, -1);
+                            m_Callable = CCallable(lua_toresource(luaVM, -2), lua_tonumber(luaVM, -1));
 
                             isNil = false;
                             m_iType = LUA_TFUNCTION;
+                        }
+                        else if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
+                        {
+                            CWebAssemblyFunction* function = (CWebAssemblyFunction*)lua_touserdata(luaVM, -1);
+
+                            if (function)
+                            {
+                                m_Callable = CCallable(function);
+
+                                m_Callable.SetLuaResource(function->GetApiEnviornment()->script->GetStoreContext()->GetResource());
+                                m_Callable.SetIsWasmFunctionState(true);
+
+                                isNil = false;
+                                m_iType = LUA_TFUNCTION;
+                            }
                         }
                     }
                     lua_pop(luaVM, 2);
@@ -285,10 +471,14 @@ void CLuaArgument::Read(lua_State* luaVM, int iArgument, CFastHashMap<const void
             case LUA_TFUNCTION:
             {
                 lua_pushvalue(luaVM, iArgument);
-                m_iFunctionRef = luaL_ref(luaVM, LUA_REGISTRYINDEX);
+                int funcRef = luaL_ref(luaVM, LUA_REGISTRYINDEX);
 
                 CLuaMain& luaMain = lua_getownercluamain(luaVM);
-                m_pResource = luaMain.GetResource();
+
+                m_Callable = CCallable(luaMain.GetResource(), funcRef);
+
+                lua_pop(luaVM, 1);
+
                 break;
             }
 
@@ -368,24 +558,35 @@ void CLuaArgument::Push(lua_State* luaVM, CFastHashMap<CLuaArguments*, int>* pKn
 
             case LUA_TFUNCTION:
             {
-                if (m_pResource)
+                CResource* resource = m_Callable.GetLuaResource();
+
+                if (resource)
                 {
-                    lua_newtable(luaVM);            // create callable
+                    lua_newtable(luaVM); // create callable
 
-                    lua_pushresource(luaVM, m_pResource);            // push function inside callable
-                    lua_setfield(luaVM, -2, "resource");
+                    lua_pushresource(luaVM, resource);
+                    lua_setfield(luaVM, -2, "resource"); // setting resource field
 
-                    lua_pushnumber(luaVM, m_iFunctionRef);            // push function ref inside callable
-                    lua_setfield(luaVM, -2, "reference");
+                    if (m_Callable.IsWasmFunction())
+                    {
+                        lua_pushuserdata(luaVM, m_Callable.GetWasmFunction());
+                    }
+                    else
+                    {
+                        lua_pushnumber(luaVM, m_Callable.GetLuaFunctionRef());
+                    }
+                        
+                    lua_setfield(luaVM, -2, "reference"); // setting the function reference
 
-                    lua_pushcfunction(luaVM, CleanupFunction);            // push cleanup function
-                    lua_setfield(luaVM, -2, "free");
+                    lua_pushcfunction(luaVM, CleanupFunction);
+                    lua_setfield(luaVM, -2, "free"); // setting cleanup function
 
-                    lua_newtable(luaVM);            // create metatable
+                    lua_newtable(luaVM);
                     lua_pushcfunction(luaVM, CallFunction);
-                    lua_setfield(luaVM, -2, "__call");
+                    lua_setfield(luaVM, -2, "__call"); // set call metamethod
                     lua_setmetatable(luaVM, -2);
                 }
+
                 break;
             }
         }
@@ -1057,7 +1258,7 @@ bool CLuaArgument::IsEqualTo(const CLuaArgument& compareTo, std::set<const CLuaA
         }
         case LUA_TFUNCTION:
         {
-            return m_pResource == compareTo.m_pResource && m_iFunctionRef == compareTo.m_iFunctionRef;
+            return m_Callable == compareTo.m_Callable;
         }
     }
 
@@ -1193,19 +1394,123 @@ void CLuaArgument::SetUserData(void* userData)
     m_pUserData = userData;
 }
 
-void CLuaArgument::SetFunctionResource(CResource* resource)
+void CLuaArgument::SetCallable(CCallable callable)
 {
-    m_pResource = resource;
-}
-
-void CLuaArgument::SetFunctionReference(int functionRef)
-{
-    m_iFunctionRef = functionRef;
+    m_iType = LUA_TFUNCTION;
+    m_Callable = callable;
 }
 
 int CLuaArgument::CallFunction(lua_State* luaVM)
 {
     if (lua_type(luaVM, 1) == LUA_TTABLE)
+    {
+        lua_getfield(luaVM, 1, "resource");
+
+        CResource*        resource = nullptr;
+        CScriptDebugging* debugger = g_pGame->GetScriptDebugging();
+
+        if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
+        {
+            resource = lua_toresource(luaVM, -1);
+        }
+
+        lua_pop(luaVM, 1);
+
+        if (resource)
+        {
+            const char* resourceName = resource->GetName().c_str();
+
+            if (resource->IsActive())
+            {
+                lua_State* resourceVM = resource->GetVirtualMachine()->GetVM();
+
+                if (!resourceVM)
+                {
+                    debugger->LogCustom(luaVM, "Couldn't get resource lua virtual machine!");
+                    return 0;
+                }
+
+                lua_getfield(luaVM, 1, "reference");
+
+                CCallable callable;
+
+                if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
+                {
+                    CWebAssemblyFunction* wasmFunction = (CWebAssemblyFunction*)lua_touserdata(luaVM, -1);
+
+                    if (!wasmFunction)
+                    {
+                        lua_pop(luaVM, 1);
+
+                        debugger->LogCustom(luaVM, "Web assembly function is not accessable anymore!");
+
+                        return 0;
+                    }
+
+                    callable = CCallable(wasmFunction);
+
+                    callable.SetLuaResource(resource);
+                    callable.SetIsWasmFunctionState(true);
+                }
+                else if (lua_type(luaVM, -1) == LUA_TNUMBER)
+                {
+                    int luaFunction = lua_tonumber(luaVM, -1);
+
+                    callable = CCallable(resource, luaFunction);
+                }
+                else
+                {
+                    lua_pop(luaVM, 1);
+
+                    debugger->LogCustom(luaVM, "Invalid callable reference!");
+
+                    return 0;
+                }
+
+                lua_pop(luaVM, 1);
+
+                CLuaArguments arguments;
+                CLuaArguments results;
+
+                CScriptArgReader argStream(luaVM);
+                argStream.Skip(1);
+
+                argStream.ReadLuaArguments(arguments);
+
+                SString errorMessage;
+
+                if (!callable.Call(&arguments, &results, &errorMessage))
+                {
+                    debugger->LogCustom(luaVM, errorMessage.empty() ? "Error while calling to callable!" : errorMessage.c_str());
+                }
+
+                arguments.DeleteArguments();
+
+                int returnCount = results.Count();
+
+                if (returnCount > 0)
+                {
+                    results.PushArguments(luaVM);
+
+                    results.DeleteArguments();
+                }
+
+                return returnCount;
+            }
+            else
+            {
+                debugger->LogCustom(luaVM, "Invalid resource to call!");
+            }
+        }
+        else
+        {
+            debugger->LogCustom(luaVM, "Couldn't find the resource of callable!");
+        }
+    }
+
+    return 0;
+
+    /*if (lua_type(luaVM, 1) == LUA_TTABLE)
     {
         lua_getfield(luaVM, 1, "resource");
         CResource* resource = nullptr;
@@ -1287,7 +1592,7 @@ int CLuaArgument::CallFunction(lua_State* luaVM)
             g_pGame->GetScriptDebugging()->LogError(NULL, "couldn't find the resource of function");
         }
     }
-    return 0;
+    return 0;*/ 
 }
 
 int CLuaArgument::CleanupFunction(lua_State* luaVM)
@@ -1313,6 +1618,8 @@ int CLuaArgument::CleanupFunction(lua_State* luaVM)
                     reference = (int)lua_tonumber(luaVM, -1);
                 }
                 lua_pop(luaVM, 1);
+                lua_pushnil(luaVM);
+                lua_setfield(luaVM, -2, "reference");
                 if (reference != 0)
                 {
                     lua_State* resourceVM = resource->GetVirtualMachine()->GetVM();

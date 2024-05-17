@@ -771,7 +771,7 @@ int CResourceManifest::Lua_WasmCompile(lua_State* luaVM)
 
     SString command = WASM_COMPILER_COMMAND;
     command += " --no-entry";
-
+    
     lua_pushstring(luaVM, "development");
     lua_gettable(luaVM, -2);
 

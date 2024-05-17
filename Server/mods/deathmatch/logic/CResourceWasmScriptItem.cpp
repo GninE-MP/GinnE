@@ -66,7 +66,7 @@ bool CResourceWasmScriptItem::Start()
                 continue;
             }
 
-            lua_newtable(luaVM);
+            /*lua_newtable(luaVM);
 
             lua_pushuserdata(luaVM, function);
             lua_setfield(luaVM, -2, WASM_LUA_FUNCTION_FIELD_NAME);
@@ -80,6 +80,17 @@ bool CResourceWasmScriptItem::Start()
             lua_setfield(luaVM, -2, "__call");
 
             lua_setmetatable(luaVM, -2);
+
+            lua_setglobal(luaVM, name.c_str());*/
+
+            CCallable callable(function);
+            callable.SetLuaResource(m_resource);
+            callable.SetIsWasmFunctionState(true);
+
+            CLuaArgument luaCallable;
+            luaCallable.SetCallable(callable);
+
+            luaCallable.Push(luaVM);
 
             lua_setglobal(luaVM, name.c_str());
         }
