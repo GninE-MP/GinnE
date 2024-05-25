@@ -69,10 +69,13 @@ bool CCallable::Call(CLuaArguments* args, CLuaArguments* results, SString* error
         }
 
         CWebAssemblyVariables wArgs, wResults;
+        CWebAssemblyMemory*   memory = m_pWasmFunction->GetApiEnviornment()->script->GetMemory();
+
+        std::vector<CWebAssemblyMemoryPointerAddress> ptrToDelete;
 
         if (args)
         {
-            args->WriteWebAssemblyVariables(&wArgs, &m_pWasmFunction->GetFunctionType().GetArguments(), m_pWasmFunction->GetApiEnviornment()->script->GetMemory());
+            args->WriteWebAssemblyVariables(&wArgs, &m_pWasmFunction->GetFunctionType().GetArguments(), memory, &ptrToDelete);
         }
 
         bool callResult = m_pWasmFunction->Call(&wArgs, &wResults, errorMessage);
@@ -80,6 +83,14 @@ bool CCallable::Call(CLuaArguments* args, CLuaArguments* results, SString* error
         if (results)
         {
             results->ReadWebAssemblyVariables(&wResults);
+        }
+
+        if (!ptrToDelete.empty())
+        {
+            for (const CWebAssemblyMemoryPointerAddress& ptr : ptrToDelete)
+            {   
+                memory->Free(ptr);
+            }
         }
 
         return callResult;
@@ -118,11 +129,15 @@ bool CCallable::Call(CLuaArguments* args, CLuaArguments* results, SString* error
         args->PushArguments(luaVM);
     }
 
+    bool callResult = true;
+
     if (lua_pcall(luaVM, argsCount, LUA_MULTRET, 0) != 0)
     {
         *errorMessage = lua_tostring(luaVM, -1);
 
         lua_pop(luaVM, 1);
+
+        callResult = false;
     }
 
     int returnCount = lua_gettop(luaVM) - top;
@@ -133,6 +148,95 @@ bool CCallable::Call(CLuaArguments* args, CLuaArguments* results, SString* error
         {
             argStream.ReadLuaArguments(*results);
         }
+    }
+
+    return callResult;
+}
+
+void CCallable::WriteHash(uint8_t* hash)
+{
+    if (!hash)
+    {
+        return;
+    }
+
+    size_t headerSize = sizeof(C_CALLABLE_HASH_HEADER_BYTES) - 1;
+
+    memcpy(hash, C_CALLABLE_HASH_HEADER_BYTES, headerSize);
+
+    uint resourceScriptId = m_pLuaResource ? m_pLuaResource->GetScriptID() : 0;
+
+    hash += headerSize;
+    memcpy(hash, &resourceScriptId, sizeof(CWebAssemblyUserData));
+
+    hash += sizeof(CWebAssemblyUserData);
+
+    if (m_bIsWasmFunction)
+    {
+        CWebAssemblyUserData address = (CWebAssemblyUserData)m_pWasmFunction;
+        memcpy(hash, &address, sizeof(CWebAssemblyUserData));
+    }
+    else
+    {
+        CWebAssemblyUserData ref = m_iLuaFunctionRef;
+        memcpy(hash, &ref, sizeof(CWebAssemblyUserData));
+    }
+
+    hash += sizeof(CWebAssemblyUserData);
+
+    uint8_t isWasmFunction = m_bIsWasmFunction;
+    memcpy(hash, &isWasmFunction, sizeof(uint8_t));
+}
+
+bool CCallable::ReadHash(uint8_t* hash)
+{
+    if (!hash)
+    {
+        return false;
+    }
+
+    Drop();
+
+    size_t headerSize = sizeof(C_CALLABLE_HASH_HEADER_BYTES) - 1;
+
+    if (strncmp((const char*)hash, C_CALLABLE_HASH_HEADER_BYTES, headerSize) != 0)
+    {
+        return false;
+    }
+
+    hash += headerSize;
+
+    uint resourceScriptId = *(CWebAssemblyUserData*)hash;
+
+    m_pLuaResource = g_pGame->GetResourceManager()->GetResourceFromScriptID(resourceScriptId);
+
+    if (!m_pLuaResource)
+    {
+        Drop();
+        return false;
+    }
+
+    hash += sizeof(CWebAssemblyUserData);
+
+    CWebAssemblyUserData functionReferenceAddress = *(CWebAssemblyUserData*)hash;
+
+    if (functionReferenceAddress == 0)
+    {
+        Drop();
+        return false;
+    }
+
+    hash += sizeof(CWebAssemblyUserData);
+
+    m_bIsWasmFunction = *hash;
+
+    if (m_bIsWasmFunction)
+    {
+        m_pWasmFunction = (CWebAssemblyFunction*)functionReferenceAddress;
+    }
+    else
+    {
+        m_iLuaFunctionRef = functionReferenceAddress;
     }
 
     return true;
@@ -476,8 +580,6 @@ void CLuaArgument::Read(lua_State* luaVM, int iArgument, CFastHashMap<const void
                 CLuaMain& luaMain = lua_getownercluamain(luaVM);
 
                 m_Callable = CCallable(luaMain.GetResource(), funcRef);
-
-                lua_pop(luaVM, 1);
 
                 break;
             }

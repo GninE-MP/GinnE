@@ -39,6 +39,7 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
     SetFunctionType("read_shared_pointer_address", "xz*x");
     SetFunctionType("write_shared_pointer_address", "xz*x");
     SetFunctionType("get_max_shared_pointer_size", "xz");
+    SetFunctionType("get_memory_free_space", "x");
 
     SetFunctionType("get_tick_count", "l");
     SetFunctionType("get_real_time", "bilb");
@@ -55,11 +56,14 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
     SetFunctionType("to_color", "iiiii");
     SetFunctionType("get_process_memory_stats", "b*");
 
-    SetFunctionType("call_callable", "*u*");
+    SetFunctionType("call_callable", "*u**x");
     SetFunctionType("is_valid_callable", "bu");
-    SetFunctionType("get_callable_declaration", "iu*i");
-    SetFunctionType("get_callable_resource", "uu");
+    SetFunctionType("get_callable_declaration", "ius*i");
     SetFunctionType("free_callable_result", "v*");
+    SetFunctionType("c_function_to_callable", "b**");
+    SetFunctionType("get_callable_resource", "u*");
+    SetFunctionType("get_callable_reference", "u*");
+    SetFunctionType("is_callable_wasm_function", "b*");
 }
 
 void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -74,6 +78,7 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "read_shared_pointer_address", ReadSharedPointerAddress },
         { "write_shared_pointer_address", WriteSharedPointerAddress },
         { "get_max_shared_pointer_size", GetMaxSharedPointerSize },
+        { "get_memory_free_space", GetMemoryFreeSpace },
 
         { "get_tick_count", GetTickCount_ },
         { "get_real_time", GetRealTime },
@@ -93,8 +98,11 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "call_callable", CallCallable },
         { "is_valid_callable", IsValidCallable },
         { "get_callable_declaration", GetCallableDeclaration },
+        { "free_callable_result", FreeCallableResult },
+        { "c_function_to_callable", CFunctionToCallable },
         { "get_callable_resource", GetCallableResource },
-        { "free_callable_result", FreeCallableResult }
+        { "get_callable_reference", GetCallableReference },
+        { "is_callable_wasm_function", IsCallableWasmFunction },
     };
 
     WASM_REGISTER_API(script, functions);
@@ -284,9 +292,9 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetMaxSharedPointerSize, env, args, results
         return argStream.Return(0);
     }
 
+    intptr_t            address = (intptr_t)ptr;
     CWebAssemblyMemory* memory = script->GetMemory();
 
-    intptr_t address = (intptr_t)ptr;
     intptr_t memoryEndPointer = ((intptr_t)memory->GetBase()) + memory->GetSize();
 
     if (address > memoryEndPointer)
@@ -295,6 +303,13 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetMaxSharedPointerSize, env, args, results
     }
 
     return argStream.Return(memoryEndPointer - address);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetMemoryFreeSpace, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.Return((int32_t)argStream.GetScript()->GetMemory()->GetFreeSpaceSize());
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetTickCount_, env, args, results)
@@ -626,38 +641,115 @@ WebAssemblyApi(CWebAssemblyUtilDefs::GetProcessMemoryStats, env, args, results)
 
 WebAssemblyApi(CWebAssemblyUtilDefs::CallCallable, env, args, results)
 {
-    uintptr_t functionHash;
+    uint8_t*                         functionHash;
+    uint8_t*                         argsData;
+    CWebAssemblyMemoryPointerAddress outError;
+    uint32_t                         maxErrorSize;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    argStream.ReadInternalFunctionHash(functionHash, 3133);
+    argStream.ReadPointer(functionHash);
+    argStream.ReadPointer(argsData);
+    argStream.ReadPointerAddress(outError);
+    argStream.ReadUInt32(maxErrorSize, 0xffffffff);
 
-    argStream.GetScript()->CallInternalFunctionByHash(functionHash, NULL, NULL);
+    CCallable callable;
+
+    if (!callable.ReadHash(functionHash))
+    {
+        return argStream.ReturnNull();
+    }
+
+    CWebAssemblyMemory* mem = argStream.GetScript()->GetMemory();
+
+    SString errorMessage;
+
+    CLuaArguments cArgs, cResults;
+    
+    if (!callable.Call(&cArgs, &cResults, &errorMessage))
+    {
+        size_t errorLength = errorMessage.size();
+
+        if (errorLength > 0)
+        {
+            errorLength = std::min(errorLength, maxErrorSize);
+
+            argStream.WritePointer(outError, errorMessage.data(), errorLength);
+        }
+
+        return argStream.ReturnNull();
+    }
 
     return argStream.ReturnNull();
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::IsValidCallable, env, args, results)
 {
-    uintptr_t functionHash;
+    uint8_t* functionHash;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadPointer(functionHash);
+
+    CCallable callable;
+
+    return argStream.Return(callable.ReadHash(functionHash));
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableDeclaration, env, args, results)
 {
+    uint8_t*                         functionHash;
+    SString                          functionName;
+    CWebAssemblyMemoryPointerAddress outString;
+    uint32_t                         maxSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
-}
+    argStream.ReadPointer(functionHash);
+    argStream.ReadString(functionName);
+    argStream.ReadPointerAddress(outString);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
 
-WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableResource, env, args, results)
-{
-    CWebAssemblyArgReader argStream(env, args, results);
+    if (outString == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
 
-    return argStream.ReturnNull();
+    CCallable callable;
+
+    if (!callable.ReadHash(functionHash))
+    {
+        return argStream.Return(0);
+    }
+
+    SString declaration;
+
+    if (callable.IsWasmFunction())
+    {
+        CWebAssemblyFunction* wasmFunction = callable.GetWasmFunction();
+
+        if (wasmFunction)
+        {
+            declaration = wasmFunction->GetFunctionType().GenerateFunctionStructureText(functionName);
+        }
+    }
+    else
+    {
+        declaration += "any ";
+        declaration += functionName;
+        declaration += "(...any)";
+    }
+
+    if (declaration.empty())
+    {
+        return argStream.Return(0);
+    }
+
+    size_t length = std::min(declaration.size(), maxSize);
+
+    argStream.WritePointer(outString, declaration.data(), length);
+
+    return argStream.Return(length);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::FreeCallableResult, env, args, results)
@@ -665,4 +757,97 @@ WebAssemblyApi(CWebAssemblyUtilDefs::FreeCallableResult, env, args, results)
     CWebAssemblyArgReader argStream(env, args, results);
 
     return argStream.ReturnNull();
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::CFunctionToCallable, env, args, results)
+{
+    uintptr_t                        functionHash;
+    CWebAssemblyMemoryPointerAddress callableRefPtr;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadInternalFunctionHash(functionHash);
+    argStream.ReadPointerAddress(callableRefPtr);
+
+    if (callableRefPtr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(false);
+    }
+
+    CWebAssemblyFunction* function = argStream.GetScript()->GetInternalFunctionByHash(functionHash);
+
+    if (!function)
+    {
+        return argStream.Return(false);
+    }
+
+    CCallable callable(function);
+    callable.SetLuaResource(GetWebAssemblyEnvResource(env));
+    callable.SetIsWasmFunctionState(true);
+
+    uint8_t callableHash[C_CALLABLE_HASH_SIZE];
+    callable.WriteHash(callableHash);
+
+    argStream.WritePointer(callableRefPtr, callableHash, C_CALLABLE_HASH_SIZE);
+
+    return argStream.Return(true);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableResource, env, args, results)
+{
+    uint8_t* callableHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadPointer(callableHash);
+
+    CCallable callable;
+
+    if (!callable.ReadHash(callableHash))
+    {
+        return argStream.ReturnNull();
+    }
+
+    return argStream.Return(RESOURCE_TO_WASM_USERDATA(callable.GetLuaResource()));
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::GetCallableReference, env, args, results)
+{
+    uint8_t* callableHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadPointer(callableHash);
+
+    CCallable callable;
+
+    if (!callable.ReadHash(callableHash))
+    {
+        return argStream.ReturnNull();
+    }
+
+    if (callable.IsWasmFunction())
+    {
+        return argStream.Return((CWebAssemblyUserData)callable.GetWasmFunction());
+    }
+
+    return argStream.Return((CWebAssemblyUserData)callable.GetLuaFunctionRef());
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::IsCallableWasmFunction, env, args, results)
+{
+    uint8_t* callableHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadPointer(callableHash);
+
+    CCallable callable;
+
+    if (!callable.ReadHash(callableHash))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(callable.IsWasmFunction());
 }

@@ -29,6 +29,13 @@ class CResource;
 #define LUA_TSTRING_LONG 10
 #define LUA_CALLABLE 0xfac
 
+#define C_CALLABLE_HASH_HEADER_BYTES "crbh1"
+#define C_CALLABLE_HASH_SIZE ( \
+    sizeof(C_CALLABLE_HASH_HEADER_BYTES) - 1 + \
+    sizeof(CWebAssemblyUserData)*2 + \
+    sizeof(uint8_t) \
+)
+
 class CWebAssemblyFunction;
 class CWebAssemblyVariables;
 
@@ -41,6 +48,9 @@ public:
     ~CCallable() = default;
 
     bool Call(CLuaArguments* args, CLuaArguments* results, SString* errorMessage = NULL) const; // args! CLuaArguments
+
+    void WriteHash(uint8_t* hash);
+    bool ReadHash(uint8_t* hash);
 
     void Drop();
 

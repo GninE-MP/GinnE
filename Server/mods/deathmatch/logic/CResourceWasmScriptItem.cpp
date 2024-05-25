@@ -52,7 +52,7 @@ bool CResourceWasmScriptItem::Start()
 
         CWebAssemblyDefs::RegisterApi(script);
 
-        CWebAssemblyLoadState state = m_pWasmContext->LoadScriptBinary(script, &buffer.at(0), iSize, m_strShortName);
+        CWebAssemblyLoadState state = m_pWasmContext->LoadScriptBinary(script, &buffer.at(0), iSize, m_strShortName, false);
 
         lua_State* luaVM = m_resource->GetVirtualMachine()->GetVM();
 
@@ -94,6 +94,8 @@ bool CResourceWasmScriptItem::Start()
 
             lua_setglobal(luaVM, name.c_str());
         }
+
+        script->CallMainFunction({ m_resource->GetName(), m_strShortName, std::to_string(m_pWasmContext->GetScripts().size()) });
 
         return state == CWebAssemblyLoadState::Succeed;
     }

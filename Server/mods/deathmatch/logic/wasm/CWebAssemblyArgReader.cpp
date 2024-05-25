@@ -122,6 +122,20 @@ bool CWebAssemblyArgReader::NextIsInternalFunctionHash()
     return NextIsUserData();
 }
 
+bool CWebAssemblyArgReader::NextIsIntPtr()
+{
+    #if IS_APP_ON_64_BIT_VERSION
+        return NextIsInt64();
+    #else
+        return NextIsInt32();
+    #endif
+}
+
+bool CWebAssemblyArgReader::NextIsUIntPtr()
+{
+    return NextIsIntPtr();
+}
+
 void CWebAssemblyArgReader::ReadInt32(int32_t& out, int32_t defaultValue)
 {
     if (!Skip())
@@ -403,6 +417,24 @@ void CWebAssemblyArgReader::ReadInternalFunctionHash(uintptr_t& out, uintptr_t d
     {
         out = indexOrHash;
     }
+}
+
+void CWebAssemblyArgReader::ReadIntPtr(intptr_t& out, intptr_t defaultValue)
+{
+    #if IS_APP_ON_64_BIT_VERSION
+        ReadInt64(out, defaultValue);
+    #else
+        ReadInt32(out, defaultValue);
+    #endif
+}
+
+void CWebAssemblyArgReader::ReadUIntPtr(uintptr_t& out, uintptr_t defaultValue)
+{
+    #if IS_APP_ON_64_BIT_VERSION
+        ReadUInt64(out, defaultValue);
+    #else
+        ReadUInt32(out, defaultValue);
+    #endif
 }
 
 bool CWebAssemblyArgReader::HasResult()

@@ -829,7 +829,7 @@ bool CLuaArguments::ReadFromJSONArray(json_object* object, std::vector<CLuaArgum
     return false;
 }
 
-void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern, CWebAssemblyMemory* memory)
+void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern, CWebAssemblyMemory* memory, std::vector<CWebAssemblyMemoryPointerAddress>* pointersToDelete)
 {
     if (!vars)
     {
@@ -846,6 +846,12 @@ void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebA
         CWebAssemblyVariable pattern = typePattern ? typePattern->Get(i) : CWebAssemblyVariable((int32_t)0);
 
         CWebAssemblyValue value = pattern.GetValue();
+
+        CWebAssemblyMemoryPointerAddress ptr = WEB_ASSEMBLY_NULL_PTR;
+
+        CCallable callable = arg->GetCallable();
+
+        //uint8_t functionHash[C_CALLABLE_HASH_SIZE]; 
 
         #define SET_VALUE(val) \
             if (typePattern) \
@@ -897,7 +903,9 @@ void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebA
             case LUA_TSTRING:
                 if (memory)
                 {
-                    vars->Push((int32_t)memory->StringToUTF8(arg->GetString()));
+                    ptr = memory->StringToUTF8(arg->GetString());
+
+                    vars->Push((int32_t)ptr);
                 }
 
                 break;
@@ -909,12 +917,37 @@ void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebA
             case LUA_TTABLE:
                 break;
             case LUA_TFUNCTION:
+                if (memory)
+                {
+                    /*callable.WriteHash(functionHash);
+
+                    void* pPtr = NULL;
+                    ptr = memory->Malloc(C_CALLABLE_HASH_SIZE, &pPtr);
+
+                    memcpy(pPtr, functionHash, C_CALLABLE_HASH_SIZE);
+
+                    vars->Push((int32_t)ptr);*/
+                    void* pPtr = NULL;
+                    ptr = memory->Malloc(C_CALLABLE_HASH_SIZE, &pPtr);
+
+                    if (pPtr)
+                    {
+                        callable.WriteHash((uint8_t*)pPtr);
+                        vars->Push((int32_t)ptr);
+                    }
+                }
+
                 break;
             default:
                 break;
         }
 
         #undef SET_VALUE
+
+        if (pointersToDelete && ptr != WEB_ASSEMBLY_NULL_PTR)
+        {
+            pointersToDelete->push_back(ptr);
+        }
     }
 }
 

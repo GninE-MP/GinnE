@@ -274,6 +274,8 @@ public:
     void                      SetContext(CWebAssemblyMemoryContext context);
     CWebAssemblyMemoryContext GetContext();
 
+    size_t GetFreeSpaceSize();
+
     bool DoesPointerBelongToMemory(void* ptr);
 
 private:

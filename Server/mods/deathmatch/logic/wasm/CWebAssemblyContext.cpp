@@ -211,11 +211,14 @@ CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* 
 
     CWebAssemblyLoadState state = script->LoadBinary(binary, binarySize, fileName);
 
-    if (state == CWebAssemblyLoadState::Succeed && executeMain)
+    if (state == CWebAssemblyLoadState::Succeed)
     {
         m_lsScripts.push_back(script);
 
-        script->CallMainFunction({ GetResource()->GetName(), fileName, std::to_string(m_lsScripts.size()) });
+        if (executeMain)
+        {
+            script->CallMainFunction({GetResource()->GetName(), fileName, std::to_string(m_lsScripts.size())});
+        }
     }
 
     return state;
@@ -1946,6 +1949,84 @@ void CWebAssemblyMemory::SetContext(CWebAssemblyMemoryContext context)
 CWebAssemblyMemoryContext CWebAssemblyMemory::GetContext()
 {
     return m_pContext;
+}
+
+size_t CWebAssemblyMemory::GetFreeSpaceSize()
+{
+    #define DIGIT_COUNT(n) (std::floor(std::log10(std::abs((double)n) + 1)) + 1)
+
+    14116616161;
+
+    size_t memTotalSizeDigitCount = DIGIT_COUNT(GetSize());
+    size_t chunksArraySize = (memTotalSizeDigitCount * sizeof(CWebAssemblyMemoryPointerAddress)) * 2;
+
+    CWebAssemblyMemoryPointerAddress* chunks = (CWebAssemblyMemoryPointerAddress*)malloc(chunksArraySize);
+    
+    if (!chunks)
+    {
+        return 0;
+    }
+
+    memset((void*)chunks, WEB_ASSEMBLY_NULL_PTR, chunksArraySize);
+
+    size_t eachChunkSize = std::pow(10, memTotalSizeDigitCount - 1);
+    size_t freeSpace = 0;
+
+    for (size_t i = 0; i < chunksArraySize; i++)
+    {
+        chunks[i] = Malloc(eachChunkSize);
+
+        if (chunks[i] == WEB_ASSEMBLY_NULL_PTR)
+        {
+            size_t remainedSize = eachChunkSize;
+            size_t remainedSizeDigitCount = DIGIT_COUNT(remainedSize);
+
+            while (remainedSizeDigitCount > 0)
+            {
+                #define REMAINED_VALUE ((int)std::pow((double)10, (double)(remainedSizeDigitCount - 1)))
+
+                chunks[i] = Malloc(remainedSize);
+
+                if (chunks[i] != WEB_ASSEMBLY_NULL_PTR || remainedSize == 0)
+                {
+                    Free(chunks[i]);
+                    chunks[i] = WEB_ASSEMBLY_NULL_PTR;
+
+                    remainedSize += REMAINED_VALUE;
+                    remainedSizeDigitCount -= 1;
+
+                    if (remainedSizeDigitCount > 0)
+                    {
+                        remainedSize -= REMAINED_VALUE;
+                    }
+
+                    continue;
+                }
+
+                remainedSize -= REMAINED_VALUE;
+
+                #undef REMAINED_VALUE
+            }
+
+            freeSpace += (i * eachChunkSize) + remainedSize;
+
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < memTotalSizeDigitCount; i++)
+    {
+        if (chunks[i] != WEB_ASSEMBLY_NULL_PTR)
+        {
+            Free(chunks[i]);
+        }
+    }
+
+    free((void*)chunks);
+
+    #undef DIGIT_COUNT
+
+    return freeSpace;
 }
 
 bool CWebAssemblyMemory::DoesPointerBelongToMemory(void* ptr)

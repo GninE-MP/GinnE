@@ -28,6 +28,7 @@ public:
     DEFINE_WASM_FUNCTION(ReadSharedPointerAddress, env, args, results);
     DEFINE_WASM_FUNCTION(WriteSharedPointerAddress, env, args, results);
     DEFINE_WASM_FUNCTION(GetMaxSharedPointerSize, env, args, results);
+    DEFINE_WASM_FUNCTION(GetMemoryFreeSpace, env, args, results);
 
     DEFINE_WASM_FUNCTION(GetTickCount_, env, args, results);
     DEFINE_WASM_FUNCTION(GetRealTime, env, args, results);
@@ -47,6 +48,9 @@ public:
     DEFINE_WASM_FUNCTION(CallCallable, env, args, results);
     DEFINE_WASM_FUNCTION(IsValidCallable, env, args, results);
     DEFINE_WASM_FUNCTION(GetCallableDeclaration, env, args, results);
-    DEFINE_WASM_FUNCTION(GetCallableResource, env, args, results);
     DEFINE_WASM_FUNCTION(FreeCallableResult, env, args, results);
+    DEFINE_WASM_FUNCTION(CFunctionToCallable, env, args, results);
+    DEFINE_WASM_FUNCTION(GetCallableResource, env, args, results);
+    DEFINE_WASM_FUNCTION(GetCallableReference, env, args, results);
+    DEFINE_WASM_FUNCTION(IsCallableWasmFunction, env, args, results);
 };

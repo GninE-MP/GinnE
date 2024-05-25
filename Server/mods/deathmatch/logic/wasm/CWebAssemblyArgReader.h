@@ -23,6 +23,7 @@
 #include "CDatabaseManager.h"
 
 #define ELEMENT_TO_WASM_USERDATA(element) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((element)->GetID().Value()))
+#define RESOURCE_TO_WASM_USERDATA(resource) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((resource)->GetScriptID()))
 
 class CWebAssemblyScript;
 
@@ -45,6 +46,8 @@ public:
     bool NextIsPointerAddress();
     bool NextIsUserData();
     bool NextIsInternalFunctionHash();
+    bool NextIsIntPtr();
+    bool NextIsUIntPtr();
 
     void ReadInt32(int32_t& out, int32_t defaultValue = 0);
     void ReadUInt32(uint32_t& out, uint32_t defaultValue = 0);
@@ -59,6 +62,8 @@ public:
     void ReadVector2D(CVector2D& out, CVector2D defaultValue = CVector2D(0.0f, 0.0f));
     void ReadVector3D(CVector& out, CVector defaultValue = CVector(0.0f, 0.0f, 0.0f));
     void ReadInternalFunctionHash(uintptr_t& out, uintptr_t defaultValue = NULL);
+    void ReadIntPtr(intptr_t& out, intptr_t defaultValue = 0);
+    void ReadUIntPtr(uintptr_t& out, uintptr_t defaultValue = 0);
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)

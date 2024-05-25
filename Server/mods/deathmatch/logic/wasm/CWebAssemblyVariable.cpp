@@ -857,7 +857,7 @@ bool CWebAssemblyFunction::Call(CWebAssemblyVariables* args, CWebAssemblyVariabl
     {
         int count = functionArguments.GetSize();
 
-        for (int i = std::abs(difference) - 1; i < count; i++)
+        for (int i = argsValues.size(); i < count; i++)
         {            
             argsValues.push_back(functionArguments[i].GetValue());
         }

@@ -22,6 +22,8 @@ extern "C"
 #include "json.h"
 #include "CLuaFunctionRef.h"
 
+#include "wasm/WebAssemblyImports.h"
+
 inline void LUA_CHECKSTACK(lua_State* L, int size)
 {
     if (lua_getstackgap(L) < size + 5)
@@ -98,7 +100,7 @@ public:
     bool         ReadFromJSONObject(json_object* object, std::vector<CLuaArguments*>* pKnownTables = NULL);
     bool         ReadFromJSONArray(json_object* object, std::vector<CLuaArguments*>* pKnownTables = NULL);
 
-    void WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern = NULL, CWebAssemblyMemory* wasmMemory = NULL);
+    void WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern = NULL, CWebAssemblyMemory* wasmMemory = NULL, std::vector<CWebAssemblyMemoryPointerAddress>* pointersToDelete = NULL);
     void ReadWebAssemblyVariables(CWebAssemblyVariables* vars);
 
     unsigned int                               Count() const { return static_cast<unsigned int>(m_Arguments.size()); };
