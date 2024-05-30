@@ -851,8 +851,6 @@ void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebA
 
         CCallable callable = arg->GetCallable();
 
-        //uint8_t functionHash[C_CALLABLE_HASH_SIZE]; 
-
         #define SET_VALUE(val) \
             if (typePattern) \
             { \
@@ -919,14 +917,6 @@ void CLuaArguments::WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebA
             case LUA_TFUNCTION:
                 if (memory)
                 {
-                    /*callable.WriteHash(functionHash);
-
-                    void* pPtr = NULL;
-                    ptr = memory->Malloc(C_CALLABLE_HASH_SIZE, &pPtr);
-
-                    memcpy(pPtr, functionHash, C_CALLABLE_HASH_SIZE);
-
-                    vars->Push((int32_t)ptr);*/
                     void* pPtr = NULL;
                     ptr = memory->Malloc(C_CALLABLE_HASH_SIZE, &pPtr);
 
@@ -958,7 +948,240 @@ void CLuaArguments::ReadWebAssemblyVariables(CWebAssemblyVariables* vars)
         return;
     }
 
+    for (CWebAssemblyVariable& var : vars->GetList())
+    {
+        CLuaArgument* arg = new CLuaArgument();
 
+        switch (var.GetType())
+        {
+            case C_WASM_VARIABLE_TYPE_I32:
+                arg->SetNumber((lua_Number)var.GetInt32());
+                break;
+            case C_WASM_VARIABLE_TYPE_I64:
+                arg->SetNumber((lua_Number)var.GetInt64());
+                break;
+            case C_WASM_VARIABLE_TYPE_F32:
+                arg->SetNumber((lua_Number)var.GetFloat32());
+                break;
+            case C_WASM_VARIABLE_TYPE_F64:
+                arg->SetNumber((lua_Number)var.GetFloat64());
+                break;
+            default:
+                break;
+        }
+
+        m_Arguments.push_back(arg);
+    }
+}
+
+void CLuaArguments::UnpackCompiledArguments(uint8_t* data, size_t size, bool readAsTable)
+{
+    if (!data || size < C_ARGS_SEPRATOR_LENGTH)
+    {
+        return;
+    }
+
+    int  openedList = 0;
+    bool isInsideString = false;
+
+    for (long long i = 0, lastPos = 0, tkey = 1; i < size; i++)
+    {
+        char* pos = (char*)data + i;
+
+        if (isInsideString)
+        {
+            if (strncmp(pos, C_ARGS_STRING_SYNTAX, C_ARGS_STRING_SYNTAX_LENGTH) == 0)
+            {
+                if (strncmp(pos - 1, C_ARGS_STRING_PASS_SYNTAX, C_ARGS_STRING_PASS_SYNTAX_LENGTH) == 0)
+                {
+                    continue;
+                }
+
+                isInsideString = false;
+            }
+
+            continue;
+        }
+        
+        if (strncmp(pos, C_ARGS_STRING_SYNTAX, C_ARGS_STRING_SYNTAX_LENGTH) == 0)
+        {
+            isInsideString = true;
+            continue;
+        }
+
+        if (openedList > 0)
+        {
+            if (strncmp(pos, C_ARGS_LIST_OPEN_SYNTAX, C_ARGS_LIST_OPEN_SYNTAX_LENGTH) == 0)
+            {
+                openedList++;
+            }
+            else if (strncmp(pos, C_ARGS_LIST_CLOSE_SYNTAX, C_ARGS_LIST_CLOSE_SYNTAX_LENGTH) == 0)
+            {
+                openedList--;
+            }
+
+            continue;
+        }
+        
+        if (strncmp(pos, C_ARGS_LIST_OPEN_SYNTAX, C_ARGS_LIST_OPEN_SYNTAX_LENGTH) == 0)
+        {
+            openedList++;
+        }
+
+        if (strncmp(pos, C_ARGS_SEPRATOR, C_ARGS_SEPRATOR_LENGTH) == 0)
+        {
+            long long size = i - lastPos;
+            char*     argData = pos - (intptr_t)size;
+
+            if (lastPos > 0)
+            {
+                argData += C_ARGS_SEPRATOR_LENGTH;
+                size -= C_ARGS_SEPRATOR_LENGTH;
+            }
+
+            char argType = *argData;
+
+            argData += C_ARGS_TYPE_IDENTIFIER_LENGTH;
+            size -= C_ARGS_TYPE_IDENTIFIER_LENGTH;
+
+            CLuaArgument* pArgument = new CLuaArgument();
+
+            switch (argType)
+            {
+                case C_ARGS_TYPE_ID_UNKNOWN:
+                case C_ARGS_TYPE_ID_NULL:
+                    break;
+                case C_ARGS_TYPE_ID_BOOLEAN:
+                    pArgument->SetBoolean(*argData == '1' ? true : false);
+                    break;
+                case C_ARGS_TYPE_ID_NUMBER:
+                    pArgument->SetNumber(strtod(argData, NULL));
+                    break;
+                case C_ARGS_TYPE_ID_STRING:
+                    {
+                        argData += C_ARGS_STRING_SYNTAX_LENGTH;
+                        size -= C_ARGS_STRING_SYNTAX_LENGTH * 2;
+
+                        char* str = (char*)malloc(size + 1);
+                        memset((void*)str, 0, size + 1);
+
+                        size_t sSize = size;
+                        for (size_t i = 0, ci = 0; i < sSize; i++) {
+                            char* chunk = argData + i;
+
+                            if (strncmp(chunk, C_ARGS_STRING_PASS_SYNTAX, C_ARGS_STRING_PASS_SYNTAX_LENGTH) == 0) {
+                                if (strncmp(chunk + C_ARGS_STRING_PASS_SYNTAX_LENGTH, C_ARGS_STRING_SYNTAX, C_ARGS_STRING_SYNTAX_LENGTH) == 0) {
+                                    size -= C_ARGS_STRING_PASS_SYNTAX_LENGTH;
+                                    str = (char*)realloc((void*)str, size);
+
+                                    continue;
+                                }
+                            }
+        
+                            str[ci] = *chunk;
+                            ci++;
+                        }
+
+                        str[size] = '\0';
+
+                        pArgument->SetString(std::string(str, size));
+
+                        free((void*)str);
+                    }
+
+                    break;
+                case C_ARGS_TYPE_ID_CALLABLE:
+                    {
+                        argData += C_ARGS_STRING_SYNTAX_LENGTH;
+                        size -= C_ARGS_STRING_SYNTAX_LENGTH * 2;
+
+                        char* str = (char*)malloc(size + 1);
+                        memset((void*)str, 0, size + 1);
+
+                        size_t sSize = size;
+                        for (size_t i = 0, ci = 0; i < sSize; i++) {
+                            char* chunk = argData + i;
+
+                            if (strncmp(chunk, C_ARGS_STRING_PASS_SYNTAX, C_ARGS_STRING_PASS_SYNTAX_LENGTH) == 0) {
+                                if (strncmp(chunk + C_ARGS_STRING_PASS_SYNTAX_LENGTH, C_ARGS_STRING_SYNTAX, C_ARGS_STRING_SYNTAX_LENGTH) == 0) {
+                                    size -= C_ARGS_STRING_PASS_SYNTAX_LENGTH;
+                                    str = (char*)realloc((void*)str, size);
+
+                                    continue;
+                                }
+                            }
+        
+                            str[ci] = *chunk;
+                            ci++;
+                        }
+
+                        CCallable callable;
+
+                        if (callable.ReadHash((uint8_t*)str))
+                        {
+                            pArgument->SetCallable(callable);
+                        }
+
+                        free((void*)str);
+                    }
+
+                    break;
+                case C_ARGS_TYPE_ID_LIST:
+                    {
+                        while (strncmp(argData, C_ARGS_LIST_OPEN_SYNTAX, C_ARGS_LIST_OPEN_SYNTAX_LENGTH) != 0 && size > 0)
+                        {
+                            argData++;
+                            size--;
+                        }
+
+                        argData += C_ARGS_LIST_OPEN_SYNTAX_LENGTH;
+                        size -= C_ARGS_LIST_OPEN_SYNTAX_LENGTH + C_ARGS_LIST_CLOSE_SYNTAX_LENGTH;
+
+                        if (size > 0)
+                        {
+                            CLuaArguments* tData = new CLuaArguments();
+
+                            if (tData)
+                            {
+                                tData->UnpackCompiledArguments((uint8_t*)argData, size, true);
+
+                                pArgument->ReadTable(tData);
+
+                                delete tData;
+                            }
+                        }
+                    }
+
+                    break;
+                case C_ARGS_TYPE_ID_USERDATA:
+                    #if IS_APP_ON_64_BIT_VERSION
+                        pArgument->SetUserData((void*)strtoll(argData, NULL, 10));
+                    #else
+                        pArgument->SetUserData((void*)atoi(argData));
+                    #endif
+                    break;
+                default:
+                    break;
+            }
+
+            if (pArgument)
+            {
+                if (readAsTable)
+                {
+                    CLuaArgument* tableKey = new CLuaArgument();
+                    tableKey->SetNumber(tkey);
+
+                    m_Arguments.push_back(tableKey);
+
+                    tkey++;
+                }
+
+                m_Arguments.push_back(pArgument);
+            }
+
+            lastPos = i;
+        }
+    }
 }
 
 bool CLuaArguments::IsEqualTo(const CLuaArguments& compareTo, std::set<const CLuaArguments*>* knownTables) const

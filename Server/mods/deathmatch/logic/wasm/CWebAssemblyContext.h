@@ -255,6 +255,7 @@ public:
     void Destroy();
 
     CWebAssemblyMemoryPointerAddress Malloc(const size_t& size, void** physicalPointer = NULL);
+    CWebAssemblyMemoryPointerAddress Realloc(CWebAssemblyMemoryPointerAddress pointer, const size_t& size, void** physicalPointer = NULL);
     void                             Free(CWebAssemblyMemoryPointerAddress pointer);
 
     CWebAssemblyMemoryPointerAddress StringToUTF8(const SString& str);

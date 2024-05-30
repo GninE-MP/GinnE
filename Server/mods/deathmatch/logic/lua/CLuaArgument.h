@@ -115,6 +115,7 @@ public:
     CElement*          GetElement() const;
     bool               GetAsString(SString& strBuffer);
     CCallable          GetCallable() const { return m_Callable; }
+    CLuaArguments*     GetTableData() const { return m_pTableData; }
 
     bool         ReadFromBitStream(NetBitStreamInterface& bitStream, std::vector<CLuaArguments*>* pKnownTables = NULL);
     bool         WriteToBitStream(NetBitStreamInterface& bitStream, CFastHashMap<CLuaArguments*, unsigned long>* pKnownTables = NULL) const;

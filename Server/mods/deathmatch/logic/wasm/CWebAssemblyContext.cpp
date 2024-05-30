@@ -21,6 +21,12 @@
 #include "CScriptArgReader.h"
 #include "luadefs/CLuaDefs.h"
 
+#ifndef lua_toresource
+    #define lua_toresource(luaVM, index) \
+        (g_pGame->GetResourceManager()->GetResourceFromScriptID(reinterpret_cast<unsigned long>((CResource*)lua_touserdata(luaVM, index))))
+#endif
+
+
 CGame*              pGame = NULL;
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
 
@@ -1184,6 +1190,96 @@ WebAssemblyApi(CWebAssemblyScript::Wasm_CallLuaImportedFunction, env, args, resu
 
                 argStream.WritePointer(ptr + stringSize, &endCharacter);
             }
+            else if (type == LUA_TUSERDATA || type == LUA_TLIGHTUSERDATA)
+            {
+                CWebAssemblyUserData result = (CWebAssemblyUserData)lua_touserdata(luaVM, -1);
+
+                bytesWrote = std::min((uint32_t)sizeof(result), maxSize);
+
+                argStream.WritePointer(ptr, &result, bytesWrote);
+            }
+            else if (type == LUA_TTABLE)
+            {    
+                bool isFunctionReference = false;
+
+                if (lua_getmetatable(luaVM, -1))
+                {
+                    if (lua_type(luaVM, -1) == LUA_TTABLE)
+                    {
+                        lua_getfield(luaVM, -1, "__call");
+                        if (lua_type(luaVM, -1) == LUA_TFUNCTION)
+                        {
+                            lua_CFunction caller = lua_tocfunction(luaVM, -1);
+                            if (caller == CLuaArgument::CallFunction)
+                            {
+                                isFunctionReference = true;
+                            }
+                        }
+                        lua_pop(luaVM, 1);
+                    }
+                    lua_pop(luaVM, 1);
+                }
+
+                if (isFunctionReference)
+                {
+                    lua_getfield(luaVM, -1, "resource");
+                    lua_getfield(luaVM, -2, "reference");
+
+                    if (lua_type(luaVM, -2) == LUA_TLIGHTUSERDATA)
+                    {
+                        if (lua_type(luaVM, -1) == LUA_TNUMBER)
+                        {
+                            CCallable callable(lua_toresource(luaVM, -2), lua_tonumber(luaVM, -1));
+
+                            uint8_t hash[C_CALLABLE_HASH_SIZE];
+
+                            callable.WriteHash(hash);
+
+                            bytesWrote = std::min((uint32_t)C_CALLABLE_HASH_SIZE, maxSize);
+
+                            argStream.WritePointer(ptr, hash, bytesWrote);
+                        }
+                        else if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
+                        {
+                            CWebAssemblyFunction* function = (CWebAssemblyFunction*)lua_touserdata(luaVM, -1);
+
+                            if (function)
+                            {
+                                CCallable callable(function);
+
+                                callable.SetLuaResource(function->GetApiEnviornment()->script->GetStoreContext()->GetResource());
+                                callable.SetIsWasmFunctionState(true);
+
+                                uint8_t hash[C_CALLABLE_HASH_SIZE];
+
+                                callable.WriteHash(hash);
+
+                                bytesWrote = std::min((uint32_t)C_CALLABLE_HASH_SIZE, maxSize);
+
+                                argStream.WritePointer(ptr, hash, bytesWrote);
+                            }
+                        }
+                    }
+                    lua_pop(luaVM, 2);
+                }
+            }
+            else if (type == LUA_TFUNCTION)
+            {
+                lua_pushvalue(luaVM, -1);
+                int funcRef = luaL_ref(luaVM, LUA_REGISTRYINDEX);
+
+                CLuaMain& luaMain = lua_getownercluamain(luaVM);
+
+                CCallable callable(luaMain.GetResource(), funcRef);
+
+                uint8_t hash[C_CALLABLE_HASH_SIZE];
+
+                callable.WriteHash(hash);
+
+                bytesWrote = std::min((uint32_t)C_CALLABLE_HASH_SIZE, maxSize);
+
+                argStream.WritePointer(ptr, hash, bytesWrote);
+            }
         }
 
         lua_pop(luaVM, 1);
@@ -1812,6 +1908,42 @@ CWebAssemblyMemoryPointerAddress CWebAssemblyMemory::Malloc(const size_t& size, 
     return pointerAddress;
 }
 
+
+CWebAssemblyMemoryPointerAddress CWebAssemblyMemory::Realloc(CWebAssemblyMemoryPointerAddress pointer, const size_t& size, void** physicalPointer)
+{
+    CWebAssemblyFunction* moduleReallocFunction = m_pScript->GetExportedFunction(WASM_REALLOC_FUNCTION_NAME);
+
+    if (!moduleReallocFunction)
+    {
+        CLogger::ErrorPrintf("Couldn't find module `%s` function[\"@%s/%s\"].\n", WASM_REALLOC_FUNCTION_NAME, m_pScript->GetStoreContext()->GetResource()->GetName().c_str(), m_pScript->GetScriptFile().c_str());
+        return WEB_ASSEMBLY_NULL_PTR;
+    }
+
+    CWebAssemblyVariables args, results;
+
+    args.Push((int32_t)pointer);
+    args.Push((int32_t)size);
+    
+    if (!moduleReallocFunction->Call(&args, &results))
+    {
+        CLogger::ErrorPrintf("Cloudn't re-allocate memory blocks for module[\"@%s/%s\"].\n", m_pScript->GetStoreContext()->GetResource()->GetName().c_str(), m_pScript->GetScriptFile().c_str());
+        return WEB_ASSEMBLY_NULL_PTR;
+    }
+
+    if (results.GetSize() < 1)
+    {
+        return WEB_ASSEMBLY_NULL_PTR;
+    }
+
+    CWebAssemblyMemoryPointerAddress pointerAddress = results.GetFirst().GetInt32();
+
+    if (physicalPointer) {
+        *physicalPointer = GetMemoryPhysicalPointer(pointerAddress);
+    }
+
+    return pointerAddress;
+}
+
 void CWebAssemblyMemory::Free(CWebAssemblyMemoryPointerAddress pointer)
 {
     if (pointer == WEB_ASSEMBLY_NULL_PTR)
@@ -1954,8 +2086,6 @@ CWebAssemblyMemoryContext CWebAssemblyMemory::GetContext()
 size_t CWebAssemblyMemory::GetFreeSpaceSize()
 {
     #define DIGIT_COUNT(n) (std::floor(std::log10(std::abs((double)n) + 1)) + 1)
-
-    14116616161;
 
     size_t memTotalSizeDigitCount = DIGIT_COUNT(GetSize());
     size_t chunksArraySize = (memTotalSizeDigitCount * sizeof(CWebAssemblyMemoryPointerAddress)) * 2;

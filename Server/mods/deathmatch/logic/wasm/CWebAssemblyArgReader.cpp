@@ -314,12 +314,6 @@ void CWebAssemblyArgReader::ReadPointerAddress(CWebAssemblyMemoryPointerAddress&
 
 void CWebAssemblyArgReader::ReadFunction(CWebAssemblyFunction*& out, CWebAssemblyFunction* defaultValue)
 {
-    /*if (!out)
-    {
-        out = defaultValue;
-        return;
-    }*/
-
     if (!Skip())
     {
         out = defaultValue;

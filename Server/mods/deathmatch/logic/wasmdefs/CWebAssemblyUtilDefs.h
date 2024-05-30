@@ -48,9 +48,27 @@ public:
     DEFINE_WASM_FUNCTION(CallCallable, env, args, results);
     DEFINE_WASM_FUNCTION(IsValidCallable, env, args, results);
     DEFINE_WASM_FUNCTION(GetCallableDeclaration, env, args, results);
-    DEFINE_WASM_FUNCTION(FreeCallableResult, env, args, results);
     DEFINE_WASM_FUNCTION(CFunctionToCallable, env, args, results);
     DEFINE_WASM_FUNCTION(GetCallableResource, env, args, results);
     DEFINE_WASM_FUNCTION(GetCallableReference, env, args, results);
     DEFINE_WASM_FUNCTION(IsCallableWasmFunction, env, args, results);
+
+    DEFINE_WASM_FUNCTION(ArgsCreate, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsDelete, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushNull, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushBoolean, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushNumber, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushString, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushCallable, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushUserdata, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPushList, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsPop, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgType, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsBoolean, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsNumber, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsString, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsCallable, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsUserdata, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgAsList, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsGetArgCount, env, args, results);
 };

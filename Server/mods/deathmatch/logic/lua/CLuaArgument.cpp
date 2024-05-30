@@ -495,6 +495,7 @@ void CLuaArgument::Read(lua_State* luaVM, int iArgument, CFastHashMap<const void
 
                     lua_getfield(luaVM, iArgument, "resource");
                     lua_getfield(luaVM, iArgument, "reference");
+
                     if (lua_type(luaVM, -2) == LUA_TLIGHTUSERDATA)
                     {
                         if (lua_type(luaVM, -1) == LUA_TNUMBER)
@@ -1611,90 +1612,6 @@ int CLuaArgument::CallFunction(lua_State* luaVM)
     }
 
     return 0;
-
-    /*if (lua_type(luaVM, 1) == LUA_TTABLE)
-    {
-        lua_getfield(luaVM, 1, "resource");
-        CResource* resource = nullptr;
-        if (lua_type(luaVM, -1) == LUA_TLIGHTUSERDATA)
-        {
-            resource = lua_toresource(luaVM, -1);
-        }
-        lua_pop(luaVM, 1);
-        if (resource)
-        {
-            const char* resourceName = resource->GetName().c_str();
-            if (resource->IsActive())
-            {
-                lua_getfield(luaVM, 1, "reference");
-                int reference = 0;
-                if (lua_type(luaVM, -1) == LUA_TNUMBER)
-                {
-                    reference = (int)lua_tonumber(luaVM, -1);
-                }
-                lua_pop(luaVM, 1);
-                if (reference != 0)
-                {
-                    lua_State* resourceVM = resource->GetVirtualMachine()->GetVM();
-                    if (resourceVM)
-                    {
-                        lua_getref(resourceVM, reference);
-                        if (lua_type(resourceVM, -1) == LUA_TFUNCTION)
-                        {
-                            lua_pop(resourceVM, 1);            // pop function after type checked
-
-                            CLuaArguments arguments;
-
-                            CScriptArgReader argReader(luaVM);
-                            argReader.Skip(1);
-                            argReader.ReadLuaArguments(arguments);
-
-                            int top = lua_gettop(resourceVM);
-                            argReader.m_luaVM = resourceVM;
-                            argReader.m_iIndex = top + 1;
-
-                            lua_getref(resourceVM, reference);
-                            arguments.PushArguments(resourceVM);
-                            lua_call(resourceVM, arguments.Count(), LUA_MULTRET);
-
-                            arguments.DeleteArguments();
-
-                            int returnCount = lua_gettop(resourceVM) - top;
-                            if (returnCount > 0)
-                            {
-                                argReader.ReadLuaArguments(arguments);
-                                arguments.PushArguments(luaVM);
-                            }
-
-                            return returnCount;
-                        }
-                        else
-                        {
-                            g_pGame->GetScriptDebugging()->LogError(NULL, "calling to a none function value on resource[%s]", resourceName);
-                        }
-                        lua_pop(resourceVM, 1);            // pop function
-                    }
-                    else
-                    {
-                        g_pGame->GetScriptDebugging()->LogError(NULL, "couldn't find resource virutal machine");
-                    }
-                }
-                else
-                {
-                    g_pGame->GetScriptDebugging()->LogError(NULL, "invalid reference id while calling to resource[%s]", resourceName);
-                }
-            }
-            else
-            {
-                g_pGame->GetScriptDebugging()->LogError(NULL, "calling to a none running resource[%s]", resourceName);
-            }
-        }
-        else
-        {
-            g_pGame->GetScriptDebugging()->LogError(NULL, "couldn't find the resource of function");
-        }
-    }
-    return 0;*/ 
 }
 
 int CLuaArgument::CleanupFunction(lua_State* luaVM)

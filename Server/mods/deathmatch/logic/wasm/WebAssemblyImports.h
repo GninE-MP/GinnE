@@ -33,9 +33,10 @@
 
 #define WEB_ASSEMBLY_API_MODULE_NAME "env"
 
-#define WASM_MAIN_FUNCTION_NAME   "ModuleMain"
-#define WASM_MALLOC_FUNCTION_NAME "malloc"
-#define WASM_FREE_FUNCTION_NAME   "free"
+#define WASM_MAIN_FUNCTION_NAME    "ModuleMain"
+#define WASM_MALLOC_FUNCTION_NAME  "malloc"
+#define WASM_REALLOC_FUNCTION_NAME "realloc"
+#define WASM_FREE_FUNCTION_NAME    "free"
 
 #define WASM_INTERNAL_FUNCTIONS_TABLE_EXPORT_NAME "__indirect_function_table"
 

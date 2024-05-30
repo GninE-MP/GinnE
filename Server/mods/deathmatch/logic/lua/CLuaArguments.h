@@ -24,6 +24,34 @@ extern "C"
 
 #include "wasm/WebAssemblyImports.h"
 
+#define C_ARGS_SEPRATOR ",^"
+#define C_ARGS_SEPRATOR_LENGTH (sizeof(C_ARGS_SEPRATOR) - 1)
+#define C_ARGS_TYPE_IDENTIFIER_LENGTH (sizeof(char))
+#define C_ARGS_STRING_SYNTAX "\""
+#define C_ARGS_STRING_SYNTAX_LENGTH (sizeof(C_ARGS_STRING_SYNTAX) - 1)
+#define C_ARGS_STRING_PASS_SYNTAX "\\"
+#define C_ARGS_STRING_PASS_SYNTAX_LENGTH (sizeof(C_ARGS_STRING_PASS_SYNTAX) - 1)
+#define C_ARGS_LIST_OPEN_SYNTAX "{"
+#define C_ARGS_LIST_OPEN_SYNTAX_LENGTH (sizeof(C_ARGS_LIST_OPEN_SYNTAX) - 1)
+#define C_ARGS_LIST_CLOSE_SYNTAX "}"
+#define C_ARGS_LIST_CLOSE_SYNTAX_LENGTH (sizeof(C_ARGS_LIST_CLOSE_SYNTAX) - 1)
+#define C_ARGS_LIST_ARGC_OPEN_SYNTAX "("
+#define C_ARGS_LIST_ARGC_OPEN_SYNTAX_LENGTH (sizeof(C_ARGS_LIST_ARGC_OPEN_SYNTAX) - 1)
+#define C_ARGS_LIST_ARGC_CLOSE_SYNTAX ")"
+#define C_ARGS_LIST_ARGC_CLOSE_SYNTAX_LENGTH (sizeof(C_ARGS_LIST_ARGC_CLOSE_SYNTAX) - 1)
+#define C_ARGS_INVALID_POSITION ((long long)-1)
+
+enum C_ARGS_TYPE_IDENTIFIERS : char {
+    C_ARGS_TYPE_ID_UNKNOWN = 0,
+    C_ARGS_TYPE_ID_NULL = '0',
+    C_ARGS_TYPE_ID_BOOLEAN = 'b',
+    C_ARGS_TYPE_ID_NUMBER = 'n',
+    C_ARGS_TYPE_ID_STRING = 's',
+    C_ARGS_TYPE_ID_CALLABLE = 'c',
+    C_ARGS_TYPE_ID_USERDATA = 'u',
+    C_ARGS_TYPE_ID_LIST = 'l'
+};
+
 inline void LUA_CHECKSTACK(lua_State* L, int size)
 {
     if (lua_getstackgap(L) < size + 5)
@@ -102,6 +130,7 @@ public:
 
     void WriteWebAssemblyVariables(CWebAssemblyVariables* vars, CWebAssemblyVariables* typePattern = NULL, CWebAssemblyMemory* wasmMemory = NULL, std::vector<CWebAssemblyMemoryPointerAddress>* pointersToDelete = NULL);
     void ReadWebAssemblyVariables(CWebAssemblyVariables* vars);
+    void UnpackCompiledArguments(uint8_t* data, size_t size, bool readAsTable = false);
 
     unsigned int                               Count() const { return static_cast<unsigned int>(m_Arguments.size()); };
     std::vector<CLuaArgument*>::const_iterator IterBegin() const { return m_Arguments.begin(); };
