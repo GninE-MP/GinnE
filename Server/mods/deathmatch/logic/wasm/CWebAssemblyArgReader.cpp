@@ -431,6 +431,42 @@ void CWebAssemblyArgReader::ReadUIntPtr(uintptr_t& out, uintptr_t defaultValue)
     #endif
 }
 
+
+void CWebAssemblyArgReader::ReadMatrix(CMatrix& out, CMatrix defaultValue)
+{
+    CWebAssemblyMemoryPointerAddress ptr;
+
+    ReadPointerAddress(ptr);
+
+    if (ptr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        out = defaultValue;
+        return;
+    }
+
+    struct V
+    {
+        float32_t x;
+        float32_t y;
+        float32_t z;
+    };
+
+    struct M
+    {
+        V right;
+        V front;
+        V up;
+        V pos;
+    };
+
+    M* value = (M*)(m_pScript->GetMemory()->GetMemoryPhysicalPointer(ptr));
+
+    out.vRight = CVector(value->right.x, value->right.y, value->right.z);
+    out.vFront = CVector(value->front.x, value->front.y, value->front.z);
+    out.vUp = CVector(value->up.x, value->up.y, value->up.z);
+    out.vPos = CVector(value->pos.x, value->pos.y, value->pos.z);
+}
+
 bool CWebAssemblyArgReader::HasResult()
 {
     return m_pResults && m_pResults->size > 0;

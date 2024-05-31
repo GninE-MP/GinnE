@@ -23,6 +23,8 @@
 
 class CResource;
 
+class CWebAssemblyScript;
+
 class CResourceManager
 {
 public:
@@ -119,6 +121,8 @@ public:
     void    ClearBlockedFileReason(const SString& strFileHash);
     void    AddBlockedFileReason(const SString& strFileHash, const SString& strReason);
     SString GetBlockedFileReason(const SString& strFileHash);
+
+    CWebAssemblyScript* FindPointerWasmScript(void* ptr);
 
 private:
     SString                 m_strResourceDirectory;

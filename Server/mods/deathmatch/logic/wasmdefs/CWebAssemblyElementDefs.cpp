@@ -23,6 +23,8 @@
 #include "../wasm/CWebAssemblyVariable.h"
 #include "../wasm/CWebAssemblyArgReader.h"
 
+#include "wasm_args_list.h"
+
 #include "CWebAssemblyElementDefs.h"
 
 void CWebAssemblyElementDefs::RegisterFunctionTypes()
@@ -76,35 +78,35 @@ void CWebAssemblyElementDefs::RegisterFunctionTypes()
     SetFunctionType("set_element_attached_offsets", "be**");
     SetFunctionType("get_element_attached_offsets", "be**");
 
-    SetFunctionType("get_element_data", "");
-    SetFunctionType("get_all_element_data", "");
-    SetFunctionType("has_element_data", "");
-    SetFunctionType("set_element_data", "besb*x");
-    SetFunctionType("remove_element_data", "");
-    SetFunctionType("add_element_data_subscriber", "");
-    SetFunctionType("remove_element_data_subscriber", "");
-    SetFunctionType("has_element_data_subscriber", "");
+    SetFunctionType("get_element_data", "uesb");
+    SetFunctionType("get_all_element_data", "ie*i");
+    SetFunctionType("has_element_data", "besb");
+    SetFunctionType("set_element_data", "besub");
+    SetFunctionType("remove_element_data", "bes");
+    SetFunctionType("add_element_data_subscriber", "bese");
+    SetFunctionType("remove_element_data_subscriber", "bese");
+    SetFunctionType("has_element_data_subscriber", "bese");
 
-    SetFunctionType("set_element_id", "");
-    SetFunctionType("set_element_parent", "");
-    SetFunctionType("set_element_matrix", "");
-    SetFunctionType("set_element_position", "");
-    SetFunctionType("set_element_rotation", "");
-    SetFunctionType("set_element_velocity", "");
-    SetFunctionType("set_element_turn_velocity", "");
-    SetFunctionType("set_element_visible_to", "");
-    SetFunctionType("clear_element_visible_to", "");
-    SetFunctionType("is_element_visible_to", "");
-    SetFunctionType("set_element_interior", "");
-    SetFunctionType("set_element_dimension", "");
-    SetFunctionType("set_element_alpha", "");
-    SetFunctionType("set_element_double_sided", "");
-    SetFunctionType("set_element_health", "");
-    SetFunctionType("set_element_model", "");
-    SetFunctionType("set_element_syncer", "");
-    SetFunctionType("set_element_collisions_enabled", "");
-    SetFunctionType("set_element_frozen", "");
-    SetFunctionType("set_low_lod_element", "");
+    SetFunctionType("set_element_id", "bes");
+    SetFunctionType("set_element_parent", "bee");
+    SetFunctionType("set_element_matrix", "be*");
+    SetFunctionType("set_element_position", "be*b");
+    SetFunctionType("set_element_rotation", "be*sb");
+    SetFunctionType("set_element_velocity", "be*");
+    SetFunctionType("set_element_turn_velocity", "be*");
+    SetFunctionType("set_element_visible_to", "beeb");
+    SetFunctionType("clear_element_visible_to", "be");
+    SetFunctionType("is_element_visible_to", "bee");
+    SetFunctionType("set_element_interior", "beib*");
+    SetFunctionType("set_element_dimension", "bei");
+    SetFunctionType("set_element_alpha", "bei");
+    SetFunctionType("set_element_double_sided", "beb");
+    SetFunctionType("set_element_health", "bef");
+    SetFunctionType("set_element_model", "bei");
+    SetFunctionType("set_element_syncer", "beebb");
+    SetFunctionType("set_element_collisions_enabled", "beb");
+    SetFunctionType("set_element_frozen", "beb");
+    SetFunctionType("set_low_lod_element", "bee");
 }
 
 void CWebAssemblyElementDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -1350,63 +1352,206 @@ WebAssemblyApi(CWebAssemblyElementDefs::IsElementCallPropagationEnabled, env, ar
 
 WebAssemblyApi(CWebAssemblyElementDefs::ClearElementVisibleTo, env, args, results)
 {
+    CElement* element;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::ClearElementVisibleTo(element));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::IsElementVisibleTo, env, args, results)
 {
+    CElement* element;
+    CElement* to;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(to);
+
+    if (!element || !to)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!IS_PERPLAYER_ENTITY(element))
+    {
+        return argStream.Return(true);
+    }
+
+    return argStream.Return(static_cast<CPerPlayerEntity*>(element)->IsVisibleToReferenced(to));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementVisibleTo, env, args, results)
 {
+    CElement* element;
+    CElement* to;
+    bool      visible;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(to);
+    argStream.ReadBoolean(visible);
+
+    if (!element || !to)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementVisibleTo(element, to, visible));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::GetElementData, env, args, results)
 {
-    CWebAssemblyArgReader argStream(env, args, results);
-
-    return argStream.ReturnNull();
-}
-
-WebAssemblyApi(CWebAssemblyElementDefs::GetAllElementData, env, args, results)
-{
-    CWebAssemblyArgReader argStream(env, args, results);
-
-    return argStream.ReturnNull();
-}
-
-WebAssemblyApi(CWebAssemblyElementDefs::HasElementData, env, args, results)
-{
-    CWebAssemblyArgReader argStream(env, args, results);
-
-    return argStream.ReturnNull();
-}
-
-WebAssemblyApi(CWebAssemblyElementDefs::SetElementData, env, args, results)
-{
-    CElement*                        element;
-    SString                          key;
-    bool                             syncMode;
-    CWebAssemblyMemoryPointerAddress dataPtr;
-    uint32_t                         maxSize;
+    CElement* element;
+    SString   key;
+    bool      inherit;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
     argStream.ReadUserData(element);
     argStream.ReadString(key);
-    argStream.ReadBoolean(syncMode, true);
-    argStream.ReadPointerAddress(dataPtr);
+    argStream.ReadBoolean(inherit, true);
+
+    if (!element || key.empty())
+    {
+        return argStream.ReturnNull();
+    }
+
+    CLuaMain* luaMain = GetWebAssemblyEnvResource(env)->GetVirtualMachine();
+
+    if (!luaMain)
+    {
+        return argStream.ReturnNull();
+    }
+
+    if (key.length() > MAX_CUSTOMDATA_NAME_LENGTH)
+    {
+        key = key.Left(MAX_CUSTOMDATA_NAME_LENGTH);
+    }
+    
+#ifdef GninE_CLIENT
+    CLuaArgument* pVariable = element->GetCustomData(key, inherit);
+#else
+    CLuaArgument* pVariable = CStaticFunctionDefinitions::GetElementData(element, key, inherit);
+#endif
+
+    if (!pVariable)
+    {
+        return argStream.ReturnNull();
+    }
+
+    cargs* data = args_create();
+
+    args_read_clua_argument(data, pVariable);
+
+    return argStream.ReturnSystemPointer(data);
+}
+
+WebAssemblyApi(CWebAssemblyElementDefs::GetAllElementData, env, args, results)
+{
+    CElement*                        element;
+    CWebAssemblyMemoryPointerAddress listPtr;
+    uint32_t                         maxSize;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(element);
+    argStream.ReadPointerAddress(listPtr);
     argStream.ReadUInt32(maxSize);
 
-    if (!element || dataPtr == WEB_ASSEMBLY_NULL_PTR || key.empty())
+    if (!element || listPtr == WEB_ASSEMBLY_NULL_PTR || maxSize < 1)
+    {
+        return argStream.Return(0);
+    }
+
+    CLuaArguments data;
+    element->GetAllCustomData(&data);
+
+    if (data.Count() % 2 != 0)
+    {
+        return argStream.Return(0);
+    }
+
+    CWebAssemblyMemory* memory = argStream.GetScript()->GetMemory();
+
+    uint32_t count = 0;
+
+    std::vector<CLuaArgument*>::const_iterator iter = data.IterBegin();
+
+    for (; iter != data.IterEnd() && maxSize > 0; iter += 2)
+    {
+        CLuaArgument* key = *iter;
+
+        if (key->GetType() != LUA_TSTRING)
+        {
+            continue;
+        }
+
+        CWebAssemblyMemoryPointerAddress keyPtr = memory->StringToUTF8(key->GetString());
+
+        if (keyPtr == WEB_ASSEMBLY_NULL_PTR) {
+            continue;
+        }
+
+        argStream.WritePointer(listPtr, &keyPtr);
+        listPtr += sizeof(CWebAssemblyMemoryPointerAddress);
+
+        count++;
+        maxSize--;
+    }
+
+    return argStream.Return(count);
+}
+
+WebAssemblyApi(CWebAssemblyElementDefs::HasElementData, env, args, results)
+{
+    CElement* element;
+    SString   key;
+    bool      inherit;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadBoolean(inherit, true);
+
+    if (!element || key.empty())
+    {
+        return argStream.Return(false);
+    }
+
+    if (key.length() > MAX_CUSTOMDATA_NAME_LENGTH)
+    {
+        key = key.Left(MAX_CUSTOMDATA_NAME_LENGTH);
+    }
+
+    return argStream.Return(element->GetCustomData(key.c_str(), inherit) != nullptr);
+}
+
+WebAssemblyApi(CWebAssemblyElementDefs::SetElementData, env, args, results)
+{
+    CElement* element;
+    SString   key;
+    cargs*    argsL;
+    bool      syncMode;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadSystemPointer(argsL);
+    argStream.ReadBoolean(syncMode, true);
+
+    if (!element || !argsL || key.empty())
     {
         return argStream.Return(false);
     }
@@ -1418,10 +1563,20 @@ WebAssemblyApi(CWebAssemblyElementDefs::SetElementData, env, args, results)
         key = key.Left(MAX_CUSTOMDATA_NAME_LENGTH);
     }
 
-    CLuaArgument arg;
-    arg.SetString("this is a web assembly data!");
+    if (argsL->argsCount < 1)
+    {
+        return argStream.Return(false);
+    }
 
-    if (!CStaticFunctionDefinitions::SetElementData(element, key.c_str(), arg, syncType))
+    CLuaArguments luaArgs;
+    luaArgs.UnpackCompiledArguments((uint8_t*)argsL->data, argsL->dataSize);
+
+    if (luaArgs.Count() < 1)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::SetElementData(element, key.c_str(), **luaArgs.IterBegin(), syncType))
     {
         return argStream.Return(false);
     }
@@ -1431,30 +1586,100 @@ WebAssemblyApi(CWebAssemblyElementDefs::SetElementData, env, args, results)
 
 WebAssemblyApi(CWebAssemblyElementDefs::RemoveElementData, env, args, results)
 {
+    CElement* element;
+    SString   key;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+
+    if (!element || key.empty())
+    {
+        return argStream.Return(false);
+    }
+
+    if (key.length() > MAX_CUSTOMDATA_NAME_LENGTH)
+    {
+        key = key.Left(MAX_CUSTOMDATA_NAME_LENGTH);
+    }
+
+    if (!CStaticFunctionDefinitions::RemoveElementData(element, key.c_str()))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::AddElementDataSubscriber, env, args, results)
 {
+    CElement* element;
+    SString   key;
+    CPlayer*  player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadUserData(player);
+
+    if (!element || key.empty() || !player)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::AddElementDataSubscriber(element, key.c_str(), player))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::RemoveElementDataSubscriber, env, args, results)
 {
+    CElement* element;
+    SString   key;
+    CPlayer*  player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadUserData(player);
+
+    if (!element || key.empty() || !player)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::RemoveElementDataSubscriber(element, key.c_str(), player))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::HasElementDataSubscriber, env, args, results)
 {
+    CElement* element;
+    SString   key;
+    CPlayer*  player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(key);
+    argStream.ReadUserData(player);
+
+    if (!element || key.empty() || !player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::HasElementDataSubscriber(element, key.c_str(), player));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::AttachElements, env, args, results)
@@ -1655,121 +1880,356 @@ WebAssemblyApi(CWebAssemblyElementDefs::GetElementAttachedOffsets, env, args, re
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementID, env, args, results)
 {
+    CElement* element;
+    SString   id;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadString(id);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementID(element, id.c_str()));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementParent, env, args, results)
 {
+    CElement* element;
+    CElement* parent;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(parent);
+
+    if (!element || !parent)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementParent(element, parent));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementMatrix, env, args, results)
 {
+    CElement* element;
+    CMatrix   matrix;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+
+    argStream.ReadUserData(element);
+    argStream.ReadMatrix(matrix);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementMatrix(element, matrix));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementPosition, env, args, results)
 {
+    CElement* element;
+    CVector   position;
+    bool      wrap;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadVector3D(position);
+    argStream.ReadBoolean(wrap, true);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementPosition(element, position, wrap));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementRotation, env, args, results)
 {
+    CElement* element;
+    CVector   rotation;
+    SString   order;
+    bool      fixPed;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadVector3D(rotation);
+    argStream.ReadString(order, "default");
+    argStream.ReadBoolean(fixPed, false);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    eEulerRotationOrder rotOrder;
+
+    StringToEnum(order, rotOrder);
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementRotation(element, rotation, rotOrder, fixPed));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementVelocity, env, args, results)
 {
+    CElement* element;
+    CVector   velocity;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadVector3D(velocity);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementVelocity(element, velocity));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementTurnVelocity, env, args, results)
 {
+    CElement* element;
+    CVector   turnVel;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadVector3D(turnVel);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementAngularVelocity(element, turnVel));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementInterior, env, args, results)
 {
+    CElement* element;
+    int32_t   interior;
+    bool      setPosition;
+    CVector   position;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadInt32(interior);
+    argStream.ReadBoolean(setPosition, false);
+    argStream.ReadVector3D(position);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementInterior(element, (uint8_t)interior, setPosition, position));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementDimension, env, args, results)
 {
+    CElement* element;
+    int32_t   dim;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadInt32(dim);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    bool visibleInAllDim = false;
+
+    if (dim == -1)
+    {
+        if (IS_OBJECT(element))
+        {
+            visibleInAllDim = true;
+        }
+        else
+        {
+            return argStream.Return(false, "The -1 value can be used only in objects!");
+        }
+    }
+    else if (dim < 0 || dim > 65535)
+    {
+        return argStream.Return(false, "Invalid dimension range specified!");
+    }
+
+    if (visibleInAllDim)
+    {
+        return argStream.Return(CStaticFunctionDefinitions::SetObjectVisibleInAllDimensions(element, true));
+    }
+
+    if (IS_OBJECT(element) && CStaticFunctionDefinitions::IsObjectVisibleInAllDimensions(element))
+    {
+        return argStream.Return(CStaticFunctionDefinitions::SetObjectVisibleInAllDimensions(element, false, (uint16_t)dim));
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementDimension(element, (uint16_t)dim));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementAlpha, env, args, results)
 {
+    CElement* element;
+    int32_t   alpha;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadInt32(alpha);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementAlpha(element, (uint8_t)alpha));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementDoubleSided, env, args, results)
 {
+    CElement* element;
+    bool      enabled;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadBoolean(enabled);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementDoubleSided(element, enabled));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementHealth, env, args, results)
 {
+    CElement* element;
+    float32_t health;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadFloat32(health);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementHealth(element, health));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementModel, env, args, results)
 {
+    CElement* element;
+    int32_t   model;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadInt32(model);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementModel(element, (uint16_t)model));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementSyncer, env, args, results)
 {
+    CElement* element;
+    CPlayer*  player;
+    bool      enabled;
+    bool      persist;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(player);
+    argStream.ReadBoolean(enabled, true);
+    argStream.ReadBoolean(persist, false);
+
+    if (!element || !player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementSyncer(element, player, enabled, persist));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementCollisionsEnabled, env, args, results)
 {
+    CElement* element;
+    bool      enabled;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadBoolean(enabled);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementCollisionsEnabled(element, enabled));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementFrozen, env, args, results)
 {
+    CElement* element;
+    bool      frozenStatus;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadBoolean(frozenStatus);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetElementFrozen(element, frozenStatus));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetLowLODElement, env, args, results)
 {
+    CElement* element;
+    CElement* lowLodElement;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(element);
+    argStream.ReadUserData(lowLodElement);
+
+    if (!element)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetLowLodElement(element, lowLodElement));
 }
 
 WebAssemblyApi(CWebAssemblyElementDefs::SetElementCallPropagationEnabled, env, args, results)

@@ -64,6 +64,7 @@ public:
     void ReadInternalFunctionHash(uintptr_t& out, uintptr_t defaultValue = NULL);
     void ReadIntPtr(intptr_t& out, intptr_t defaultValue = 0);
     void ReadUIntPtr(uintptr_t& out, uintptr_t defaultValue = 0);
+    void ReadMatrix(CMatrix& out, CMatrix defaultValue = CMatrix());
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)

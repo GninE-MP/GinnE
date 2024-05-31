@@ -71,4 +71,5 @@ public:
     DEFINE_WASM_FUNCTION(ArgsGetArgAsUserdata, env, args, results);
     DEFINE_WASM_FUNCTION(ArgsGetArgAsList, env, args, results);
     DEFINE_WASM_FUNCTION(ArgsGetArgCount, env, args, results);
+    DEFINE_WASM_FUNCTION(ArgsClone, env, args, results);
 };

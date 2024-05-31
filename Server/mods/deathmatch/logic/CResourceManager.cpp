@@ -23,6 +23,8 @@
 #include "CDatabaseManager.h"
 #include "CRegistry.h"
 
+#include "wasm/CWebAssemblyContext.h"
+
 #define BLOCKED_DB_FILE_NAME    "fileblock.db"
 #define BLOCKED_DB_TABLE_NAME   "`block_reasons`"
 
@@ -1446,4 +1448,34 @@ SString CResourceManager::GetBlockedFileReason(const SString& strFileHash)
         return *pstrReason;
 
     return "";
+}
+
+CWebAssemblyScript* CResourceManager::FindPointerWasmScript(void* ptr)
+{
+    std::list<CResource*>::const_iterator iter = IterBegin();
+
+    for (; iter != IterEnd(); iter++)
+    {
+        CResource* resource = *iter;
+
+        if (!resource) {
+            continue;
+        }
+
+        CWebAssemblyContext* wasmContext = resource->GetResourceWebAssemblyContext();
+
+        if (!wasmContext)
+        {
+            continue;
+        }
+
+        CWebAssemblyScript* script = wasmContext->FindPointerScript(ptr);
+
+        if (script)
+        {
+            return script;
+        }
+    }
+
+    return NULL;
 }
