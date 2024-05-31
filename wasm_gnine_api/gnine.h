@@ -1,3 +1,14 @@
+/*****************************************************************************
+ *
+ *  PROJECT:     GninE v1.0
+ *  LICENSE:     See LICENSE in the top level directory
+ *  PURPOSE:     GninE C & CPP api
+ *  GITHUB:      https://github.com/GninE-MP/GinnE/blob/main/wasm_gnine_api/gnine.h
+ *
+ *  GninE is available from http://www.gnine.com/
+ *
+ *****************************************************************************/
+
 #pragma once
 
 #ifndef GNINE_HEADER
@@ -102,6 +113,8 @@ typedef GNINE_USERDATA GNINE_RESOURCE;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
 typedef GNINE_ELEMENT GNINE_MARKER;
+
+typedef GNINE_ELEMENT GNINE_PLAYER;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -222,6 +235,7 @@ GNINE_API_IMPORT(args_get_arg_as_callable, (GNINE_ARGUMENTS args, GNINE_I32 inde
 GNINE_API_IMPORT(args_get_arg_as_userdata, (GNINE_ARGUMENTS args, GNINE_I32 index), GNINE_USERDATA);
 GNINE_API_IMPORT(args_get_arg_as_list, (GNINE_ARGUMENTS args, GNINE_I32 index), GNINE_ARGUMENTS);
 GNINE_API_IMPORT(args_get_arg_count, (GNINE_ARGUMENTS args), GNINE_UI32);
+GNINE_API_IMPORT(args_clone, (GNINE_ARGUMENTS args), GNINE_ARGUMENTS);
 
 GNINE_API_IMPORT(get_c_function_numeric_position, (GNINE_PTR function), GNINE_UI32);
 
@@ -274,7 +288,35 @@ GNINE_API_IMPORT(get_element_attached_to, (GNINE_ELEMENT element), GNINE_ELEMENT
 GNINE_API_IMPORT(set_element_attached_offsets, (GNINE_ELEMENT element, struct GNINE_VECTOR3* position_offset, struct GNINE_VECTOR3* rotation_offset), bool);
 GNINE_API_IMPORT(get_element_attached_offsets, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_position_offset, struct GNINE_VECTOR3* out_rotation_offset), bool);
 
-GNINE_API_IMPORT(set_element_data, (GNINE_ELEMENT element, GNINE_STRING key, bool sync_mode, GNINE_PTR data, GNINE_I_PTR max_size), bool);
+GNINE_API_IMPORT(get_element_data, (GNINE_ELEMENT element, GNINE_STRING key, bool inherit), GNINE_ARGUMENTS);
+GNINE_API_IMPORT(get_all_element_data, (GNINE_ELEMENT element, GNINE_STRING* data_list_out, GNINE_UI32 max_item_size), GNINE_UI32);
+GNINE_API_IMPORT(has_element_data, (GNINE_ELEMENT element, GNINE_STRING key, bool inherit), bool);
+GNINE_API_IMPORT(set_element_data, (GNINE_ELEMENT element, GNINE_STRING key, GNINE_ARGUMENTS args, bool sync_mode), bool);
+GNINE_API_IMPORT(remove_element_data, (GNINE_ELEMENT element, GNINE_STRING key), bool);
+GNINE_API_IMPORT(add_element_data_subscriber, (GNINE_ELEMENT element, GNINE_STRING key, GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(remove_element_data_subscriber, (GNINE_ELEMENT element, GNINE_STRING key, GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(has_element_data_subscriber, (GNINE_ELEMENT element, GNINE_STRING key, GNINE_PLAYER player), bool);
+
+GNINE_API_IMPORT(set_element_id, (GNINE_ELEMENT element, GNINE_STRING id), bool);
+GNINE_API_IMPORT(set_element_parent, (GNINE_ELEMENT element, GNINE_ELEMENT parent), bool);
+GNINE_API_IMPORT(set_element_matrix, (GNINE_ELEMENT element, struct GNINE_MATRIX* matrix), bool);
+GNINE_API_IMPORT(set_element_position, (GNINE_ELEMENT element, struct GNINE_VECTOR3* position, bool wrap), bool);
+GNINE_API_IMPORT(set_element_rotation, (GNINE_ELEMENT element, struct GNINE_VECTOR3* rotation, GNINE_STRING rotation_order, bool fix_ped_rotaion), bool);
+GNINE_API_IMPORT(set_element_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* velocity), bool);
+GNINE_API_IMPORT(set_element_turn_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* velocity), bool);
+GNINE_API_IMPORT(set_element_visible_to, (GNINE_ELEMENT element, GNINE_ELEMENT to_element, bool visible), bool);
+GNINE_API_IMPORT(clear_element_visible_to, (GNINE_ELEMENT element), bool);
+GNINE_API_IMPORT(is_element_visible_to, (GNINE_ELEMENT element, GNINE_ELEMENT to_element), bool);
+GNINE_API_IMPORT(set_element_interior, (GNINE_ELEMENT element, GNINE_I32 interior, bool set_position, struct GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(set_element_dimension, (GNINE_ELEMENT element, GNINE_I32 dimension), bool);
+GNINE_API_IMPORT(set_element_alpha, (GNINE_ELEMENT element, GNINE_I32 alpha), bool);
+GNINE_API_IMPORT(set_element_double_sided, (GNINE_ELEMENT element, bool enabled), bool);
+GNINE_API_IMPORT(set_element_health, (GNINE_ELEMENT element, GNINE_F32 health), bool);
+GNINE_API_IMPORT(set_element_model, (GNINE_ELEMENT element, GNINE_I32 model), bool);
+GNINE_API_IMPORT(set_element_syncer, (GNINE_ELEMENT element, GNINE_PLAYER player, bool enabled, bool persist), bool);
+GNINE_API_IMPORT(set_element_collisions_enabled, (GNINE_ELEMENT element, bool enabled), bool);
+GNINE_API_IMPORT(set_element_frozen, (GNINE_ELEMENT element, bool freeze_status), bool);
+GNINE_API_IMPORT(set_low_lod_element, (GNINE_ELEMENT element, GNINE_ELEMENT target), bool);
 
 /*
     API FUNCTION: gnine_print
@@ -330,7 +372,7 @@ namespace GNINE_NAMESPACE {
 
     using CString = GNINE_STRING;
     using CXString = GNINE_XSTRING;
-    using String = std::string;
+    using String = STD_NAMESPACE::string;
 
     using LuaNumber = GNINE_LUA_NUMBER;
 
@@ -341,6 +383,7 @@ namespace GNINE_NAMESPACE {
     using ResourceId = GNINE_RESOURCE;
     using ColShapeId = GNINE_COL_SHAPE;
     using MarkerId = GNINE_MARKER;
+    using PlayerId = GNINE_PLAYER;
 
     using RealTimeData = GNINE_REAL_TIME;
 
@@ -350,7 +393,7 @@ namespace GNINE_NAMESPACE {
 
     static constexpr Float32 FLOAT_EPSILON = 0.0001f;
 
-    class Exception : public std::exception {
+    class Exception : public STD_NAMESPACE::exception {
         public:
             Exception(String message) : m_strMessage(message) {}
 
@@ -367,23 +410,40 @@ namespace GNINE_NAMESPACE {
             class Arguments {
                 public:
                     Arguments() {
+                        Drop();
                         m_pArgs = gnine_args_create();
-                        m_bCanDelete = true;
                     }
 
                     Arguments(GNINE_ARGUMENTS args) {
-                        m_pArgs = args;
-                        m_bCanDelete = true;
+                        Drop();
+
+                        if (!args) {
+                            return;
+                        }
+
+                        m_pArgs = gnine_args_clone(args);
+                    }
+
+                    Arguments(Arguments& args) {
+                        Drop();
+                        
+                        if (!args) {
+                            return;
+                        }
+
+                        m_pArgs = gnine_args_clone(args);
                     }
 
                     ~Arguments() {
                         if (m_pArgs) {
-                            if (m_bCanDelete) {
-                                gnine_args_delete(m_pArgs);
-                            }
+                            gnine_args_delete(m_pArgs);
 
                             m_pArgs = NULL;
                         }
+                    }
+
+                    void Drop() {
+                        m_pArgs = NULL;
                     }
 
                     void Push() {
@@ -413,7 +473,7 @@ namespace GNINE_NAMESPACE {
                     void Push(UInt64 arg) {
                         return Push((LuaNumber)arg);
                     }
-                    
+
                     void Push(Float32 arg) {
                         return Push((LuaNumber)arg);
                     }
@@ -427,6 +487,10 @@ namespace GNINE_NAMESPACE {
                     }
 
                     void Push(GNINE_CALLABLE_REF arg) {
+                        gnine_args_push_callable(m_pArgs, arg);
+                    }
+                    
+                    void PushCallable(GNINE_CALLABLE_REF arg) {
                         gnine_args_push_callable(m_pArgs, arg);
                     }
 
@@ -497,15 +561,31 @@ namespace GNINE_NAMESPACE {
                     }
 
                     Arguments& operator=(GNINE_ARGUMENTS target) {
-                        m_pArgs = target;
+                        if (m_pArgs) {
+                            gnine_args_delete(m_pArgs);
+                        }
+
+                        if (!target) {
+                            Drop();
+                            return *this;
+                        }
+
+                        m_pArgs = gnine_args_clone(target);
 
                         return *this;
                     }
 
                     Arguments& operator=(Arguments& target) {
-                        m_pArgs = (GNINE_ARGUMENTS)target;
+                        if (m_pArgs) {
+                            gnine_args_delete(m_pArgs);
+                        }
 
-                        target.m_bCanDelete = false;
+                        if (!target) {
+                            Drop();
+                            return *this;
+                        }
+
+                        m_pArgs = gnine_args_clone((GNINE_ARGUMENTS)target);
 
                         return *this;
                     }
@@ -519,10 +599,24 @@ namespace GNINE_NAMESPACE {
                     }
                 private:
                     GNINE_ARGUMENTS m_pArgs;
-                    bool            m_bCanDelete;
             };
 
-            using Argument = std::variant<nullptr_t, bool, LuaNumber, const char*, String, Callable, Userdata, Arguments*>;
+            using Argument = STD_NAMESPACE::variant<
+                nullptr_t,
+                bool,
+                LuaNumber,
+                CString,
+                String,
+                Callable,
+                Userdata,
+                Arguments*,
+                Int32,
+                Int64,
+                UInt32,
+                UInt64,
+                Float32,
+                MemoryPointer
+            >;
 
             GNINE_CALLABLE_REF m_rFunctionRef;
 
@@ -647,8 +741,8 @@ namespace GNINE_NAMESPACE {
                         m_FunctionArguments->Push(STD_NAMESPACE::get<bool>(arg));
                     }else if (STD_NAMESPACE::holds_alternative<LuaNumber>(arg)) {
                         m_FunctionArguments->Push(STD_NAMESPACE::get<LuaNumber>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<const char*>(arg)) {
-                        m_FunctionArguments->Push(String(STD_NAMESPACE::get<const char*>(arg)));
+                    }else if (STD_NAMESPACE::holds_alternative<CString>(arg)) {
+                        m_FunctionArguments->Push(String(STD_NAMESPACE::get<CString>(arg)));
                     }else if (STD_NAMESPACE::holds_alternative<String>(arg)) {
                         m_FunctionArguments->Push(STD_NAMESPACE::get<String>(arg));
                     }else if (STD_NAMESPACE::holds_alternative<Callable>(arg)) {
@@ -657,6 +751,18 @@ namespace GNINE_NAMESPACE {
                         m_FunctionArguments->Push(STD_NAMESPACE::get<Userdata>(arg));
                     }else if (STD_NAMESPACE::holds_alternative<Arguments*>(arg)) {
                         m_FunctionArguments->Push(*STD_NAMESPACE::get<Arguments*>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<Int32>(arg)) {
+                        m_FunctionArguments->Push(STD_NAMESPACE::get<Int32>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<Int64>(arg)) {
+                        m_FunctionArguments->Push(STD_NAMESPACE::get<Int64>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<UInt32>(arg)) {
+                        m_FunctionArguments->Push(STD_NAMESPACE::get<UInt32>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<UInt64>(arg)) {
+                        m_FunctionArguments->Push(STD_NAMESPACE::get<UInt64>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<Float32>(arg)) {
+                        m_FunctionArguments->Push(STD_NAMESPACE::get<Float32>(arg));
+                    }else if (STD_NAMESPACE::holds_alternative<MemoryPointer>(arg)) {
+                        m_FunctionArguments->Push((LuaNumber)(IntPtr)STD_NAMESPACE::get<MemoryPointer>(arg));
                     }
                 }
     };
@@ -857,7 +963,7 @@ namespace GNINE_NAMESPACE {
             {
                 Vector3 vecRotation;
                 vecRotation.fZ = atan2(fY, fX);
-                Vector3 vecTemp(std::hypotf(fX, fY), fZ, 0);
+                Vector3 vecTemp(STD_NAMESPACE::hypotf(fX, fY), fZ, 0);
                 vecTemp.Normalize();
                 constexpr float pi = 3.14159265358979323846f;
                 vecRotation.fY = atan2(vecTemp.fX, vecTemp.fY) - pi / 2;
@@ -868,7 +974,7 @@ namespace GNINE_NAMESPACE {
             Vector3 GetOtherAxis() const
             {
                 Vector3 vecResult;
-                if (std::abs(fX) > std::abs(fY))
+                if (STD_NAMESPACE::abs(fX) > STD_NAMESPACE::abs(fY))
                     vecResult = Vector3(fZ, 0, -fX);
                 else
                     vecResult = Vector3(0, -fZ, fY);
@@ -1098,7 +1204,7 @@ namespace GNINE_NAMESPACE {
 
             constexpr float DotProduct(Vector2& other) const { return fX * other.fX + fY * other.fY; }
 
-            float Length() const { return std::hypotf(fX, fY); }
+            float Length() const { return STD_NAMESPACE::hypotf(fX, fY); }
 
             // LengthSquared returns Length() without sqrt applied (i.e. returns x*x* + y*y).
             // This can be useful if you only want to compare lengths.
@@ -1514,7 +1620,7 @@ namespace GNINE_NAMESPACE {
                 array[15] = 1.0f;
             }
 
-            std::array<std::array<float, 4>, 4> To4x4Array() const noexcept
+            STD_NAMESPACE::array<STD_NAMESPACE::array<float, 4>, 4> To4x4Array() const noexcept
             {
                 return {vRight.fX, vRight.fY, vRight.fZ, 0.0f, vFront.fX, vFront.fY, vFront.fZ, 0.0f, vUp.fX, vUp.fY, vUp.fZ, 0.0f, vPos.fX, vPos.fY, vPos.fZ, 1.0f};
             }
@@ -1535,6 +1641,37 @@ namespace GNINE_NAMESPACE {
                 return String(data, size);
             }
 
+            operator GNINE_MATRIX() {
+                GNINE_MATRIX mat;
+
+                GNINE_VECTOR3 v;
+                v.x = vRight.fX;
+                v.y = vRight.fY;
+                v.z = vRight.fZ;
+
+                mat.right = v;
+                
+                v.x = vFront.fX;
+                v.y = vFront.fY;
+                v.z = vFront.fZ;
+
+                mat.front = v;
+                
+                v.x = vUp.fX;
+                v.y = vUp.fY;
+                v.z = vUp.fZ;
+
+                mat.up = v;
+                
+                v.x = vPos.fX;
+                v.y = vPos.fY;
+                v.z = vPos.fZ;
+
+                mat.pos = v;
+
+                return mat;
+            }
+
             enum EMatrixAxes
             {
                 AXIS_RIGHT,
@@ -1552,7 +1689,8 @@ namespace GNINE_NAMESPACE {
     class ColShape;
     class Marker;
 
-    using ElementList = std::vector<Element>;
+    using ElementList = STD_NAMESPACE::vector<Element>;
+    using ElementDataKeyList = STD_NAMESPACE::vector<String>;
 
     class Element {
         public:
@@ -1567,6 +1705,305 @@ namespace GNINE_NAMESPACE {
             }
 
             ~Element() = default;
+
+            bool SetLowLOD(Element element) {
+                return gnine_set_low_lod_element(m_pElementId, element);
+            }
+
+            bool SetFrozenStatus(bool frozenStatus) {
+                return gnine_set_element_frozen(m_pElementId, frozenStatus);
+            }
+
+            bool SetCollisionsEnabled(bool enabled) {
+                return gnine_set_element_collisions_enabled(m_pElementId, enabled);
+            }
+
+            bool SetModel(Int32 model) {
+                return gnine_set_element_model(m_pElementId, model);
+            }
+
+            bool SetHealth(Float32 health) {
+                return gnine_set_element_health(m_pElementId, health);
+            }
+
+            bool SetDoubleSidedEnabled(bool enabled) {
+                return gnine_set_element_double_sided(m_pElementId, enabled);
+            }
+
+            bool SetAlpha(Int32 alpha) {
+                return gnine_set_element_alpha(m_pElementId, alpha);
+            }
+
+            bool SetDimension(Int32 dimension) {
+                return gnine_set_element_dimension(m_pElementId, dimension);
+            }
+
+            bool SetInterior(Int32 interior, bool setPosition = false, Vector3 position = Vector3(0.0f, 0.0f, 0.0f)) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_set_element_interior(m_pElementId, interior, setPosition, &pos);
+            }
+
+            bool IsVisibleTo(Element to) const {
+                return gnine_is_element_visible_to(m_pElementId, to);
+            }
+
+            bool ClearVisibleTo() {
+                return gnine_clear_element_visible_to(m_pElementId);
+            }
+
+            bool SetVisibleTo(Element to, bool visible) {
+                return gnine_set_element_visible_to(m_pElementId, to, visible);
+            }
+
+            bool SetTurnVelocity(Vector3 turnVelocity) {
+                GNINE_VECTOR3 vel = turnVelocity;
+
+                return gnine_set_element_turn_velocity(m_pElementId, &vel);
+            }
+
+            bool SetVelocity(Vector3 velocity) {
+                GNINE_VECTOR3 vel = velocity;
+
+                return gnine_set_element_velocity(m_pElementId, &vel);
+            }
+
+            bool SetRotation(Vector3 rotation, String rotationOrder = "default", bool fixPedRotation = false) {
+                GNINE_VECTOR3 rot = rotation;
+
+                return gnine_set_element_rotation(m_pElementId, &rot, rotationOrder.c_str(), fixPedRotation);
+            }
+
+            bool SetPosition(Vector3 position, bool wrap = true) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_set_element_position(m_pElementId, &pos, wrap);
+            }
+
+            bool SetMatrix(Matrix matrix) {
+                GNINE_MATRIX matData = matrix;
+
+                return gnine_set_element_matrix(m_pElementId, &matData);
+            }
+
+            bool SetParent(Element parent) {
+                return gnine_set_element_parent(m_pElementId, parent);
+            }
+
+            bool SetUniqueId(String id) {
+                return gnine_set_element_id(m_pElementId, id.c_str());
+            }
+
+            bool RemoveData(String key) {
+                return gnine_remove_element_data(m_pElementId, key.c_str());
+            }
+
+            bool HasData(String key, bool inherit = true) const {
+                return gnine_has_element_data(m_pElementId, key.c_str(), inherit);
+            }
+
+            ElementDataKeyList GetAllData(UInt32 maxItemSize = 500) const {
+                ElementDataKeyList list;
+
+                CString datas[maxItemSize];
+                memset((MemoryPointer)datas, 0, sizeof(datas));
+
+                UInt32 itemCount = gnine_get_all_element_data(m_pElementId, datas, maxItemSize);
+
+                for (UInt32 i = 0; i < itemCount; i++) {
+                    CString data = datas[i];
+
+                    list.push_back(data);
+
+                    free((void*)data);
+                }
+
+                return list;
+            }
+
+            Callable::Arguments GetDataDirect(String key, bool inherit = true) const {
+                if (key.empty()) {
+                    return Callable::Arguments(NULL);
+                }
+
+                return gnine_get_element_data(m_pElementId, key.c_str(), inherit);
+            }
+
+            Byte GetDataType(String key, bool inherit = true) const {
+                if (key.empty()) {
+                    return GNINE_ARGUMENT_TYPE_UNKNOWN;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return GNINE_ARGUMENT_TYPE_UNKNOWN;
+                }
+
+                return data.GetType(1);
+            }
+
+            bool GetData(String key, bool* value, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_BOOLEAN) {
+                    return false;
+                }
+
+                *value = data.GetAsBoolean(1);
+
+                return true;
+            }
+
+            bool GetData(String key, LuaNumber* value, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_NUMBER) {
+                    return false;
+                }
+
+                *value = data.GetAsNumber(1);
+
+                return true;
+            }
+
+            bool GetData(String key, String* value, UIntPtr valueLength = 1024, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_STRING) {
+                    return false;
+                }
+
+                *value = data.GetAsString(1, valueLength);
+
+                return true;
+            }
+
+            bool GetData(String key, Callable* value, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_CALLABLE) {
+                    return false;
+                }
+
+                *value = data.GetAsCallable(1);
+
+                return true;
+            }
+
+            bool GetData(String key, Userdata* value, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_USERDATA) {
+                    return false;
+                }
+
+                *value = data.GetAsUserdata(1);
+
+                return true;
+            }
+
+            bool GetData(String key, Callable::Arguments* value, bool inherit = true) const {
+                if (key.empty() || !value) {
+                    return false;
+                }
+
+                Callable::Arguments data = GetDataDirect(key, inherit);
+
+                if (!data || data.Count() < 1) {
+                    return false;
+                }
+
+                if (data.GetType(1) != GNINE_ARGUMENT_TYPE_NUMBER) {
+                    return false;
+                }
+
+                *value = data.GetAsList(1);
+
+                return true;
+            }
+
+            bool SetDataDirect(String key, Callable::Arguments* data, bool syncMode = true) {
+                if (key.empty() || !data) {
+                    return false;
+                }
+
+                return gnine_set_element_data(m_pElementId, key.c_str(), *data, syncMode);
+            }
+
+            bool SetData(String key, Callable::Arguments& value, bool syncMode = true) {
+                if (key.empty()) {
+                    return false;
+                }
+
+                Callable::Arguments data;
+                data.Push(value);
+
+                return SetDataDirect(key, &data, syncMode);
+            }
+
+            bool SetData(String key, Callable value, bool syncMode = true) {
+                if (key.empty()) {
+                    return false;
+                }
+
+                Callable::Arguments data;
+                data.PushCallable(value.m_rFunctionRef);
+
+                return SetDataDirect(key, &data, syncMode);
+            }
+
+            template<typename ValueType>
+            bool SetData(String key, ValueType value, bool syncMode = true) {
+                if (key.empty()) {
+                    return false;
+                }
+
+                Callable::Arguments data;
+                data.Push(value);
+
+                return SetDataDirect(key, &data, syncMode);
+            }
 
             bool SetAttachedOffsets(Vector3 positionOffset, Vector3 rotationOffset) {
                 GNINE_VECTOR3 posOffset = positionOffset;
@@ -1788,7 +2225,7 @@ namespace GNINE_NAMESPACE {
                     list.push_back(children[i]);
                 }
 
-                return std::move(list);
+                return STD_NAMESPACE::move(list);
             }
 
             Element GetChild(UInt32 index) const {
@@ -1849,12 +2286,12 @@ namespace GNINE_NAMESPACE {
                 return gnine_is_element(m_pElementId);
             }
 
-            Element operator=(Element element) {
+            Element& operator=(Element element) {
                 SetId(element.GetId());
                 return *this;
             }
 
-            Element operator=(ElementId element) {
+            Element& operator=(ElementId element) {
                 SetId(element);
                 return *this;
             }
@@ -1928,7 +2365,7 @@ namespace GNINE_NAMESPACE {
                     list.push_back(elements[i]);
                 }
 
-                return std::move(list);
+                return STD_NAMESPACE::move(list);
             }
 
             static ElementList GetElementsWithinRange(Vector3 position, Float32 radius, String elementType = "", Int32 interior = -1, Int32 dimension = -1, UInt32 maxSize = 500) {
@@ -1985,7 +2422,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_is_element_within_col_shape(element, *this);
             }
 
-            ColShape operator=(Element element) {
+            ColShape& operator=(Element element) {
                 SetId(element);
                 
                 return *this;
@@ -1997,27 +2434,65 @@ namespace GNINE_NAMESPACE {
     };
 
     class Marker : public Element {
-        Marker() {
-            Drop();
-        }
+        public:
+            Marker() {
+                Drop();
+            }
 
-        Marker(MarkerId markerId) {
-            Drop();
+            Marker(MarkerId markerId) {
+                Drop();
 
-            SetId(markerId);
-        }
+                SetId(markerId);
+            }
 
-        ~Marker() = default;
+            ~Marker() = default;
 
-        bool IsElementInside(Element element) const {
-            return gnine_is_element_within_marker(element, *this);
-        }
+            bool IsElementInside(Element element) const {
+                return gnine_is_element_within_marker(element, *this);
+            }
 
-        Marker operator=(Element element) {
-            SetId(element);
+            Marker& operator=(Element element) {
+                SetId(element);
 
-            return *this;
-        }
+                return *this;
+            }
+    };
+
+    class Player : public Element {
+        public:
+            Player() {
+                Drop();
+            }
+
+            Player(PlayerId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Player() = default;
+
+            Player& operator=(Player player) {
+                SetId(player);
+
+                return *this;
+            }
+
+            bool SetSyncElementEnabled(Element element, bool enabled = true, bool persist = false) {
+                return gnine_set_element_syncer(element, *this, enabled, persist);
+            }
+
+            bool SubscribeElementData(Element element, String key) {
+                return gnine_add_element_data_subscriber(element, key.c_str(), *this);
+            }
+
+            bool UnsubscribeElementData(Element element, String key) {
+                return gnine_remove_element_data_subscriber(element, key.c_str(), *this);
+            }
+
+            bool DoesSubscribeElementData(Element element, String key) const {
+                return gnine_has_element_data_subscriber(element, key.c_str(), *this);
+            }
     };
 
     inline SharedMemoryPointer GetSharedPointerAddress(MemoryPointer ptr) {
@@ -2201,7 +2676,7 @@ namespace GNINE_NAMESPACE {
 
     template<typename Arg>
     inline void Print(Arg arg) {
-        __OUTPUT_DATA__ += std::to_string(arg);
+        __OUTPUT_DATA__ += STD_NAMESPACE::to_string(arg);
         __OUTPUT_DATA__ += "    ";
 
         Printf(__OUTPUT_DATA__.c_str());
@@ -2211,7 +2686,7 @@ namespace GNINE_NAMESPACE {
 
     template<typename Arg, typename ...Args>
     inline void Print(Arg arg, Args... args) {
-        __OUTPUT_DATA__ += std::to_string(arg);
+        __OUTPUT_DATA__ += STD_NAMESPACE::to_string(arg);
         __OUTPUT_DATA__ += "    ";
 
         Print(args...);
