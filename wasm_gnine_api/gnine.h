@@ -72,6 +72,10 @@
 
 #define GNINE_CALLABLE_REF_BYTE_HEADER "crbh1"
 
+#define GNINE_PLAYER_AC_INFO(size) struct { GNINE_I8 DetectedAC[size]; GNINE_UI32 d3d9Size; GNINE_I8 d3d9MD5[size]; GNINE_I8 d3d9SHA256[size]; }
+
+#define gnine_get_player_ac_info(player, info, max_strings_size) gnine_get_player_ac_info_r(player, (info)->DetectedAC, &((info)->d3d9Size), (info)->d3d9MD5, (info)->d3d9SHA256, max_strings_size)
+
 typedef char GNINE_I8;
 typedef unsigned char GNINE_UI8;
 typedef GNINE_UI8 GNINE_BYTE;
@@ -110,11 +114,13 @@ typedef GNINE_USERDATA_T* GNINE_USERDATA;
 
 typedef GNINE_USERDATA GNINE_ELEMENT;
 typedef GNINE_USERDATA GNINE_RESOURCE;
+typedef GNINE_USERDATA GNINE_ACCOUNT;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
 typedef GNINE_ELEMENT GNINE_MARKER;
 
 typedef GNINE_ELEMENT GNINE_PLAYER;
+typedef GNINE_ELEMENT GNINE_TEAM;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -181,7 +187,6 @@ struct GNINE_PROCESS_MEMORY_STATS {
     GNINE_UI32 sharedMemorySize;
     GNINE_UI32 privateMemorySize;
 };
-
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
 
@@ -317,6 +322,69 @@ GNINE_API_IMPORT(set_element_syncer, (GNINE_ELEMENT element, GNINE_PLAYER player
 GNINE_API_IMPORT(set_element_collisions_enabled, (GNINE_ELEMENT element, bool enabled), bool);
 GNINE_API_IMPORT(set_element_frozen, (GNINE_ELEMENT element, bool freeze_status), bool);
 GNINE_API_IMPORT(set_low_lod_element, (GNINE_ELEMENT element, GNINE_ELEMENT target), bool);
+
+GNINE_API_IMPORT(get_player_count, (), GNINE_UI32);
+GNINE_API_IMPORT(set_player_ammo, (GNINE_PLAYER player, GNINE_UI32 ammo, GNINE_UI32 slot, GNINE_UI32 ammo_in_clip), bool);
+GNINE_API_IMPORT(get_player_from_name, (GNINE_STRING name), GNINE_PLAYER);
+GNINE_API_IMPORT(get_player_money, (GNINE_PLAYER player), GNINE_I32);
+GNINE_API_IMPORT(get_player_ping, (GNINE_PLAYER player), GNINE_UI32);
+GNINE_API_IMPORT(get_random_player, (), GNINE_PLAYER);
+GNINE_API_IMPORT(is_player_muted, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(get_player_team, (GNINE_PLAYER player), GNINE_TEAM);
+GNINE_API_IMPORT(can_player_use_function, (GNINE_PLAYER player, GNINE_STRING function_name), bool);
+GNINE_API_IMPORT(get_player_wanted_level, (GNINE_PLAYER player), GNINE_UI32);
+GNINE_API_IMPORT(get_alive_players, (GNINE_PLAYER* player_list, GNINE_UI32 max_item_count), GNINE_UI32);
+GNINE_API_IMPORT(get_dead_players, (GNINE_PLAYER* player_list, GNINE_UI32 max_item_count), GNINE_UI32);
+GNINE_API_IMPORT(get_player_idle_time, (GNINE_PLAYER* player), GNINE_I64);
+GNINE_API_IMPORT(is_player_scoreboard_forced, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(is_player_map_forced, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(get_player_nametag_text, (GNINE_PLAYER player, GNINE_XSTRING out_text, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_nametag_color, (GNINE_PLAYER player, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(is_player_nametag_showing, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(get_player_serial, (GNINE_PLAYER player, GNINE_UI32 index, GNINE_XSTRING out_serial, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_community_id, (GNINE_PLAYER player, GNINE_XSTRING out_id, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_user_name, (GNINE_PLAYER player, GNINE_XSTRING out_user_name, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_blur_level, (GNINE_PLAYER player), GNINE_I32);
+GNINE_API_IMPORT(get_player_name, (GNINE_PLAYER player, GNINE_XSTRING out_name, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_ip, (GNINE_PLAYER player, GNINE_XSTRING out_ip, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_account, (GNINE_PLAYER player), GNINE_ACCOUNT);
+GNINE_API_IMPORT(get_player_version, (GNINE_PLAYER player, GNINE_XSTRING out_version, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_player_ac_info_r, (GNINE_PLAYER player, GNINE_XSTRING out_DetectedAC, GNINE_UI32* out_d3d9Size, GNINE_XSTRING out_d3d9MD5, GNINE_XSTRING out_d3d9SHA256, GNINE_I_PTR max_strings_size), bool);
+GNINE_API_IMPORT(get_player_script_debug_level, (GNINE_PLAYER player), GNINE_UI32);
+
+GNINE_API_IMPORT(set_player_money, (GNINE_PLAYER player, GNINE_I32 money, bool instant), bool);
+GNINE_API_IMPORT(give_player_money, (GNINE_PLAYER player, GNINE_I32 money), bool);
+GNINE_API_IMPORT(take_player_money, (GNINE_PLAYER player, GNINE_I32 money), bool);
+GNINE_API_IMPORT(spawn_player, (GNINE_PLAYER player, struct GNINE_VECTOR3* position, GNINE_F32 rotation, GNINE_I32 model, GNINE_I32 interior, GNINE_I32 dimension, GNINE_TEAM team), bool);
+GNINE_API_IMPORT(show_player_hud_component, (GNINE_PLAYER player, GNINE_STRING component, bool show), bool);
+GNINE_API_IMPORT(set_player_wanted_level, (GNINE_PLAYER player, GNINE_UI32 level), bool);
+GNINE_API_IMPORT(force_player_map, (GNINE_PLAYER player, bool force), bool);
+GNINE_API_IMPORT(set_player_nametag_text, (GNINE_PLAYER player, GNINE_STRING nametag_text), bool);
+GNINE_API_IMPORT(set_player_nametag_color, (GNINE_PLAYER player, struct GNINE_COLOR* nametag_color), bool);
+GNINE_API_IMPORT(set_player_nametag_showing, (GNINE_PLAYER player, bool show), bool);
+GNINE_API_IMPORT(set_player_muted, (GNINE_PLAYER player , bool muted), bool);
+GNINE_API_IMPORT(set_player_blur_level, (GNINE_PLAYER player, GNINE_I32 blur_level), bool);
+GNINE_API_IMPORT(redirect_player, (GNINE_PLAYER player, GNINE_STRING host, GNINE_I32 port, GNINE_STRING password), bool);
+GNINE_API_IMPORT(set_player_name, (GNINE_PLAYER player, GNINE_STRING name), bool);
+GNINE_API_IMPORT(donate_satchels, (GNINE_PLAYER player), bool);
+/*GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );
+GNINE_API_IMPORT(ss, (), );*/
 
 /*
     API FUNCTION: gnine_print
