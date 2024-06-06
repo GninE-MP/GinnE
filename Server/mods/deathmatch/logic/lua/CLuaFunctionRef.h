@@ -12,16 +12,17 @@
 #pragma once
 
 #define LUA_REFNIL      (-1)
-#define VERIFY_FUNCTION(func) ( (func).ToInt () != LUA_REFNIL )
+#define VERIFY_FUNCTION(func) ((func).IsCallable() ? true : (func).ToInt() != LUA_REFNIL)
 #define IS_REFNIL(func) ( (func).ToInt () == LUA_REFNIL )
 
-struct lua_State;
+#include "CLuaArgument.h"
 
 class CLuaFunctionRef
 {
 public:
     CLuaFunctionRef();
     CLuaFunctionRef(lua_State* luaVM, int iFunction, const void* pFuncPtr);
+    CLuaFunctionRef(CCallable callable);
     CLuaFunctionRef(const CLuaFunctionRef& other);
     ~CLuaFunctionRef();
     CLuaFunctionRef& operator=(const CLuaFunctionRef& other);
@@ -29,6 +30,10 @@ public:
     lua_State*       GetLuaVM() const;
     bool             operator==(const CLuaFunctionRef& other) const;
     bool             operator!=(const CLuaFunctionRef& other) const;
+    void             SetIsCallableState(bool is) { m_bIsCallable = is; }
+    void             SetCallable(CCallable callable) { m_Callable = callable; }
+    bool             IsCallable() const { return m_bIsCallable; }
+    CCallable        GetCallable() const { return m_Callable; }
     static void      RemoveLuaFunctionRefsForVM(lua_State* luaVM);
 
 protected:
@@ -39,4 +44,7 @@ protected:
 
     // Global list to track function refs and make sure they can't be used after a VM has closed
     static CIntrusiveList<CLuaFunctionRef> ms_AllRefList;
+
+    CCallable m_Callable;
+    bool      m_bIsCallable;
 };

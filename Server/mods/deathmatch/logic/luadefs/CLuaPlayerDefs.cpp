@@ -1660,7 +1660,17 @@ int CLuaPlayerDefs::GetFunctionsBoundToKey(lua_State* luaVM)
                             if (strKey == pBind->boundKey->szKey)
                             {
                                 lua_pushnumber(luaVM, ++uiIndex);
-                                lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                if (pBind->m_iLuaFunction.IsCallable())
+                                {
+                                    CLuaArgument func;
+                                    func.SetCallable(pBind->m_iLuaFunction.GetCallable());
+
+                                    func.Push(luaVM);
+                                }
+                                else
+                                {
+                                    lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                }
                                 lua_settable(luaVM, -3);
                             }
                         }
@@ -1674,7 +1684,17 @@ int CLuaPlayerDefs::GetFunctionsBoundToKey(lua_State* luaVM)
                             if (strKey == pBind->boundControl->szControl)
                             {
                                 lua_pushnumber(luaVM, ++uiIndex);
-                                lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                if (pBind->m_iLuaFunction.IsCallable())
+                                {
+                                    CLuaArgument func;
+                                    func.SetCallable(pBind->m_iLuaFunction.GetCallable());
+
+                                    func.Push(luaVM);
+                                }
+                                else
+                                {
+                                    lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                }
                                 lua_settable(luaVM, -3);
                             }
                         }

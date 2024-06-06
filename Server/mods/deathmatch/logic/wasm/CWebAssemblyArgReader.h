@@ -21,6 +21,7 @@
 #include "CAccessControlList.h"
 #include "CAccessControlListGroup.h"
 #include "CDatabaseManager.h"
+#include "wasmdefs/wasm_args_list.h"
 
 #define ELEMENT_TO_WASM_USERDATA(element) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((element)->GetID().Value()))
 #define RESOURCE_TO_WASM_USERDATA(resource) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((resource)->GetScriptID()))
@@ -48,6 +49,8 @@ public:
     bool NextIsInternalFunctionHash();
     bool NextIsIntPtr();
     bool NextIsUIntPtr();
+    bool NextIsCallable();
+    bool NextIsCArgs();
 
     void ReadInt32(int32_t& out, int32_t defaultValue = 0);
     void ReadUInt32(uint32_t& out, uint32_t defaultValue = 0);
@@ -65,6 +68,10 @@ public:
     void ReadIntPtr(intptr_t& out, intptr_t defaultValue = 0);
     void ReadUIntPtr(uintptr_t& out, uintptr_t defaultValue = 0);
     void ReadMatrix(CMatrix& out, CMatrix defaultValue = CMatrix());
+    void ReadCallable(CCallable& callable, CCallable defaultValue = CCallable());
+    void ReadLuaFunctionRef(CLuaFunctionRef& luaFunction, CLuaFunctionRef defaultValue = CLuaFunctionRef());
+    void ReadCArgs(cargs*& cArgs, cargs* defaultValue = NULL);
+    void ReadLuaArguments(CLuaArguments& luaArgs, CLuaArguments defaultValue = CLuaArguments());
 
     template<typename PTR>
     void ReadPointer(PTR*& out, PTR* defaultValue = NULL)

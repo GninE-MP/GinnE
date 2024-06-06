@@ -244,6 +244,8 @@ void CKeyBinds::Clear(eKeyBindType bindType)
     }
 }
 
+#include "CLogger.h"
+
 void CKeyBinds::Call(CKeyBind* pKeyBind)
 {
     if (pKeyBind && !pKeyBind->IsBeingDeleted())
@@ -253,6 +255,7 @@ void CKeyBinds::Call(CKeyBind* pKeyBind)
             case KEY_BIND_FUNCTION:
             {
                 CKeyFunctionBind* pBind = static_cast<CKeyFunctionBind*>(pKeyBind);
+
                 if (pBind->luaMain && VERIFY_FUNCTION(pBind->m_iLuaFunction))
                 {
                     CLuaArguments Arguments;

@@ -15,6 +15,7 @@
 #include "CStaticFunctionDefinitions.h"
 #include "CDummy.h"
 #include "Utils.h"
+#include "CKeyBinds.h"
 
 #include "../wasm/CWebAssemblyContext.h"
 #include "../wasm/CWebAssemblyVariable.h"
@@ -68,27 +69,29 @@ void CWebAssemblyPlayerDefs::RegisterFunctionTypes()
     SetFunctionType("redirect_player", "besis");
     SetFunctionType("set_player_name", "bes");
     SetFunctionType("donate_satchels", "be");
-    SetFunctionType("take_player_screen_shot", "");
-    SetFunctionType("set_player_script_debug_level", "");
+    SetFunctionType("take_player_screen_shot", "beiisiii");
+    SetFunctionType("set_player_script_debug_level", "bei");
 
-    SetFunctionType("get_player_announce_value", "");
-    SetFunctionType("set_player_announce_value", "");
-    SetFunctionType("resend_player_mod_info", "");
-    SetFunctionType("resend_player_ac_info", "");
+    SetFunctionType("get_player_announce_value", "xes*x");
+    SetFunctionType("set_player_announce_value", "bess");
+    SetFunctionType("resend_player_mod_info", "be");
+    SetFunctionType("resend_player_ac_info", "be");
 
-    SetFunctionType("bind_key", "");
-    SetFunctionType("unbind_key", "");
-    SetFunctionType("is_key_bound", "");
-    SetFunctionType("get_functions_bound_to_key", "");
-    SetFunctionType("get_key_bound_to_function", "");
-    SetFunctionType("get_control_state", "");
-    SetFunctionType("is_control_enabled", "");
+    SetFunctionType("bind_key", "bess*u");
+    SetFunctionType("bind_key_on_command", "bessss");
+    SetFunctionType("unbind_key", "bess*");
+    SetFunctionType("unbind_key_on_command", "besss");
+    SetFunctionType("is_key_bound", "bess*");
+    SetFunctionType("get_functions_bound_to_key", "iess*i");
+    SetFunctionType("get_key_bound_to_function", "xe*sx");
+    SetFunctionType("get_control_state", "bes");
+    SetFunctionType("is_control_enabled", "bes");
 
-    SetFunctionType("set_control_state", "");
-    SetFunctionType("toggle_control", "");
-    SetFunctionType("toggle_all_controls", "");
+    SetFunctionType("set_control_state", "besb");
+    SetFunctionType("toggle_control", "besb");
+    SetFunctionType("toggle_all_controls", "bebbb");
 
-    SetFunctionType("play_sound_front_end", "");
+    SetFunctionType("play_sound_front_end", "bei");
     SetFunctionType("play_mission_audio", "");
     SetFunctionType("preload_mission_audio", "");
 
@@ -157,7 +160,9 @@ void CWebAssemblyPlayerDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "resend_player_ac_info", ResendPlayerACInfo },
 
         { "bind_key", BindKey },
+        { "bind_key_on_command", BindKeyOnCommand },
         { "unbind_key", UnbindKey },
+        { "unbind_key_on_command", UnbindKeyOnCommand },
         { "is_key_bound", IsKeyBound },
         { "get_functions_bound_to_key", GetFunctionsBoundToKey },
         { "get_key_bound_to_function", GetKeyBoundToFunction },
@@ -1171,121 +1176,612 @@ WebAssemblyApi(CWebAssemblyPlayerDefs::DetonateSatchels, env, args, results)
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::TakePlayerScreenShot, env, args, results)
 {
+    CElement* player;
+    uint32_t  width;
+    uint32_t  height;
+    SString   tag;
+    uint32_t  quality;
+    uint32_t  maxBandwidth;
+    uint32_t  maxPacketSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadUInt32(width);
+    argStream.ReadUInt32(height);
+    argStream.ReadString(tag, "");
+    argStream.ReadUInt32(quality, 30);
+    argStream.ReadUInt32(maxBandwidth, 5000);
+    argStream.ReadUInt32(maxPacketSize, 500);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    CResource* resource = GetWebAssemblyEnvResource(env);
+
+    if (!resource)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::TakePlayerScreenShot(player, width, height, tag, quality, maxBandwidth, maxPacketSize, resource));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::SetPlayerScriptDebugLevel, env, args, results)
 {
+    CElement* player;
+    uint32_t  level;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadUInt32(level);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetPlayerScriptDebugLevel(player, level));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetPlayerAnnounceValue, env, args, results)
 {
+    CPlayer*                         player;
+    SString                          key;
+    CWebAssemblyMemoryPointerAddress outValue;
+    uint32_t                         maxSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadPointerAddress(outValue);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+
+    if (!player || outValue == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+
+    SString value;
+
+    if (!CStaticFunctionDefinitions::GetPlayerAnnounceValue(player, key, value))
+    {
+        return argStream.Return(0);
+    }
+
+    uint32_t size = std::min((size_t)maxSize, value.size());
+
+    argStream.WritePointer(outValue, value.data(), size);
+
+    return argStream.Return(size);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::SetPlayerAnnounceValue, env, args, results)
 {
+    CPlayer* player;
+    SString  key;
+    SString  value;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(value);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::SetPlayerAnnounceValue(player, key, value));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ResendPlayerModInfo, env, args, results)
 {
+    CPlayer* player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    g_pNetServer->ResendModPackets(player->GetSocket());
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ResendPlayerACInfo, env, args, results)
 {
+    CPlayer* player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    g_pNetServer->ResendACPackets(player->GetSocket());
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::BindKey, env, args, results)
 {
+    CPlayer*        player;
+    SString         key;
+    SString         hitState;
+    CLuaFunctionRef function;
+    CLuaArguments   arguments;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadLuaFunctionRef(function);
+    argStream.ReadLuaArguments(arguments);
+    
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    CLuaMain* luaMain = GetWebAssemblyEnvResource(env)->GetVirtualMachine();
+
+    return argStream.Return(CStaticFunctionDefinitions::BindKey(player, key.c_str(), hitState.c_str(), luaMain, function, arguments));
+}
+
+WebAssemblyApi(CWebAssemblyPlayerDefs::BindKeyOnCommand, env, args, results)
+{
+    CPlayer* player;
+    SString  key;
+    SString  hitState;
+    SString  command;
+    SString  arguments;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadString(command);
+    argStream.ReadString(arguments, "");
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::BindKey(player, key.c_str(), hitState.c_str(), command.c_str(), arguments.c_str(), GetWebAssemblyEnvResource(env)->GetName().c_str()));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::UnbindKey, env, args, results)
 {
+    CPlayer*        player;
+    SString         key;
+    SString         hitState;
+    CLuaFunctionRef function;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadLuaFunctionRef(function);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    CLuaMain* luaMain = GetWebAssemblyEnvResource(env)->GetVirtualMachine();
+
+    return argStream.Return(CStaticFunctionDefinitions::UnbindKey(player, key.c_str(), luaMain, hitState.c_str(), function));
+}
+
+WebAssemblyApi(CWebAssemblyPlayerDefs::UnbindKeyOnCommand, env, args, results)
+{
+    CPlayer* player;
+    SString  key;
+    SString  hitState;
+    SString  command;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadString(command);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::UnbindKey(player, key.c_str(), hitState.c_str(), command.c_str(), GetWebAssemblyEnvResource(env)->GetName().c_str()));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::IsKeyBound, env, args, results)
 {
+    CPlayer*        player;
+    SString         key;
+    SString         hitState;
+    CLuaFunctionRef function;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadLuaFunctionRef(function);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    CLuaMain* luaMain = GetWebAssemblyEnvResource(env)->GetVirtualMachine();
+
+    bool bound = false;
+
+    if (!CStaticFunctionDefinitions::IsKeyBound(player, key.c_str(), luaMain, hitState.c_str(), function, bound))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(bound);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetFunctionsBoundToKey, env, args, results)
 {
+    CPlayer* player;
+    SString  key;
+    SString  hitState;
+    uint8_t* outCallables;
+    uint32_t maxItemCount;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(key);
+    argStream.ReadString(hitState);
+    argStream.ReadPointer(outCallables);
+    argStream.ReadUInt32(maxItemCount, 500);
+
+    if (!player || outCallables == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(false);
+    }
+
+    bool checkHitState = false;
+    bool hitStateB = false;
+
+    if (hitState == "down")
+    {
+        checkHitState = true;
+        hitStateB = true;
+    }
+    else if (hitState == "up")
+    {
+        checkHitState = true;
+        hitStateB = false;
+    }
+
+    uint32_t count = 0;
+    
+    std::list<CKeyBind*>::iterator iter = player->GetKeyBinds()->IterBegin();
+
+    lua_State* luaVM = GetWebAssemblyLuaVM(env);
+
+    for (; iter != player->GetKeyBinds()->IterEnd() && maxItemCount > 0; ++iter)
+    {
+        CKeyBind* pKeyBind = *iter;
+        if (!pKeyBind->IsBeingDeleted())
+        {
+            switch (pKeyBind->GetType())
+            {
+                case KEY_BIND_FUNCTION:
+                {
+                    CKeyFunctionBind* pBind = static_cast<CKeyFunctionBind*>(pKeyBind);
+                    if (!checkHitState || pBind->bHitState == hitStateB)
+                    {
+                        if (key == pBind->boundKey->szKey)
+                        {
+                            if (pBind->m_iLuaFunction.IsCallable())
+                            {
+                                pBind->m_iLuaFunction.GetCallable().WriteHash(outCallables + (C_CALLABLE_HASH_SIZE * count));
+                            }
+                            else
+                            {
+                                lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                CLuaArgument func(luaVM, lua_gettop(luaVM));
+                                lua_pop(luaVM, 1);
+
+                                if (func.GetType() != LUA_TFUNCTION)
+                                {
+                                    continue;
+                                }
+
+                                func.GetCallable().WriteHash(outCallables + (C_CALLABLE_HASH_SIZE * count));
+                            }
+
+                            count++;
+                            maxItemCount--;
+                        }
+                    }
+                    break;
+                }
+                case KEY_BIND_CONTROL_FUNCTION:
+                {
+                    CControlFunctionBind* pBind = static_cast<CControlFunctionBind*>(pKeyBind);
+                    if (!checkHitState || pBind->bHitState == hitStateB)
+                    {
+                        if (key == pBind->boundControl->szControl)
+                        {
+                            if (pBind->m_iLuaFunction.IsCallable())
+                            {
+                                pBind->m_iLuaFunction.GetCallable().WriteHash(outCallables + (C_CALLABLE_HASH_SIZE * count));
+                            }
+                            else
+                            {
+                                lua_rawgeti(luaVM, LUA_REGISTRYINDEX, pBind->m_iLuaFunction.ToInt());
+                                CLuaArgument func(luaVM, lua_gettop(luaVM));
+                                lua_pop(luaVM, 1);
+
+                                if (func.GetType() != LUA_TFUNCTION)
+                                {
+                                    continue;
+                                }
+
+                                func.GetCallable().WriteHash(outCallables + (C_CALLABLE_HASH_SIZE * count));
+                            }
+
+                            count++;
+                            maxItemCount--;
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
+    return argStream.Return(count);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetKeyBoundToFunction, env, args, results)
 {
+    CPlayer*                         player;
+    CLuaFunctionRef                  function;
+    CWebAssemblyMemoryPointerAddress outKey;
+    uint32_t                         maxSize;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadLuaFunctionRef(function);
+    argStream.ReadPointerAddress(outKey);
+    argStream.ReadUInt32(maxSize, 0xffffffff);
+
+    if (!player || outKey == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+    
+    list<CKeyBind*>::iterator iter = player->GetKeyBinds()->IterBegin();
+
+    for (; iter != player->GetKeyBinds()->IterEnd(); ++iter)
+    {
+        CKeyBind* pKeyBind = *iter;
+
+        if (!pKeyBind->IsBeingDeleted())
+        {
+            switch (pKeyBind->GetType())
+            {
+                case KEY_BIND_FUNCTION:
+                {
+                    CKeyFunctionBind* pBind = static_cast<CKeyFunctionBind*>(pKeyBind);
+
+                    if (function == pBind->m_iLuaFunction)
+                    {
+                        SString key = pBind->boundKey->szKey;
+
+                        uint32_t size = std::min((size_t)maxSize, key.size());
+
+                        argStream.WritePointer(outKey, key.data(), size);
+
+                        return argStream.Return(size);
+                    }
+
+                    break;
+                }
+                case KEY_BIND_CONTROL_FUNCTION:
+                {
+                    CControlFunctionBind* pBind = static_cast<CControlFunctionBind*>(pKeyBind);
+
+                    if (function == pBind->m_iLuaFunction)
+                    {
+                        SString key = pBind->boundKey->szKey;
+
+                        uint32_t size = std::min((size_t)maxSize, key.size());
+
+                        argStream.WritePointer(outKey, key.data(), size);
+
+                        return argStream.Return(size);
+                    }
+
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
+    return argStream.Return(0);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetControlState, env, args, results)
 {
+    CPlayer* player;
+    SString  control;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(control);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    bool enabled = false;
+
+    if (!CStaticFunctionDefinitions::GetControlState(player, control.c_str(), enabled))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(enabled);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::IsControlEnabled, env, args, results)
 {
+    CPlayer* player;
+    SString  control;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(control);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    bool enabled = false;
+
+    if (!CStaticFunctionDefinitions::IsControlEnabled(player, control.c_str(), enabled))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(enabled);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::SetControlState, env, args, results)
 {
+    CPlayer* player;
+    SString  control;
+    bool     state;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(control);
+    argStream.ReadBoolean(state);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::SetControlState(player, control.c_str(), state))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ToggleControl, env, args, results)
 {
+    CPlayer* player;
+    SString  control;
+    bool     state;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadString(control);
+    argStream.ReadBoolean(state);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::ToggleControl(player, control.c_str(), state))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ToggleAllControls, env, args, results)
 {
+    CPlayer* player;
+    bool     enabled;
+    bool     gtaControls;
+    bool     gnineControls;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadBoolean(enabled);
+    argStream.ReadBoolean(gtaControls, true);
+    argStream.ReadBoolean(gnineControls, true);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::ToggleAllControls(player, gtaControls, gnineControls, enabled))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::PlaySoundFrontEnd, env, args, results)
 {
+    CPlayer* player;
+    uint32_t sound;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadUInt32(sound);
+
+    if (!player || sound > 101)
+    {
+        return argStream.Return(false);
+    }
+
+    if (!CStaticFunctionDefinitions::PlaySoundFrontEnd(player, (unsigned char)sound))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::PlayMissionAudio, env, args, results)

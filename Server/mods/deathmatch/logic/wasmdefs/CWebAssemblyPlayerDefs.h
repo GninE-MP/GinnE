@@ -75,7 +75,9 @@ public:
 
     // Key bind funcs
     DEFINE_WASM_FUNCTION(BindKey, env, args, results);
+    DEFINE_WASM_FUNCTION(BindKeyOnCommand, env, args, results);
     DEFINE_WASM_FUNCTION(UnbindKey, env, args, results);
+    DEFINE_WASM_FUNCTION(UnbindKeyOnCommand, env, args, results);
     DEFINE_WASM_FUNCTION(IsKeyBound, env, args, results);
     DEFINE_WASM_FUNCTION(GetFunctionsBoundToKey, env, args, results);
     DEFINE_WASM_FUNCTION(GetKeyBoundToFunction, env, args, results);

@@ -58,6 +58,8 @@ CPacketTranslator::~CPacketTranslator()
 {
 }
 
+#include "CLogger.h"
+
 CPacket* CPacketTranslator::Translate(const NetServerPlayerID& Socket, ePacketID PacketID, NetBitStreamInterface& BitStream, SNetExtraInfo* pNetExtraInfo)
 {
     // Create the packet class

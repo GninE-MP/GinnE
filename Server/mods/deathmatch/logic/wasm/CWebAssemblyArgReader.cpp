@@ -136,6 +136,16 @@ bool CWebAssemblyArgReader::NextIsUIntPtr()
     return NextIsIntPtr();
 }
 
+bool CWebAssemblyArgReader::NextIsCallable()
+{
+    return NextIsUserData();
+}
+
+bool CWebAssemblyArgReader::NextIsCArgs()
+{
+    return NextIsUserData();
+}
+
 void CWebAssemblyArgReader::ReadInt32(int32_t& out, int32_t defaultValue)
 {
     if (!Skip())
@@ -465,6 +475,49 @@ void CWebAssemblyArgReader::ReadMatrix(CMatrix& out, CMatrix defaultValue)
     out.vFront = CVector(value->front.x, value->front.y, value->front.z);
     out.vUp = CVector(value->up.x, value->up.y, value->up.z);
     out.vPos = CVector(value->pos.x, value->pos.y, value->pos.z);
+}
+
+void CWebAssemblyArgReader::ReadCallable(CCallable& callable, CCallable defaultValue)
+{
+    uint8_t* ref;
+
+    ReadPointer(ref);
+
+    callable.Drop();
+
+    if (!callable.ReadHash(ref))
+    {
+        callable = defaultValue;
+    }
+}
+
+void CWebAssemblyArgReader::ReadLuaFunctionRef(CLuaFunctionRef& luaFunction, CLuaFunctionRef defaultValue)
+{
+    CCallable callable;
+
+    ReadCallable(callable);
+
+    luaFunction = CLuaFunctionRef(callable);
+}
+
+void CWebAssemblyArgReader::ReadCArgs(cargs*& cArgs, cargs* defaultValue)
+{
+    ReadSystemPointer(cArgs, defaultValue);
+}
+
+void CWebAssemblyArgReader::ReadLuaArguments(CLuaArguments& luaArgs, CLuaArguments defaultValue)
+{
+    cargs* argsL;
+
+    ReadCArgs(argsL);
+
+    if (!argsL || !argsL->data || argsL->dataSize < 1)
+    {
+        luaArgs = defaultValue;
+        return;
+    }
+
+    luaArgs.UnpackCompiledArguments((uint8_t*)argsL->data, argsL->dataSize);
 }
 
 bool CWebAssemblyArgReader::HasResult()

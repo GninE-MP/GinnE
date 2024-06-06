@@ -210,6 +210,22 @@ void CLuaArguments::PushArguments(const CLuaArguments& Arguments)
 
 bool CLuaArguments::Call(CLuaMain* pLuaMain, const CLuaFunctionRef& iLuaFunction, CLuaArguments* returnValues) const
 {
+    if (iLuaFunction.IsCallable())
+    {
+        CCallable callable = iLuaFunction.GetCallable();
+
+        SString errorMessage;
+        
+        bool result = callable.Call((CLuaArguments*)this, returnValues, &errorMessage);
+
+        if (!result && !errorMessage.empty())
+        {
+            CLogger::ErrorPrintf(errorMessage.c_str());
+        }
+
+        return result;
+    }
+
     assert(pLuaMain);
     TIMEUS startTime = GetTimeUs();
 

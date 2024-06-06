@@ -49,6 +49,8 @@
 #define GetWebAssemblyEnvFunctionName(env) (GetWebAssemblyEnvObject(env)->functionName)
 #define GetWebAssemblyEnvContext(env) (GetWebAssemblyEnvScript(env)->GetStoreContext())
 #define GetWebAssemblyEnvResource(env) (GetWebAssemblyEnvContext(env)->GetResource())
+#define GetWebAssemblyLuaMain(env) (GetWebAssemblyEnvResource(env)->GetVirtualMachine())
+#define GetWebAssemblyLuaVM(env) (GetWebAssemblyLuaMain(env)->GetVM())
 
 #define IsAppOn64BitVersion (sizeof(intptr_t) == 8)
 

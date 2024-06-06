@@ -14,6 +14,7 @@
 #include <SharedUtil.Memory.h>
 #include "CDummy.h"
 #include "Utils.h"
+#include "CScriptDebugging.h"
 
 #include "../wasm/CWebAssemblyContext.h"
 #include "../wasm/CWebAssemblyVariable.h"
@@ -66,6 +67,7 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
     SetFunctionType("get_callable_resource", "u*");
     SetFunctionType("get_callable_reference", "u*");
     SetFunctionType("is_callable_wasm_function", "b*");
+    SetFunctionType("free_callable", "b*");
 
     SetFunctionType("args_create", "u");
     SetFunctionType("args_delete", "vu");
@@ -124,6 +126,7 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "get_callable_resource", GetCallableResource },
         { "get_callable_reference", GetCallableReference },
         { "is_callable_wasm_function", IsCallableWasmFunction },
+        { "free_callable", FreeCallable },
 
         { "args_create", ArgsCreate },
         { "args_delete", ArgsDelete },
@@ -157,7 +160,9 @@ WebAssemblyApi(CWebAssemblyUtilDefs::PrintData, env, args, results)
 
     argStream.ReadString(str);
 
-    CLogger::LogPrintf("INFO: %s\n", str.c_str());
+    //CLogger::LogPrintf("INFO: %s\n", str.c_str());
+
+    g_pGame->GetScriptDebugging()->LogInformation(GetWebAssemblyEnvResource(env)->GetVirtualMachine()->GetVM(), "%s", str.c_str());
 
     return NULL;
 }
@@ -903,6 +908,47 @@ WebAssemblyApi(CWebAssemblyUtilDefs::IsCallableWasmFunction, env, args, results)
     }
 
     return argStream.Return(callable.IsWasmFunction());
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::FreeCallable, env, args, results)
+{
+    uint8_t* callableHash;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadPointer(callableHash);
+
+    CCallable callable;
+
+    if (!callable.ReadHash(callableHash))
+    {
+        return argStream.Return(false);
+    }
+
+    memset(callableHash, 0, C_CALLABLE_HASH_SIZE);
+    
+    if (!callable.IsWasmFunction())
+    {
+        lua_State* resourceVM = callable.GetLuaResource()->GetVirtualMachine()->GetVM();
+
+        if (resourceVM)
+        {
+            lua_getref(resourceVM, callable.GetLuaFunctionRef());
+
+            if (lua_type(resourceVM, -1) != LUA_TNIL)
+            {
+                lua_pop(resourceVM, 1);
+
+                lua_unref(resourceVM, callable.GetLuaFunctionRef());
+
+                return argStream.Return(true);
+            }
+
+            lua_pop(resourceVM, 1);
+        }
+    }
+    
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyUtilDefs::ArgsCreate, env, args, results)

@@ -98,7 +98,10 @@ CLuaFunctionRef::CLuaFunctionRef() : m_ListNode(this)
     m_luaVM = NULL;
     m_iFunction = LUA_REFNIL;
     m_pFuncPtr = NULL;
+    m_bIsCallable = false;
     ms_AllRefList.push_back(this);
+
+    m_Callable.Drop();
 }
 
 CLuaFunctionRef::CLuaFunctionRef(lua_State* luaVM, int iFunction, const void* pFuncPtr) : m_ListNode(this)
@@ -106,6 +109,19 @@ CLuaFunctionRef::CLuaFunctionRef(lua_State* luaVM, int iFunction, const void* pF
     m_luaVM = lua_getmainstate(luaVM);
     m_iFunction = iFunction;
     m_pFuncPtr = pFuncPtr;
+    m_bIsCallable = false;
+    ms_AllRefList.push_back(this);
+
+    m_Callable.Drop();
+}
+
+CLuaFunctionRef::CLuaFunctionRef(CCallable callable) : m_ListNode(this)
+{
+    m_luaVM = NULL;
+    m_iFunction = LUA_REFNIL;
+    m_pFuncPtr = NULL;
+    m_Callable = callable;
+    m_bIsCallable = true;
     ms_AllRefList.push_back(this);
 }
 
@@ -114,6 +130,8 @@ CLuaFunctionRef::CLuaFunctionRef(const CLuaFunctionRef& other) : m_ListNode(this
     m_luaVM = other.m_luaVM;
     m_iFunction = other.m_iFunction;
     m_pFuncPtr = other.m_pFuncPtr;
+    m_Callable = other.m_Callable;
+    m_bIsCallable = other.m_bIsCallable;
     ms_AllRefList.push_back(this);
     luaM_inc_use(m_luaVM, m_iFunction, m_pFuncPtr);
 }
@@ -123,6 +141,9 @@ CLuaFunctionRef::~CLuaFunctionRef()
     luaM_dec_use(m_luaVM, m_iFunction, m_pFuncPtr);
     dassert(ms_AllRefList.contains(this));
     ms_AllRefList.remove(this);
+
+    m_bIsCallable = false;
+    m_Callable.Drop();
 }
 
 CLuaFunctionRef& CLuaFunctionRef::operator=(const CLuaFunctionRef& other)
@@ -132,6 +153,8 @@ CLuaFunctionRef& CLuaFunctionRef::operator=(const CLuaFunctionRef& other)
     m_luaVM = other.m_luaVM;
     m_iFunction = other.m_iFunction;
     m_pFuncPtr = other.m_pFuncPtr;
+    m_Callable = other.m_Callable;
+    m_bIsCallable = other.m_bIsCallable;
     luaM_inc_use(m_luaVM, m_iFunction, m_pFuncPtr);
     return *this;
 }
@@ -148,6 +171,21 @@ lua_State* CLuaFunctionRef::GetLuaVM() const
 
 bool CLuaFunctionRef::operator==(const CLuaFunctionRef& other) const
 {
+    if (m_bIsCallable)
+    {
+        if (!other.m_bIsCallable)
+        {
+            return false;
+        }
+
+        return m_Callable == other.m_Callable;
+    }
+
+    if (other.m_bIsCallable)
+    {
+        return false;
+    }
+
     return m_luaVM == other.m_luaVM && m_iFunction == other.m_iFunction;
 }
 

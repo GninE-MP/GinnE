@@ -52,6 +52,7 @@ public:
     DEFINE_WASM_FUNCTION(GetCallableResource, env, args, results);
     DEFINE_WASM_FUNCTION(GetCallableReference, env, args, results);
     DEFINE_WASM_FUNCTION(IsCallableWasmFunction, env, args, results);
+    DEFINE_WASM_FUNCTION(FreeCallable, env, args, results);
 
     DEFINE_WASM_FUNCTION(ArgsCreate, env, args, results);
     DEFINE_WASM_FUNCTION(ArgsDelete, env, args, results);
