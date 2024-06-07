@@ -1922,8 +1922,6 @@ WebAssemblyApi(CWebAssemblyElementDefs::SetElementMatrix, env, args, results)
     CWebAssemblyArgReader argStream(env, args, results);
 
     argStream.ReadUserData(element);
-
-    argStream.ReadUserData(element);
     argStream.ReadMatrix(matrix);
 
     if (!element)

@@ -68,7 +68,7 @@ void CWebAssemblyPlayerDefs::RegisterFunctionTypes()
     SetFunctionType("set_player_blur_level", "bei");
     SetFunctionType("redirect_player", "besis");
     SetFunctionType("set_player_name", "bes");
-    SetFunctionType("donate_satchels", "be");
+    SetFunctionType("detonate_satchels", "be");
     SetFunctionType("take_player_screen_shot", "beiisiii");
     SetFunctionType("set_player_script_debug_level", "bei");
 
@@ -92,16 +92,16 @@ void CWebAssemblyPlayerDefs::RegisterFunctionTypes()
     SetFunctionType("toggle_all_controls", "bebbb");
 
     SetFunctionType("play_sound_front_end", "bei");
-    SetFunctionType("play_mission_audio", "");
-    SetFunctionType("preload_mission_audio", "");
+    SetFunctionType("play_mission_audio", "be*i");
+    SetFunctionType("preload_mission_audio", "beii");
 
-    SetFunctionType("is_cursor_showing", "");
-    SetFunctionType("show_cursor", "");
+    SetFunctionType("is_cursor_showing", "be");
+    SetFunctionType("show_cursor", "bebb");
 
-    SetFunctionType("show_chat", "");
+    SetFunctionType("show_chat", "bebb");
 
-    SetFunctionType("kick_player", "");
-    SetFunctionType("ban_player", "");
+    SetFunctionType("kick_player", "bees");
+    SetFunctionType("ban_player", "uebbbesi");
 }
 
 void CWebAssemblyPlayerDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -150,7 +150,7 @@ void CWebAssemblyPlayerDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "set_player_blur_level", SetPlayerBlurLevel },
         { "redirect_player", RedirectPlayer },
         { "set_player_name", SetPlayerName },
-        { "donate_satchels", DetonateSatchels },
+        { "detonate_satchels", DetonateSatchels },
         { "take_player_screen_shot", TakePlayerScreenShot },
         { "set_player_script_debug_level", SetPlayerScriptDebugLevel },
 
@@ -436,9 +436,41 @@ WebAssemblyApi(CWebAssemblyPlayerDefs::GetAlivePlayers, env, args, results)
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetDeadPlayers, env, args, results)
 {
+    CWebAssemblyMemoryPointerAddress listPtr;
+    uint32_t                         maxCount;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadPointerAddress(listPtr);
+    argStream.ReadUInt32(maxCount, 500);
+
+    if (listPtr == WEB_ASSEMBLY_NULL_PTR)
+    {
+        return argStream.Return(0);
+    }
+
+    CPlayerManager* pManager = g_pGame->GetPlayerManager();
+
+    uint32_t count = 0;
+
+    std::list<CPlayer*>::const_iterator iter = pManager->IterBegin();
+
+    for (; iter != pManager->IterEnd() && maxCount > 0; iter++)
+    {
+        CPlayer* player = *iter;
+
+        if (player->IsJoined() && !player->IsSpawned() && !player->IsBeingDeleted())
+        {
+            CWebAssemblyUserData uData = ELEMENT_TO_WASM_USERDATA(player);
+
+            argStream.WritePointer(listPtr + (count * sizeof(uData)), &uData);
+
+            count++;
+            maxCount--;
+        }
+    }
+
+    return argStream.Return(count);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::GetPlayerIdleTime, env, args, results)
@@ -1130,7 +1162,7 @@ WebAssemblyApi(CWebAssemblyPlayerDefs::RedirectPlayer, env, args, results)
     argStream.ReadUserData(player);
     argStream.ReadString(host);
     argStream.ReadInt32(port);
-    argStream.ReadString(password);
+    argStream.ReadString(password, "");
 
     if (!player)
     {
@@ -1786,49 +1818,179 @@ WebAssemblyApi(CWebAssemblyPlayerDefs::PlaySoundFrontEnd, env, args, results)
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::PlayMissionAudio, env, args, results)
 {
+    CPlayer* player;
+    CVector  position;
+    uint32_t slot;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadVector3D(position);
+    argStream.ReadUInt32(slot);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::PlayMissionAudio(player, &position, (unsigned short)slot));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::PreloadMissionAudio, env, args, results)
 {
+    CPlayer* player;
+    uint32_t sound;
+    uint32_t slot;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadUInt32(sound);
+    argStream.ReadUInt32(slot);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::PreloadMissionAudio(player, (unsigned short)sound, (unsigned short)slot));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::IsCursorShowing, env, args, results)
 {
+    CPlayer* player;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    bool showing = false;
+
+    if (!CStaticFunctionDefinitions::IsCursorShowing(player, showing))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(showing);
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ShowCursor, env, args, results)
 {
+    CPlayer* player;
+    bool     show;
+    bool     toggleControls;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadBoolean(show);
+    argStream.ReadBoolean(toggleControls, true);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    CLuaMain* luaMain = GetWebAssemblyLuaMain(env);
+
+    return argStream.Return(CStaticFunctionDefinitions::ShowCursor(player, luaMain, show, toggleControls));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::ShowChat, env, args, results)
 {
+    CPlayer* player;
+    bool     show;
+    bool     inputBlocked;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadBoolean(show);
+    argStream.ReadBoolean(inputBlocked, !show);
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::ShowChat(player, show, inputBlocked));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::KickPlayer, env, args, results)
 {
+    CPlayer* player;
+    CClient* responsible;
+    SString  reason;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadUserData(responsible, (CClient*)NULL);
+    argStream.ReadString(reason, "");
+
+    if (!player)
+    {
+        return argStream.Return(false);
+    }
+
+    SString responsibleNick = "Console";
+
+    if (responsible)
+    {
+        responsibleNick = responsible->GetNick();
+    }
+
+    return argStream.Return(CStaticFunctionDefinitions::KickPlayer(player, responsibleNick, reason));
 }
 
 WebAssemblyApi(CWebAssemblyPlayerDefs::BanPlayer, env, args, results)
 {
+    CPlayer*  player;
+    bool      ip;
+    bool      username;
+    bool      serial;
+    CElement* responsible;
+    SString   reason;
+    time_t    seconds;
+
     CWebAssemblyArgReader argStream(env, args, results);
 
-    return argStream.ReturnNull();
+    argStream.ReadUserData(player);
+    argStream.ReadBoolean(ip, true);
+    argStream.ReadBoolean(username, false);
+    argStream.ReadBoolean(serial, false);
+    argStream.ReadUserData(responsible, (CElement*)NULL);
+    argStream.ReadString(reason, "");
+    argStream.ReadInt64(seconds, 0);
+
+    if (!player)
+    {
+        return argStream.ReturnNull();
+    }
+
+    CPlayer* responsiblePlayer = NULL;
+    SString  responsibleNick = "Console";
+    time_t   unban = time(NULL) + seconds;
+
+    if (responsible)
+    {
+        if (responsiblePlayer = dynamic_cast<CPlayer*>(responsible))
+        {
+            responsibleNick = responsiblePlayer->GetNick();
+        }
+    }
+
+    CBan* ban = NULL;
+
+    if (!(ban = CStaticFunctionDefinitions::BanPlayer(player, ip, username, serial, responsiblePlayer, responsibleNick, reason, unban)))
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(ban);
 }

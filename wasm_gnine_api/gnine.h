@@ -115,6 +115,7 @@ typedef GNINE_USERDATA_T* GNINE_USERDATA;
 typedef GNINE_USERDATA GNINE_ELEMENT;
 typedef GNINE_USERDATA GNINE_RESOURCE;
 typedef GNINE_USERDATA GNINE_ACCOUNT;
+typedef GNINE_USERDATA GNINE_BAN;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
 typedef GNINE_ELEMENT GNINE_MARKER;
@@ -221,6 +222,7 @@ GNINE_API_IMPORT(c_function_to_callable, (GNINE_PTR function , GNINE_CALLABLE_RE
 GNINE_API_IMPORT(get_callable_resource, (GNINE_CALLABLE_REF callableRef), GNINE_USERDATA);
 GNINE_API_IMPORT(get_callable_reference, (GNINE_CALLABLE_REF callableRef), GNINE_USERDATA);
 GNINE_API_IMPORT(is_callable_wasm_function, (GNINE_CALLABLE_REF callableRef), bool);
+GNINE_API_IMPORT(free_callable, (GNINE_CALLABLE_REF callableRef), bool);
 
 GNINE_API_IMPORT(args_create, (), GNINE_ARGUMENTS);
 GNINE_API_IMPORT(args_delete, (GNINE_ARGUMENTS args), void);
@@ -335,7 +337,7 @@ GNINE_API_IMPORT(can_player_use_function, (GNINE_PLAYER player, GNINE_STRING fun
 GNINE_API_IMPORT(get_player_wanted_level, (GNINE_PLAYER player), GNINE_UI32);
 GNINE_API_IMPORT(get_alive_players, (GNINE_PLAYER* player_list, GNINE_UI32 max_item_count), GNINE_UI32);
 GNINE_API_IMPORT(get_dead_players, (GNINE_PLAYER* player_list, GNINE_UI32 max_item_count), GNINE_UI32);
-GNINE_API_IMPORT(get_player_idle_time, (GNINE_PLAYER* player), GNINE_I64);
+GNINE_API_IMPORT(get_player_idle_time, (GNINE_PLAYER player), GNINE_I64);
 GNINE_API_IMPORT(is_player_scoreboard_forced, (GNINE_PLAYER player), bool);
 GNINE_API_IMPORT(is_player_map_forced, (GNINE_PLAYER player), bool);
 GNINE_API_IMPORT(get_player_nametag_text, (GNINE_PLAYER player, GNINE_XSTRING out_text, GNINE_I_PTR max_size), GNINE_I_PTR);
@@ -366,25 +368,40 @@ GNINE_API_IMPORT(set_player_muted, (GNINE_PLAYER player , bool muted), bool);
 GNINE_API_IMPORT(set_player_blur_level, (GNINE_PLAYER player, GNINE_I32 blur_level), bool);
 GNINE_API_IMPORT(redirect_player, (GNINE_PLAYER player, GNINE_STRING host, GNINE_I32 port, GNINE_STRING password), bool);
 GNINE_API_IMPORT(set_player_name, (GNINE_PLAYER player, GNINE_STRING name), bool);
-GNINE_API_IMPORT(donate_satchels, (GNINE_PLAYER player), bool);
-/*GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );
-GNINE_API_IMPORT(ss, (), );*/
+GNINE_API_IMPORT(detonate_satchels, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(take_player_screen_shot, (GNINE_PLAYER player, GNINE_UI32 width, GNINE_UI32 height, GNINE_STRING tag, GNINE_UI32 quality, GNINE_UI32 max_bandwidth, GNINE_UI32 max_packet_size), bool);
+GNINE_API_IMPORT(set_player_script_debug_level, (GNINE_PLAYER player, GNINE_UI32 level), bool);
+
+GNINE_API_IMPORT(get_player_announce_value, (GNINE_PLAYER player, GNINE_STRING key, GNINE_XSTRING out_value, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(set_player_announce_value, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING value), bool);
+GNINE_API_IMPORT(resend_player_mod_info, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(resend_player_ac_info, (GNINE_PLAYER player), bool);
+
+GNINE_API_IMPORT(bind_key, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_CALLABLE_REF callable, GNINE_ARGUMENTS arguments), bool);
+GNINE_API_IMPORT(bind_key_on_command, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_STRING command, GNINE_STRING arguments), bool);
+GNINE_API_IMPORT(unbind_key, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_CALLABLE_REF callable), bool);
+GNINE_API_IMPORT(unbind_key_on_command, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_STRING command), bool);
+GNINE_API_IMPORT(is_key_bound, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_CALLABLE_REF callable), bool);
+GNINE_API_IMPORT(get_functions_bound_to_key, (GNINE_PLAYER player, GNINE_STRING key, GNINE_STRING hit_state, GNINE_CALLABLE_REF* callables, GNINE_UI32 max_item_count), GNINE_UI32);
+GNINE_API_IMPORT(get_key_bound_to_function, (GNINE_PLAYER player, GNINE_CALLABLE_REF function, GNINE_XSTRING out_key, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_control_state, (GNINE_PLAYER player, GNINE_STRING control), bool);
+GNINE_API_IMPORT(is_control_enabled, (GNINE_PLAYER player, GNINE_STRING control), bool);
+
+GNINE_API_IMPORT(set_control_state, (GNINE_PLAYER player, GNINE_STRING control, bool state), bool);
+GNINE_API_IMPORT(toggle_control, (GNINE_PLAYER player, GNINE_STRING control, bool enabled), bool);
+GNINE_API_IMPORT(toggle_all_controls, (GNINE_PLAYER player, bool enabled, bool gta_controls, bool gnine_controls), bool);
+
+GNINE_API_IMPORT(play_sound_front_end, (GNINE_PLAYER player, GNINE_UI32 sound), bool);
+GNINE_API_IMPORT(play_mission_audio, (GNINE_PLAYER player, struct GNINE_VECTOR3* position, GNINE_UI32 slot), bool);
+GNINE_API_IMPORT(preload_mission_audio, (GNINE_PLAYER player, GNINE_UI32 sound, GNINE_UI32 slot), bool);
+
+GNINE_API_IMPORT(is_cursor_showing, (GNINE_PLAYER player), bool);
+GNINE_API_IMPORT(show_cursor, (GNINE_PLAYER player, bool show, bool toggle_controls), bool);
+
+GNINE_API_IMPORT(show_chat, (GNINE_PLAYER player, bool show, bool input_blocked), bool);
+
+GNINE_API_IMPORT(kick_player, (GNINE_PLAYER player, GNINE_PLAYER responsible, GNINE_STRING reason), bool);
+GNINE_API_IMPORT(ban_player, (GNINE_PLAYER player, bool ip, bool username, bool serial, GNINE_ELEMENT responsible_player, GNINE_STRING reason, GNINE_I64 seconds), GNINE_BAN);
 
 /*
     API FUNCTION: gnine_print
@@ -410,6 +427,7 @@ GNINE_API GNINE_INLINE void gnine_print(GNINE_STRING format, ...) {
 #ifdef GNINE_CPP
 
 #include <exception>
+#include <optional>
 
 /*
     MACRO: GNINE_LAMBDA
@@ -441,6 +459,7 @@ namespace GNINE_NAMESPACE {
     using CString = GNINE_STRING;
     using CXString = GNINE_XSTRING;
     using String = STD_NAMESPACE::string;
+    using StringList = STD_NAMESPACE::vector<String>;
 
     using LuaNumber = GNINE_LUA_NUMBER;
 
@@ -449,9 +468,12 @@ namespace GNINE_NAMESPACE {
 
     using ElementId = GNINE_ELEMENT;
     using ResourceId = GNINE_RESOURCE;
+    using AccountId = GNINE_ACCOUNT;
+    using BanId = GNINE_BAN;
     using ColShapeId = GNINE_COL_SHAPE;
     using MarkerId = GNINE_MARKER;
     using PlayerId = GNINE_PLAYER;
+    using TeamId = GNINE_TEAM;
 
     using RealTimeData = GNINE_REAL_TIME;
 
@@ -516,6 +538,10 @@ namespace GNINE_NAMESPACE {
 
                     void Push() {
                         gnine_args_push_null(m_pArgs);
+                    }
+
+                    void PushNull() {
+                        Push();
                     }
 
                     void Push(bool arg) {
@@ -689,16 +715,48 @@ namespace GNINE_NAMESPACE {
             GNINE_CALLABLE_REF m_rFunctionRef;
 
             Callable() {
+                m_bAutoCleanup = true;
+                m_FunctionArguments = NULL;
                 memset((MemoryPointer)m_rFunctionRef, 0, sizeof(GNINE_CALLABLE_REF));
             }
             
             Callable(GNINE_CALLABLE_REF ref) {
+                m_bAutoCleanup = true;
+                m_FunctionArguments = NULL;
                 memcpy((MemoryPointer)m_rFunctionRef, (MemoryPointer)ref, sizeof(GNINE_CALLABLE_REF));
             }
 
             template<typename Function>
             Callable(Function function) {
+                m_bAutoCleanup = true;
+                m_FunctionArguments = NULL;
                 gnine_c_function_to_callable((MemoryPointer)function, m_rFunctionRef);
+            }
+
+            Callable(const Callable& callable) {
+                TakeOwnership(*(Callable*)(&callable));
+            }
+
+            ~Callable() {
+                if (!m_bAutoCleanup) {
+                    return;
+                }
+
+                Free();
+            }
+
+            void TakeOwnership(Callable& callable) {
+                if (*this) {
+                    if (m_bAutoCleanup) {
+                        Free();
+                    }
+                }
+
+                memcpy((MemoryPointer)m_rFunctionRef, (MemoryPointer)callable.m_rFunctionRef, sizeof(GNINE_CALLABLE_REF));
+
+                m_bAutoCleanup = callable.m_bAutoCleanup;
+
+                callable.DisableAutoCleanup();
             }
 
             Callable& operator=(GNINE_CALLABLE_REF ref) {
@@ -707,8 +765,8 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            Callable& operator=(Callable callback) {
-                memcpy((MemoryPointer)m_rFunctionRef, (MemoryPointer)callback.m_rFunctionRef, sizeof(GNINE_CALLABLE_REF));
+            Callable& operator=(const Callable& callback) {
+                TakeOwnership(*(Callable*)(&callback));
 
                 return *this;
             }
@@ -720,7 +778,7 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            bool operator==(Callable target) const {
+            bool operator==(const Callable& target) const {
                 return strncmp((GNINE_STRING)m_rFunctionRef, (GNINE_STRING)target.m_rFunctionRef, sizeof(m_rFunctionRef)) == 0;
             }
 
@@ -729,6 +787,30 @@ namespace GNINE_NAMESPACE {
                 IntPtr size = gnine_get_callable_declaration((GNINE_UI8*)m_rFunctionRef, functionName.c_str(), dec, sizeof(dec));
 
                 return String(dec, size);
+            }
+            
+            Userdata GetReference() {
+                return gnine_get_callable_reference(m_rFunctionRef);
+            }
+
+            ResourceId GetResource() {
+                return gnine_get_callable_resource(m_rFunctionRef);
+            }
+
+            bool IsWasmFunction() {
+                return gnine_is_callable_wasm_function(m_rFunctionRef);
+            }
+            
+            void Free() {
+                gnine_free_callable(m_rFunctionRef);
+            }
+
+            void DisableAutoCleanup(bool state = true) {
+                m_bAutoCleanup = !state;
+            }
+
+            bool IsAutoCleanupEnabled() {
+                return m_bAutoCleanup;
             }
 
             bool Invoke(Arguments* args = NULL, Arguments* results = NULL, String* errorMessage = NULL) {
@@ -760,6 +842,20 @@ namespace GNINE_NAMESPACE {
                 return true;
             }
 
+            Arguments operator()() {
+                Arguments results;
+
+                String errorMessage = "";
+
+                bool success = Invoke(NULL, &results, &errorMessage);
+
+                if (!success) {
+                    throw Exception(errorMessage);
+                }
+                
+                return results;
+            }
+
             template<typename Arg>
             Arguments operator()(Arg arg) {
                 AddFunctionArgument((Argument)arg);
@@ -788,50 +884,64 @@ namespace GNINE_NAMESPACE {
             }
 
             operator bool() const {
-                return m_rFunctionRef[0] == 0 ? false : true;
+                return gnine_is_valid_callable((GNINE_UI8*)m_rFunctionRef);
             }
 
             operator String() const {
                 return GetDeclaration();
             }
+            
+            operator GNINE_UI8*() const {
+                return (GNINE_UI8*)m_rFunctionRef;
+            }
+
+            static void AddCallableArgumentToArguments(Arguments* args, Argument arg) {
+                if (!args || !*args) {
+                    return;
+                }
+
+                if (STD_NAMESPACE::holds_alternative<nullptr_t>(arg)) {
+                    args->Push();
+                }else if (STD_NAMESPACE::holds_alternative<bool>(arg)) {
+                    args->Push(STD_NAMESPACE::get<bool>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<LuaNumber>(arg)) {
+                    args->Push(STD_NAMESPACE::get<LuaNumber>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<CString>(arg)) {
+                    args->Push(String(STD_NAMESPACE::get<CString>(arg)));
+                }else if (STD_NAMESPACE::holds_alternative<String>(arg)) {
+                    args->Push(STD_NAMESPACE::get<String>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<Callable>(arg)) {
+                    args->Push(STD_NAMESPACE::get<Callable>(arg).m_rFunctionRef);
+                }else if (STD_NAMESPACE::holds_alternative<Userdata>(arg)) {
+                    args->Push(STD_NAMESPACE::get<Userdata>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<Arguments*>(arg)) {
+                    args->Push(*STD_NAMESPACE::get<Arguments*>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<Int32>(arg)) {
+                    args->Push(STD_NAMESPACE::get<Int32>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<Int64>(arg)) {
+                    args->Push(STD_NAMESPACE::get<Int64>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<UInt32>(arg)) {
+                    args->Push(STD_NAMESPACE::get<UInt32>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<UInt64>(arg)) {
+                    args->Push(STD_NAMESPACE::get<UInt64>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<Float32>(arg)) {
+                    args->Push(STD_NAMESPACE::get<Float32>(arg));
+                }else if (STD_NAMESPACE::holds_alternative<MemoryPointer>(arg)) {
+                    args->Push((LuaNumber)(IntPtr)STD_NAMESPACE::get<MemoryPointer>(arg));
+                }
+            }
 
             private:
                 Arguments* m_FunctionArguments;
+
+                bool m_bAutoCleanup;
 
                 void AddFunctionArgument(Argument arg) {
                     if (!m_FunctionArguments) {
                         m_FunctionArguments = new Arguments();
                     }
 
-                    if (STD_NAMESPACE::holds_alternative<nullptr_t>(arg)) {
-                        m_FunctionArguments->Push();
-                    }else if (STD_NAMESPACE::holds_alternative<bool>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<bool>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<LuaNumber>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<LuaNumber>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<CString>(arg)) {
-                        m_FunctionArguments->Push(String(STD_NAMESPACE::get<CString>(arg)));
-                    }else if (STD_NAMESPACE::holds_alternative<String>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<String>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<Callable>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<Callable>(arg).m_rFunctionRef);
-                    }else if (STD_NAMESPACE::holds_alternative<Userdata>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<Userdata>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<Arguments*>(arg)) {
-                        m_FunctionArguments->Push(*STD_NAMESPACE::get<Arguments*>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<Int32>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<Int32>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<Int64>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<Int64>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<UInt32>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<UInt32>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<UInt64>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<UInt64>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<Float32>(arg)) {
-                        m_FunctionArguments->Push(STD_NAMESPACE::get<Float32>(arg));
-                    }else if (STD_NAMESPACE::holds_alternative<MemoryPointer>(arg)) {
-                        m_FunctionArguments->Push((LuaNumber)(IntPtr)STD_NAMESPACE::get<MemoryPointer>(arg));
-                    }
+                    AddCallableArgumentToArguments(m_FunctionArguments, arg);
                 }
     };
 
@@ -1222,7 +1332,7 @@ namespace GNINE_NAMESPACE {
                 GNINE_VECTOR3 vec;
                 vec.x = fX;
                 vec.y = fY;
-                vec.z = fY;
+                vec.z = fZ;
 
                 return vec;
             }
@@ -1756,9 +1866,13 @@ namespace GNINE_NAMESPACE {
     class Element;
     class ColShape;
     class Marker;
+    class Player;
+    class Team;
 
     using ElementList = STD_NAMESPACE::vector<Element>;
     using ElementDataKeyList = STD_NAMESPACE::vector<String>;
+    using PlayerList = STD_NAMESPACE::vector<Player>;
+    using CallableList = STD_NAMESPACE::vector<Callable>;
 
     class Element {
         public:
@@ -2528,6 +2642,13 @@ namespace GNINE_NAMESPACE {
 
     class Player : public Element {
         public:
+            struct ACInfo {
+                String DetectedAC;
+                UInt32 d3d9Size;
+                String d3d9MD5;
+                String d3d9SHA256;
+            };
+
             Player() {
                 Drop();
             }
@@ -2546,6 +2667,347 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
+            bool Ban(bool ip = true, bool username = false, bool serial = false, Element responsiblePlayer = NULL, String reason = "", Int64 seconds = 0) {
+                return gnine_ban_player(*this, ip, username, serial, responsiblePlayer, reason.c_str(), seconds);
+            }
+
+            bool Kick(Player responsible = NULL, String reason = "") {
+                return gnine_kick_player(*this, responsible, reason.c_str());
+            }
+
+            bool ShowChat(bool show, bool inputBlocked) {
+                return gnine_show_chat(*this, show, inputBlocked);
+            }
+
+            bool ShowCursor(bool show, bool toggleControls = true) {
+                return gnine_show_cursor(*this, show, toggleControls);
+            }
+
+            bool IsCursorShowing() {
+                return gnine_is_cursor_showing(*this);
+            }
+
+            bool PreloadMissionAudio(UInt32 sound, UInt32 slot) {
+                return gnine_preload_mission_audio(*this, sound, slot);
+            }
+
+            bool PlayMissionAudio(Vector3 position, UInt32 slot) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_play_mission_audio(*this, &pos, slot);
+            }
+
+            bool PlaySoundFrontEnd(UInt32 sound) {
+                return gnine_play_sound_front_end(*this, sound);
+            }
+
+            bool ToggleAllControls(bool enabled, bool gtaControls = true, bool gnineControls = true) {
+                return gnine_toggle_all_controls(*this, enabled, gtaControls, gnineControls);
+            }
+
+            bool ToggleControl(String control, bool enabled) {
+                return gnine_toggle_control(*this, control.c_str(), enabled);
+            }
+
+            bool SetControlState(String control, bool state) {
+                return gnine_set_control_state(*this, control.c_str(), state);
+            }
+
+            bool IsControlEnabled(String control) {
+                return gnine_is_control_enabled(*this, control.c_str());
+            }
+
+            bool GetControlState(String control) {
+                return gnine_get_control_state(*this, control.c_str());
+            }
+
+            String GetKeyBoundToFunction(Callable function, UInt32 maxSize = 1024) {
+                Int8 key[maxSize];
+                memset((MemoryPointer)key, 0, sizeof(key));
+
+                UInt32 size = gnine_get_key_bound_to_function(*this, function, key, maxSize);
+
+                return String(key, size);
+            }
+
+            CallableList GetFunctionsBoundToKey(String key, String hitState, UInt32 maxItemCount = 500) {
+                CallableList list;
+
+                GNINE_CALLABLE_REF callables[maxItemCount];
+                memset((MemoryPointer)callables, 0, sizeof(callables));
+
+                UInt32 count = gnine_get_functions_bound_to_key(*this, key.c_str(), hitState.c_str(), callables, maxItemCount);
+
+                list.resize(count);
+
+                for (UInt32 i = 0; i < count; i++) {
+                    list[i] = callables[i];
+                }
+
+                return STD_NAMESPACE::move(list);
+            }
+
+            bool IsKeyBound(String key, String hitState, Callable function) {
+                return gnine_is_key_bound(*this, key.c_str(), hitState.c_str(), function);
+            }
+
+            bool UnbindKey(String key, String hitState, String command) {
+                return gnine_unbind_key_on_command(*this, key.c_str(), hitState.c_str(), command.c_str());
+            }
+
+            bool UnbindKey(String key, String hitState, Callable function) {
+                return gnine_unbind_key(*this, key.c_str(), hitState.c_str(), function);
+            }
+
+            bool BindKey(String key, String hitState, String command, String commandArguments = "") {
+                return gnine_bind_key_on_command(*this, key.c_str(), hitState.c_str(), command.c_str(), commandArguments.c_str());
+            }
+
+            bool BindKey(String key, String hitState, Callable function, Callable::Arguments extraArguments = Callable::Arguments(NULL)) {
+                return gnine_bind_key(*this, key.c_str(), hitState.c_str(), function, extraArguments);
+            }
+
+            bool ResendACInfo() {
+                return gnine_resend_player_ac_info(*this);
+            }
+
+            bool ResendModInfo() {
+                return gnine_resend_player_mod_info(*this);
+            }
+
+            bool SetAnnounceValue(String key, String value) {
+                return gnine_set_player_announce_value(*this, key.c_str(), value.c_str());
+            }
+
+            String GetAnnounceValue(String key, UInt32 maxSize = 1024) {
+                Int8 value[maxSize];
+                memset((MemoryPointer)value, 0, sizeof(value));
+
+                UInt32 size = gnine_get_player_announce_value(*this, key.c_str(), value, maxSize);
+
+                return String(value, size);
+            }
+
+            bool SetScriptDebugLevel(UInt32 level) {
+                return gnine_set_player_script_debug_level(*this, level);
+            }
+
+            bool TakeScreenShot(UInt32 width, UInt32 height, String tag = "", UInt32 quality = 30, UInt32 maxBandwidth = 5000, UInt32 maxPacketSize = 500) {
+                return gnine_take_player_screen_shot(*this, width, height, tag.c_str(), quality, maxBandwidth, maxPacketSize);
+            }
+
+            bool DetonateSatchels() {
+                return gnine_detonate_satchels(*this);
+            }
+
+            bool SetName(String name) {
+                return gnine_set_player_name(*this, name.c_str());
+            }
+
+            bool Redirect(String host, Int32 port, String password = "") {
+                return gnine_redirect_player(*this, host.c_str(), port, password.c_str());
+            }
+
+            bool SetBlurLevel(Int32 level) {
+                return gnine_set_player_blur_level(*this, level);
+            }
+
+            bool SetMuted(bool muted) {
+                return gnine_set_player_muted(*this, muted);
+            }
+
+            bool SetNametagShowing(bool show) {
+                return gnine_set_player_nametag_showing(*this, show);
+            }
+
+            bool SetNametagColor(Color color, bool removeOverride = false) {
+                return gnine_set_player_nametag_color(*this, &color);
+            }
+
+            bool SetNametagText(String text) {
+                return gnine_set_player_nametag_text(*this, text.c_str());
+            }
+
+            bool ForceMap(bool force) {
+                return gnine_force_player_map(*this, force);
+            }
+
+            bool SetWantedLevel(UInt32 level) {
+                return gnine_set_player_wanted_level(*this, level);
+            }
+
+            bool ShowHudComponent(String component, bool show) {
+                return gnine_show_player_hud_component(*this, component.c_str(), show);
+            }
+
+            bool Spawn(Vector3 position, Float32 rotation = 0.0f, Int32 model = 0, Int32 interior = 0, Int32 dimension = 0, TeamId team = NULL) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_spawn_player(*this, &pos, rotation, model, interior, dimension, team);
+            }
+
+            bool TakeMoney(Int32 money) {
+                return gnine_take_player_money(*this, money);
+            }
+
+            bool GiveMoney(Int32 money) {
+                return gnine_give_player_money(*this, money);
+            }
+
+            bool SetMoney(Int32 money, bool instant = false) {
+                return gnine_set_player_money(*this, money, instant);
+            }
+
+            UInt32 GetScriptDebugLevel() {
+                return gnine_get_player_script_debug_level(*this);
+            }
+
+            ACInfo GetACInfo(UInt32 maxStringsSize = 1024) {
+                Int8   DetectedAC[maxStringsSize];
+                UInt32 d3d9Size = 0;
+                Int8   d3d9MD5[maxStringsSize];
+                Int8   d3d9SHA256[maxStringsSize];
+
+                memset((MemoryPointer)DetectedAC, 0, sizeof(DetectedAC));
+                memset((MemoryPointer)d3d9MD5, 0, sizeof(d3d9MD5));
+                memset((MemoryPointer)d3d9SHA256, 0, sizeof(d3d9SHA256));
+
+                GNINE_PLAYER_AC_INFO(10) f;
+
+                gnine_get_player_ac_info_r(*this, DetectedAC, &d3d9Size, d3d9MD5, d3d9SHA256, maxStringsSize);
+
+                ACInfo info;
+                info.DetectedAC = String(DetectedAC, strlen(DetectedAC));
+                info.d3d9Size = d3d9Size;
+                info.d3d9MD5 = String(d3d9MD5, strlen(d3d9MD5));
+                info.d3d9SHA256 = String(d3d9SHA256, strlen(d3d9SHA256));
+
+                return info;
+            }
+
+            String GetVersion(UInt32 maxSize = 1024) {
+                Int8 version[maxSize];
+                memset((MemoryPointer)version, 0, sizeof(version));
+
+                UInt32 size = gnine_get_player_version(*this, version, maxSize);
+
+                return String(version, size);
+            }
+
+            AccountId GetAccount() {
+                return gnine_get_player_account(*this);
+            }
+
+            String GetIP(UInt32 maxSize = 1024) {
+                Int8 ip[maxSize];
+                memset((MemoryPointer)ip, 0, sizeof(ip));
+
+                UInt32 size = gnine_get_player_ip(*this, ip, maxSize);
+
+                return String(ip, size);
+            }
+
+            String GetName(UInt32 maxSize = 1024) {
+                Int8 name[maxSize];
+                memset((MemoryPointer)name, 0, sizeof(name));
+
+                UInt32 size = gnine_get_player_name(*this, name, maxSize);
+
+                return String(name, size);
+            }
+
+            Int32 GetBlurLevel() {
+                return gnine_get_player_blur_level(*this);
+            }
+
+            String GetUsername(UInt32 maxSize = 1024) {
+                Int8 username[maxSize];
+                memset((MemoryPointer)username, 0, sizeof(username));
+
+                UInt32 size = gnine_get_player_user_name(*this, username, maxSize);
+
+                return String(username, size);
+            }
+
+            String GetCommunityId(UInt32 maxSize = 1024) {
+                Int8 id[maxSize];
+                memset((MemoryPointer)id, 0, sizeof(id));
+
+                UInt32 size = gnine_get_player_community_id(*this, id, maxSize);
+
+                return String(id, size);
+            }
+
+            String GetSerial(UInt32 index = 0, UInt32 maxSize = 1024) {
+                Int8 serial[maxSize];
+                memset((MemoryPointer)serial, 0, sizeof(serial));
+
+                UInt32 size = gnine_get_player_serial(*this, index, serial, maxSize);
+
+                return String(serial, size);
+            }
+
+            bool IsNametagShowing() {
+                return gnine_is_player_nametag_showing(*this);
+            }
+
+            Color GetNametagColor() {
+                Color color;
+
+                gnine_get_player_nametag_color(*this, &color);
+
+                return color;
+            }
+
+            String GetNametagText(UInt32 maxSize = 1024) {
+                Int8 text[maxSize];
+                memset((MemoryPointer)text, 0, sizeof(text));
+
+                UInt32 size = gnine_get_player_nametag_text(*this, text, maxSize);
+
+                return String(text, size);
+            }
+
+            bool IsMapForced() {
+                return gnine_is_player_map_forced(*this);
+            }
+
+            bool IsScoreboardForced() {
+                return gnine_is_player_scoreboard_forced(*this);
+            }
+
+            Int64 GetIdleTime() {
+                return gnine_get_player_idle_time(*this);
+            }
+
+            UInt32 GetWantedLevel() {
+                return gnine_get_player_wanted_level(*this);
+            }
+
+            bool CanUseFunction(String functionName) {
+                return gnine_can_player_use_function(*this, functionName.c_str());
+            }
+
+            TeamId GetTeam() {
+                return gnine_get_player_team(*this);
+            }
+
+            bool IsMuted() {
+                return gnine_is_player_muted(*this);
+            }
+
+            UInt32 GetPing() {
+                return gnine_get_player_ping(*this);
+            }
+
+            Int32 GetMoney() {
+                return gnine_get_player_money(*this);
+            }
+
+            bool SetAmmo(UInt32 ammo, UInt32 slot = 0xff, UInt32 ammoInClip = 0) {
+                return gnine_set_player_ammo(*this, ammo, slot, ammoInClip);
+            }
+
             bool SetSyncElementEnabled(Element element, bool enabled = true, bool persist = false) {
                 return gnine_set_element_syncer(element, *this, enabled, persist);
             }
@@ -2560,6 +3022,73 @@ namespace GNINE_NAMESPACE {
 
             bool DoesSubscribeElementData(Element element, String key) const {
                 return gnine_has_element_data_subscriber(element, key.c_str(), *this);
+            }
+
+            static UInt32 GetPlayerCount() {
+                return gnine_get_player_count();
+            }
+
+            static Player GetPlayerFromName(String name) {
+                return gnine_get_player_from_name(name.c_str());
+            }
+
+            static Player GetRandomPlayer() {
+                return gnine_get_random_player();
+            }
+            
+            static PlayerList GetAlivePlayers(UInt32 maxItemCount = 500) {
+                PlayerList list;
+
+                PlayerId players[maxItemCount];
+                memset((MemoryPointer)players, 0, sizeof(players));
+
+                UInt32 count = gnine_get_alive_players(players, maxItemCount);
+
+                list.resize(count);
+
+                for (UInt32 i = 0; i < count ; i++) {
+                    list[i] = players[i];
+                }
+
+                return list;
+            }
+
+            static PlayerList GetDeadPlayers(UInt32 maxItemCount = 500) {
+                PlayerList list;
+
+                PlayerId players[maxItemCount];
+                memset((MemoryPointer)players, 0, sizeof(players));
+
+                UInt32 count = gnine_get_dead_players(players, maxItemCount);
+
+                list.resize(count);
+
+                for (UInt32 i = 0; i < count ; i++) {
+                    list[i] = players[i];
+                }
+
+                return list;
+            }
+    };
+
+    class Team : public Element {
+        public:
+            Team() {
+                Drop();
+            }
+
+            Team(TeamId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Team() = default;
+
+            Team& operator=(Team player) {
+                SetId(player);
+
+                return *this;
             }
     };
 
