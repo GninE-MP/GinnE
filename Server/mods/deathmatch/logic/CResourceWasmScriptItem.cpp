@@ -78,7 +78,10 @@ bool CResourceWasmScriptItem::Start()
             lua_setglobal(luaVM, name.c_str());
         }
 
-        script->CallMainFunction({ m_resource->GetName(), m_strShortName, std::to_string(m_pWasmContext->GetScripts().size()) });
+        if (state == CWebAssemblyLoadState::Succeed)
+        {   
+            script->CallMainFunction({ m_resource->GetName(), m_strShortName, std::to_string(m_pWasmContext->GetScripts().size()) });
+        }
 
         return state == CWebAssemblyLoadState::Succeed;
     }

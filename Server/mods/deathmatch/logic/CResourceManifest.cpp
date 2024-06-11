@@ -56,6 +56,10 @@ std::unordered_map<SString, SString> DEFAULT_WASM_COMPILER_SETTINGS = {
     { "TOTAL_STACK", "65536" },
     { "TOTAL_MEMORY", "1048576" },
     { "ERROR_ON_UNDEFINED_SYMBOLS", "0" }
+#if WASM_COMPILER_CAN_USE_SHAERD_MEMORY
+    ,
+    { "IMPORTED_MEMORY", "1" }
+#endif
 };
 
 std::vector<SString> DEFAULT_WASM_EXPORT_FUNCTIONS = {
@@ -134,7 +138,6 @@ void CResourceManifest::Load()
     lua_pushstring(m_pLuaVM, manifestPath.c_str());
     lua_setglobal(m_pLuaVM, MANIFEST_CURRENT_FILE_PATH);
 
-
     RegisterLuaVMFunctions(m_pLuaVM);
 
     if (luaL_dofile(m_pLuaVM, manifestPath.c_str()))
@@ -147,6 +150,7 @@ void CResourceManifest::Load()
     }
 
     lua_close(m_pLuaVM);
+    m_pLuaVM = NULL;
 }
 
 void CResourceManifest::Unload()

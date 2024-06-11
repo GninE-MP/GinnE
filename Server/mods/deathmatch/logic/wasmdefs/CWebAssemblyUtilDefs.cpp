@@ -307,6 +307,7 @@ WebAssemblyApi(CWebAssemblyUtilDefs::WriteSharedPointerAddress, env, args, resul
     }
 
     CWebAssemblyMemory* memory = script->GetMemory();
+    CWebAssemblyMemory* dataMemory = GetWebAssemblyEnvScript(env)->GetMemory();
 
     intptr_t ptrAddress = (intptr_t)ptr;
     intptr_t memBaseAddress = (intptr_t)memory->GetBase();
@@ -320,7 +321,7 @@ WebAssemblyApi(CWebAssemblyUtilDefs::WriteSharedPointerAddress, env, args, resul
         return argStream.Return(0);
     }
 
-    memcpy(ptr, memory->GetMemoryPhysicalPointer(dataPtr), size);
+    memcpy(ptr, dataMemory->GetMemoryPhysicalPointer(dataPtr), size);
 
     return argStream.Return(size);
 }

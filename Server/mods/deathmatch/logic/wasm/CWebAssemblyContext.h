@@ -15,6 +15,7 @@
 #define C_WEB_ASSEMBLY_CONTEXT_HEADER
 
 #include <vector>
+#include <pthread.h>
 
 #include "CResource.h"
 
@@ -31,6 +32,16 @@ enum class CWebAssemblyLoadState
     Failed
 };
 
+enum class CWebAssemblyThreadState
+{
+    Off = 0,
+    Starting = 1,
+    Running = 2,
+    Waiting = 3,
+    Terminated = 4,
+    Finished = 5
+};
+
 struct CWebAssemblyExtern
 {
     CWebAssemblyExternContext context;
@@ -38,6 +49,16 @@ struct CWebAssemblyExtern
 };
 
 typedef CFastHashMap<SString, CWebAssemblyExtern> CWebAssemblyExternMap;
+
+class CWebAssemblyScript;
+class CWebAssemblyStore;
+
+struct CWebAssemblySharedScriptData
+{
+    CWebAssemblyScript* script;
+    CWebAssemblyStore*  store;
+    pthread_t           threadId;
+};
 
 class CWebAssemblyEngine
 {
@@ -84,6 +105,64 @@ private:
     CWebAssemblyEngine* m_waEngine;
 };
 
+struct CWebAssemblyThreadData
+{
+    CWebAssemblyThread* thread;
+    CWebAssemblyScript* mainScript;
+    uint32_t            functionIndex;
+    void*               data;
+    uint32_t            dataSize;
+};
+
+class CWebAssemblyThread
+{
+public:
+    CWebAssemblyThread();
+    CWebAssemblyThread(CWebAssemblyContext* context, CWebAssemblyThreadData data);
+    ~CWebAssemblyThread();
+
+    void Drop();
+
+    bool Start();
+    bool Terminate();
+    bool Join();
+    void SleepFor(uint32_t milliSeconds);
+
+    void SetId(pthread_t threadId);
+    void SetState(CWebAssemblyThreadState state);
+    void SetData(CWebAssemblyThreadData data);
+
+    void SetContext(CWebAssemblyContext* context);
+    void SetExecutorScript(CWebAssemblyScript* script);
+
+    pthread_t               GetId();
+    CWebAssemblyThreadState GetState();
+    CWebAssemblyThreadData  GetData();
+    uint32_t                GetSleepingTime();
+
+    CWebAssemblyContext*          GetWasmContext();
+    CWebAssemblyScript*           GetExecutorScript();
+    CWebAssemblySharedScriptData* GetSharedScriptData();
+
+    void* GetThreadArg();
+
+    static bool IsValidThreadData(CWebAssemblyThreadData data);
+
+private:
+    pthread_t               m_ThreadId;
+    CWebAssemblyThreadState m_ThreadState;
+    CWebAssemblyThreadData  m_ThreadData;
+    uint32_t                m_uiSleepedFor;
+
+    CWebAssemblyContext*          m_pContext;
+    CWebAssemblyScript*           m_pExecutorScript;
+    CWebAssemblySharedScriptData* m_pSharedScriptData;
+
+    void* m_pThreadArg;
+
+    static void* ThreadExecutor(void* threadArg);
+};
+
 class CWebAssemblyContext
 {
 public:
@@ -95,9 +174,15 @@ public:
 
     CWebAssemblyScript*   CreateScript();
     CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName, bool executeMain = true);
+    void                  DestroyScript(CWebAssemblyScript* script);
+
+    CWebAssemblyThread* CreateThread(CWebAssemblyThreadData threadData);
+    void                DestroyThread(CWebAssemblyThread* thread);
 
     CWebAssemblyScriptList& GetScripts();
+    CWebAssemblyThreadList& GetThreads();
     void                    ClearScripts();
+    void                    ClearThreads();
 
     void       SetResource(CResource* resource);
     CResource* GetResource();
@@ -117,10 +202,16 @@ public:
     bool                DoesPointerBelongToContext(void* ptr);
     CWebAssemblyScript* FindPointerScript(void* ptr);
 
+    CWebAssemblyThread* FindThreadByThreadId(pthread_t threadId);
+
+    bool DoesOwnScript(CWebAssemblyScript* script);
+    bool DoesOwnThread(CWebAssemblyThread* thread);
+
     static void                InitializeWebAssemblyEngine(CGame* pGameObject);
     static void                DeleteWebAssemblyEngine();
     static CWebAssemblyEngine* GetWebAssemblyEngine();
     static CGame*              GetGameObject();
+    static CWebAssemblyThread* GetMainThread();
 
     static bool IsWebAssemblyBinary(const char* binary);
 
@@ -129,6 +220,7 @@ private:
     CWebAssemblyStore* m_pStore;
 
     CWebAssemblyScriptList m_lsScripts;
+    CWebAssemblyThreadList m_lsThreads;
 
     CWebAssemblyFunctionMap m_mpGlobalFunctions;
 
@@ -153,15 +245,17 @@ public:
     bool CallInternalFunction(const size_t& index, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
     bool CallInternalFunctionByHash(const uintptr_t& hash, CWebAssemblyVariables* args, CWebAssemblyVariables* results);
 
-    CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile);
+    CWebAssemblyLoadState LoadBinary(const char* binary, const size_t& binarySize, const SString& scriptFile, CWebAssemblySharedScriptData* sharedScriptData = NULL);
 
     void RegisterApiFunction(const SString& functionName, CWebAssemblyFunctionType functionType, CWebAssemblyCFunction function);
     void RegisterGlobalFunction(const SString& functionName, CWebAssemblyFunction* function, bool isLuaFunction = false);
 
     CWebAssemblyContext* GetStoreContext();
+    CWebAssemblyStore*   GetStore();
 
-    CWebAssemblyModuleContext   GetModule();
-    CWebAssemblyInstanceContext GetInstance();
+    CWebAssemblyModuleContext       GetModule();
+    CWebAssemblySharedModuleContext GetSharedModule();
+    CWebAssemblyInstanceContext     GetInstance();
 
     void BuildExportedFunctions();
     void BuildInternalFunctions();
@@ -219,15 +313,21 @@ public:
 
     CWebAssemblyApiEnviornment CreateApiEnvironment(const SString& functionName);
 
+    CWebAssemblySharedScriptData* CreateSharedScriptData(CWebAssemblyStore* store = NULL, pthread_t* threadId = NULL);
+
     static bool IsExternValid(const CWebAssemblyExtern& waExtern);
+
+    static void DeleteSharedScriptData(CWebAssemblySharedScriptData* sharedScriptData);
 
 private:
     SString m_strScriptFile;
 
     CWebAssemblyContext* m_pContextStore;
+    CWebAssemblyStore*   m_pStore;
 
-    CWebAssemblyModuleContext   m_pModule;
-    CWebAssemblyInstanceContext m_pInstance;
+    CWebAssemblyModuleContext       m_pModule;
+    CWebAssemblySharedModuleContext m_pSharedModule;
+    CWebAssemblyInstanceContext     m_pInstance;
 
     CWebAssemblyExternMap   m_mpExports;
     CWebAssemblyFunctionMap m_mpExportedFunctions;

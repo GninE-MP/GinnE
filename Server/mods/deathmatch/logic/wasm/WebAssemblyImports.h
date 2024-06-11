@@ -40,6 +40,8 @@
 
 #define WASM_INTERNAL_FUNCTIONS_TABLE_EXPORT_NAME "__indirect_function_table"
 
+#define WASM_COMPILER_CAN_USE_SHAERD_MEMORY 0
+
 #define WEB_ASSEMBLY_NULL_PTR (0)
 
 #define WebAssemblyApi(name, envVariableName, argsVariableName, resultsVariableName) CWebAssemblyTrap* name(void* envVariableName, const CWebAssemblyValueVector* argsVariableName, CWebAssemblyValueVector* resultsVariableName)
@@ -65,6 +67,7 @@ typedef wasm_store_t*                  CWebAssemblyStoreContext;
 typedef wasm_func_callback_with_env_t  CWebAssemblyCFunction;
 typedef wasm_trap_t                    CWebAssemblyTrap;
 typedef wasm_module_t*                 CWebAssemblyModuleContext;
+typedef wasm_shared_module_t*          CWebAssemblySharedModuleContext;
 typedef wasm_instance_t*               CWebAssemblyInstanceContext;
 typedef wasm_extern_t*                 CWebAssemblyExternContext;
 typedef wasm_valkind_t                 CWebAssemblyVariableKind;
@@ -83,6 +86,9 @@ typedef std::vector<CWebAssemblyExternContext> CWebAssemblyImports;
 
 class CWebAssemblyScript;
 typedef std::vector<CWebAssemblyScript*> CWebAssemblyScriptList;
+
+class CWebAssemblyThread;
+typedef std::vector<CWebAssemblyThread*> CWebAssemblyThreadList;
 
 class SString;
 

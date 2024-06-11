@@ -28,6 +28,7 @@
 
 #define GNINE_API extern "C"
 #define GNINE_EXPORT extern "C"
+#define GNINE_EXPORT_NAME(name) extern "C" __attribute__((export_name(#name)))
 #define GNINE_CPP
 #define GNINE_NAMESPACE Gnine
 #define STD_NAMESPACE std
@@ -43,6 +44,7 @@
 
 #define GNINE_API
 #define GNINE_EXPORT
+#define GNINE_EXPORT_NAME(name) __attribute__((export_name(#name)))
 
 #endif
 
@@ -50,10 +52,13 @@
 #define NULL (0)
 #endif
 
+#define GNINE_MAIN GNINE_EXPORT_NAME(ModuleMain)
+
 #define GNINE_NULL 0
 #define GNINE_NULL_PTR nullptr
 
 #define GNINE_IMPORT(name, args, ret) __attribute__((import_module("env"), import_name(#name))) GNINE_API ret name args
+#define GNINE_IMPORT_NAME(name, functionName, args, ret) __attribute__((import_module("env"), import_name(#name))) GNINE_API ret functionName args
 #define GNINE_API_IMPORT(name, args, ret) GNINE_IMPORT(gnine_##name, args, ret)
 
 #ifdef GNINE_CPP
@@ -116,6 +121,8 @@ typedef GNINE_USERDATA GNINE_ELEMENT;
 typedef GNINE_USERDATA GNINE_RESOURCE;
 typedef GNINE_USERDATA GNINE_ACCOUNT;
 typedef GNINE_USERDATA GNINE_BAN;
+typedef GNINE_USERDATA GNINE_WORKER;
+//typedef GNINE_USERDATA GNINE_THREAD;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
 typedef GNINE_ELEMENT GNINE_MARKER;
@@ -188,6 +195,18 @@ struct GNINE_PROCESS_MEMORY_STATS {
     GNINE_UI32 sharedMemorySize;
     GNINE_UI32 privateMemorySize;
 };
+
+typedef GNINE_BYTE GNINE_WORKER_STATE_TYPE;
+enum GNINE_WORKER_STATE : GNINE_WORKER_STATE_TYPE {
+    GNINE_WORKER_STATE_OFF = 0,
+    GNINE_WORKER_STATE_STARTING = 1,
+    GNINE_WORKER_STATE_RUNNING = 2,
+    GNINE_WORKER_STATE_WAITING = 3,
+    GNINE_WORKER_STATE_TERMINATED = 4,
+    GNINE_WORKER_STATE_FINISHED = 5
+};
+
+typedef void (*GNINE_WORKER_HANDLER)(GNINE_PTR data, GNINE_PTR result);
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
 
@@ -403,6 +422,40 @@ GNINE_API_IMPORT(show_chat, (GNINE_PLAYER player, bool show, bool input_blocked)
 GNINE_API_IMPORT(kick_player, (GNINE_PLAYER player, GNINE_PLAYER responsible, GNINE_STRING reason), bool);
 GNINE_API_IMPORT(ban_player, (GNINE_PLAYER player, bool ip, bool username, bool serial, GNINE_ELEMENT responsible_player, GNINE_STRING reason, GNINE_I64 seconds), GNINE_BAN);
 
+GNINE_API_IMPORT(create_team, (GNINE_STRING name, struct GNINE_COLOR* color), GNINE_TEAM);
+
+GNINE_API_IMPORT(get_team_from_name, (GNINE_STRING name), GNINE_TEAM);
+GNINE_API_IMPORT(get_team_name, (GNINE_TEAM team, GNINE_XSTRING out_name, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_team_color, (GNINE_TEAM team, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(get_team_friendly_fire, (GNINE_TEAM team), bool);
+GNINE_API_IMPORT(get_players_in_team, (GNINE_TEAM team, GNINE_PLAYER* out_players, GNINE_UI32 max_item_size), GNINE_UI32);
+GNINE_API_IMPORT(count_players_in_team, (GNINE_TEAM team), GNINE_UI32);
+
+GNINE_API_IMPORT(set_player_team, (GNINE_PLAYER player, GNINE_TEAM team), bool);
+GNINE_API_IMPORT(set_team_name, (GNINE_TEAM team, GNINE_STRING name), bool);
+GNINE_API_IMPORT(set_team_color, (GNINE_TEAM team, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_team_friendly_fire, (GNINE_TEAM team, bool friend_fire), bool);
+
+GNINE_API_IMPORT(create_worker, (GNINE_WORKER_HANDLER function, GNINE_PTR data_to_send_to_worker, GNINE_I_PTR data_size), GNINE_WORKER);
+GNINE_API_IMPORT(terminate_worker, (GNINE_WORKER worker), bool);
+GNINE_API_IMPORT(run_worker, (GNINE_WORKER worker), bool);
+GNINE_API_IMPORT(worker_join, (GNINE_WORKER worker), bool);
+GNINE_API_IMPORT(get_current_worker, (), GNINE_WORKER);
+GNINE_API_IMPORT(get_main_worker, (), GNINE_WORKER);
+GNINE_API_IMPORT(sleep_worker, (GNINE_UI32 milli_seconds), void);
+GNINE_API_IMPORT(get_worker_state, (GNINE_WORKER worker), GNINE_WORKER_STATE_TYPE);
+GNINE_API_IMPORT(is_worker, (GNINE_WORKER worker), bool);
+
+/*
+    Gnine still can't use shared memory for web assembly modules.
+    This means we can't use threads normaly like we do in real C & CPP applications.
+
+    You can use `GNINE_WORKER`s with `gnine_create_worker` that allows you to do multi threading programming with other methods.
+
+*/
+//GNINE_API_IMPORT(create_thread, (GNINE_PTR function), GNINE_THREAD);
+//GNINE_API_IMPORT(terminate_thread, (GNINE_THREAD thread), bool);
+
 /*
     API FUNCTION: gnine_print
     PARAMS:
@@ -411,7 +464,11 @@ GNINE_API_IMPORT(ban_player, (GNINE_PLAYER player, bool ip, bool username, bool 
     USAGE EXAMPLE:
         gnine_print("this is a number : %d", 3193);
 */
+#ifdef GNINE_CPP
 GNINE_API GNINE_INLINE void gnine_print(GNINE_STRING format, ...) {
+#else
+GNINE_API void gnine_print(GNINE_STRING format, ...) {
+#endif
     GNINE_I8 buffer[0xfff];
 
     va_list args;
@@ -2667,6 +2724,10 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
+            bool SetTeam(TeamId team) {
+                return gnine_set_player_team(*this, team);
+            }
+
             bool Ban(bool ip = true, bool username = false, bool serial = false, Element responsiblePlayer = NULL, String reason = "", Int64 seconds = 0) {
                 return gnine_ban_player(*this, ip, username, serial, responsiblePlayer, reason.c_str(), seconds);
             }
@@ -3089,6 +3150,69 @@ namespace GNINE_NAMESPACE {
                 SetId(player);
 
                 return *this;
+            }
+
+            bool SetFriendlyFire(bool frinedlyFire) {
+                return gnine_set_team_friendly_fire(*this, frinedlyFire);
+            }
+
+            bool SetColor(Color color) {
+                return gnine_set_team_color(*this, &color);
+            } 
+
+            bool SetName(String name) {
+                return gnine_set_team_name(*this, name.c_str());
+            }
+
+            UInt32 CountPlayers() {
+                return gnine_count_players_in_team(*this); 
+            }
+
+            PlayerList GetPlayers(UInt32 maxItemSize = 500) {
+                PlayerList list;
+
+                PlayerId players[maxItemSize];
+                memset((MemoryPointer)players, 0, sizeof(players));
+
+                UInt32 count = gnine_get_players_in_team(*this, players, maxItemSize);
+
+                list.resize(count);
+
+                for (UInt32 i = 0; i < count; i++) {
+                    list[i] = players[i];
+                }
+
+                return std::move(list);
+            }
+
+            bool GetFriendlyFire() {
+                return gnine_get_team_friendly_fire(*this);
+            }
+
+            Color GetColor() {
+                Color color;
+                memset((MemoryPointer)&color, 0, sizeof(color));
+
+                gnine_get_team_color(*this, &color);
+
+                return color;
+            }
+
+            String GetName(UIntPtr maxSize = 1024) {
+                Int8 name[maxSize];
+                memset((MemoryPointer)name, 0, maxSize);
+
+                UIntPtr size = gnine_get_team_name(*this, name, maxSize);
+
+                return String(name, size);
+            }
+
+            static Team CreateTeam(String name, Color color = { .b = 178, .g = 221, .r = 235, .a = 255 }) {
+                return gnine_create_team(name.c_str(), &color);
+            }
+
+            static Team GetTeamFromName(String name) {
+                return gnine_get_team_from_name(name.c_str());
             }
     };
 

@@ -29,6 +29,7 @@
 
 CGame*              pGame = NULL;
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
+CWebAssemblyThread* WebAssemblyMainThread = NULL;
 
 CWebAssemblyEngine::CWebAssemblyEngine()
 {
@@ -155,6 +156,303 @@ CWebAssemblyStore::operator bool()
     return m_pContext ? true : false;
 }
 
+CWebAssemblyThread::CWebAssemblyThread()
+{
+    Drop();
+}
+
+CWebAssemblyThread::CWebAssemblyThread(CWebAssemblyContext* context, CWebAssemblyThreadData data)
+{
+    Drop();
+
+    SetContext(context);
+    SetData(data);
+}
+
+CWebAssemblyThread::~CWebAssemblyThread()
+{
+    Terminate();
+    Drop();
+}
+
+void CWebAssemblyThread::Drop()
+{
+    memset(this, 0, sizeof(CWebAssemblyThread));
+}
+
+bool CWebAssemblyThread::Start()
+{
+    if (m_ThreadState != CWebAssemblyThreadState::Off)
+    {
+        return false;
+    }
+
+    if (!m_pContext || !IsValidThreadData(m_ThreadData))
+    {
+        return false;
+    }
+
+    void* threadArg = malloc(sizeof(m_ThreadData));
+
+    if (!threadArg)
+    {
+        return false;
+    }
+
+    memcpy(threadArg, &m_ThreadData, sizeof(m_ThreadData));
+
+    int result = pthread_create(&m_ThreadId, NULL, ThreadExecutor, threadArg);
+
+    SetState(result == 0 ? CWebAssemblyThreadState::Starting : CWebAssemblyThreadState::Off);
+
+    return true;
+}
+
+bool CWebAssemblyThread::Terminate()
+{
+    if (m_ThreadState != CWebAssemblyThreadState::Running && m_ThreadState != CWebAssemblyThreadState::Waiting)
+    {
+        return false;
+    }
+
+    if (m_ThreadId.p == WebAssemblyMainThread->GetId().p)
+    {
+        return NULL;
+    }
+
+    int result = pthread_cancel(m_ThreadId);
+
+    SetState(CWebAssemblyThreadState::Terminated);
+
+    if (result == 0)
+    {
+        if (m_pExecutorScript)
+        {
+            delete m_pExecutorScript;
+            m_pExecutorScript = NULL;
+        }
+    }
+
+    return result == 0;
+}
+
+bool CWebAssemblyThread::Join()
+{
+    if (m_ThreadState != CWebAssemblyThreadState::Starting && m_ThreadState != CWebAssemblyThreadState::Running && m_ThreadState != CWebAssemblyThreadState::Waiting)
+    {
+        return false;
+    }
+
+    return pthread_join(m_ThreadId, NULL) == 0;
+}
+
+void CWebAssemblyThread::SleepFor(uint32_t milliSeconds)
+{
+    if (m_ThreadState != CWebAssemblyThreadState::Running)
+    {
+        return;
+    }
+
+    SetState(CWebAssemblyThreadState::Waiting);
+
+    m_uiSleepedFor = milliSeconds;
+
+    Sleep(milliSeconds);
+
+    SetState(CWebAssemblyThreadState::Running);
+
+    m_uiSleepedFor = 0;
+}
+
+void CWebAssemblyThread::SetId(pthread_t threadId)
+{
+    m_ThreadId = threadId;
+}
+
+void CWebAssemblyThread::SetState(CWebAssemblyThreadState state)
+{
+    m_ThreadState = state;
+}
+
+void CWebAssemblyThread::SetData(CWebAssemblyThreadData data)
+{
+    m_ThreadData = data;
+}
+
+void CWebAssemblyThread::SetContext(CWebAssemblyContext* context)
+{
+    m_pContext = context;
+}
+
+
+void CWebAssemblyThread::SetExecutorScript(CWebAssemblyScript* script)
+{
+    m_pExecutorScript = script;
+}
+
+pthread_t CWebAssemblyThread::GetId()
+{
+    return m_ThreadId;
+}
+
+CWebAssemblyThreadState CWebAssemblyThread::GetState()
+{
+    return m_ThreadState;
+}
+
+CWebAssemblyThreadData CWebAssemblyThread::GetData()
+{
+    return m_ThreadData;
+}
+
+uint32_t CWebAssemblyThread::GetSleepingTime()
+{
+    return m_uiSleepedFor;
+}
+
+CWebAssemblyContext* CWebAssemblyThread::GetWasmContext()
+{
+    return m_pContext;
+}
+
+CWebAssemblyScript* CWebAssemblyThread::GetExecutorScript()
+{
+    return m_pExecutorScript;
+}
+
+CWebAssemblySharedScriptData* CWebAssemblyThread::GetSharedScriptData()
+{
+    return m_pSharedScriptData;
+}
+
+void* CWebAssemblyThread::GetThreadArg()
+{
+    return m_pThreadArg;
+}
+
+bool CWebAssemblyThread::IsValidThreadData(CWebAssemblyThreadData data)
+{
+    return data.mainScript ? true : false;
+}
+
+void* CWebAssemblyThread::ThreadExecutor(void* threadArg)
+{
+    CWebAssemblyThreadData* data = (CWebAssemblyThreadData*)threadArg;
+
+    if (!data)
+    {
+        pthread_exit(NULL);
+        return NULL;
+    }
+
+    int result;
+
+    result = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
+    if (result != 0)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        pthread_exit(NULL);
+
+        return NULL;
+    }
+
+    result = pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+    if (result != 0)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        pthread_exit(NULL);
+
+        return NULL;
+    }
+
+    CWebAssemblyEngine*  engine = CWebAssemblyContext::GetWebAssemblyEngine();
+    CWebAssemblyContext* context = data->thread->GetWasmContext();
+
+    CWebAssemblyStore* workerStore = new CWebAssemblyStore(engine);
+
+    if (!workerStore)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        pthread_exit(NULL);
+
+        return NULL;
+    }
+
+    workerStore->Build();
+
+    if (!*workerStore)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        delete workerStore;
+
+        pthread_exit(NULL);
+
+        return NULL;
+    }
+
+    CWebAssemblySharedScriptData* sharedData = data->mainScript->CreateSharedScriptData(workerStore, &(data->thread->GetId()));
+
+    if (!sharedData)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        pthread_exit(NULL);
+
+        delete workerStore;
+
+        return NULL;
+    }
+
+    CWebAssemblyScript* workerScript = context->CreateScript();
+
+    CWebAssemblyDefs::RegisterApi(workerScript);
+
+    CWebAssemblyLoadState loadState = workerScript->LoadBinary(NULL, 0, data->mainScript->GetScriptFile(), sharedData);
+
+    if (loadState == CWebAssemblyLoadState::Succeed)
+    {
+        CWebAssemblyVariables args;
+
+        CWebAssemblyMemory* memory = workerScript->GetMemory();
+
+        if (data->data && data->dataSize > 0)
+        {
+            void* dataPtr;
+
+            args.Push((int32_t)memory->Malloc(data->dataSize, &dataPtr));
+
+            if (dataPtr)
+            {
+                memcpy(dataPtr, data->data, data->dataSize);
+            }
+        }
+        else
+        {
+            args.Push(NULL);
+        }
+
+        data->thread->SetState(CWebAssemblyThreadState::Running);
+
+        workerScript->CallInternalFunction(data->functionIndex, &args, NULL);
+    }
+
+    delete workerScript;
+
+    CWebAssemblyScript::DeleteSharedScriptData(sharedData);
+
+    data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+    pthread_exit(NULL);
+    
+    return NULL;
+}
+
 CWebAssemblyContext::CWebAssemblyContext()
 {
     m_pResource = NULL;
@@ -192,6 +490,7 @@ CWebAssemblyContext::~CWebAssemblyContext()
 
 void CWebAssemblyContext::Destroy()
 {
+    ClearThreads();
     ClearScripts();
     ClearGlobalFunctions();
 
@@ -206,7 +505,7 @@ void CWebAssemblyContext::Destroy()
 CWebAssemblyScript* CWebAssemblyContext::CreateScript()
 {
     return new CWebAssemblyScript(this);
-} 
+}
 
 CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName, bool executeMain)
 {
@@ -230,9 +529,84 @@ CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* 
     return state;
 }
 
+void CWebAssemblyContext::DestroyScript(CWebAssemblyScript* script)
+{
+    if (!DoesOwnScript(script))
+    {
+        return;
+    }
+
+    int index = -1;
+
+    for (int i = 0; i < m_lsScripts.size(); i++)
+    {
+        if (m_lsScripts[i] == script)
+        {
+            index = i;
+        }
+    }
+
+    if (index >= 0)
+    {
+        m_lsScripts.erase(m_lsScripts.begin() + index);
+
+        delete script;
+    }
+}
+
+CWebAssemblyThread* CWebAssemblyContext::CreateThread(CWebAssemblyThreadData threadData)
+{
+    if (!CWebAssemblyThread::IsValidThreadData(threadData))
+    {
+        return NULL;
+    }
+
+    CWebAssemblyThread* thread = new CWebAssemblyThread(this, threadData);
+
+    if (!thread)
+    {
+        return NULL;
+    }
+
+    m_lsThreads.push_back(thread);
+
+    return thread;
+}
+
+void CWebAssemblyContext::DestroyThread(CWebAssemblyThread* thread)
+{
+    if (!DoesOwnThread(thread))
+    {
+        return;
+    }
+
+    int index = -1;
+
+    for (int i = 0; i < m_lsThreads.size(); i++)
+    {
+        if (m_lsThreads[i] == thread)
+        {
+            index = i;
+        }
+    }
+
+    if (index >= 0)
+    {
+        m_lsThreads.erase(m_lsThreads.begin() + index);
+
+        delete thread;
+    }
+}
+
 CWebAssemblyScriptList& CWebAssemblyContext::GetScripts()
 {
     return m_lsScripts;
+}
+
+
+CWebAssemblyThreadList& CWebAssemblyContext::GetThreads()
+{
+    return m_lsThreads;
 }
 
 void CWebAssemblyContext::ClearScripts()
@@ -255,6 +629,29 @@ void CWebAssemblyContext::ClearScripts()
     }
 
     m_lsScripts.clear();
+}
+
+
+void CWebAssemblyContext::ClearThreads()
+{
+    if (m_lsThreads.empty())
+    {
+        return;
+    }
+
+    size_t length = m_lsThreads.size();
+
+    for (size_t i = 0; i < length; i++)
+    {
+        CWebAssemblyThread* thread = m_lsThreads[i];
+
+        if (thread)
+        {
+            delete thread;
+        }
+    }
+
+    m_lsThreads.clear();
 }
 
 void CWebAssemblyContext::SetResource(CResource* resource)
@@ -431,6 +828,60 @@ CWebAssemblyScript* CWebAssemblyContext::FindPointerScript(void* ptr)
     return NULL;
 }
 
+CWebAssemblyThread* CWebAssemblyContext::FindThreadByThreadId(pthread_t threadId)
+{
+    if (!threadId.p)
+    {
+        return NULL;
+    }
+
+    for (CWebAssemblyThread* thread : m_lsThreads)
+    {
+        if (thread->GetId().p == threadId.p)
+        {
+            return thread;
+        }
+    }
+
+    return NULL;
+}
+
+bool CWebAssemblyContext::DoesOwnScript(CWebAssemblyScript* script)
+{
+    if (!script || script->GetStoreContext() != this || m_lsScripts.empty())
+    {
+        return false;
+    }
+
+    for (CWebAssemblyScript* s : m_lsScripts)
+    {
+        if (s == script)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool CWebAssemblyContext::DoesOwnThread(CWebAssemblyThread* thread)
+{
+    if (!thread || thread->GetWasmContext() != this || m_lsThreads.empty())
+    {
+        return false;
+    }
+
+    for (CWebAssemblyThread* th : m_lsThreads)
+    {
+        if (th == thread)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void CWebAssemblyContext::InitializeWebAssemblyEngine(CGame* pGameObject)
 {
     if (WebAssemblyEngine)
@@ -447,6 +898,19 @@ void CWebAssemblyContext::InitializeWebAssemblyEngine(CGame* pGameObject)
 
     CWebAssemblyDefs::RegisterApiFunctionTypes();
 
+    WebAssemblyMainThread = new CWebAssemblyThread();
+
+    memset(WebAssemblyMainThread, 0, sizeof(CWebAssemblyThread));
+
+    CWebAssemblyThreadData threadData;
+    memset(&threadData, 0, sizeof(threadData));
+
+    threadData.thread = WebAssemblyMainThread;
+
+    WebAssemblyMainThread->SetId(pthread_self());
+    WebAssemblyMainThread->SetState(CWebAssemblyThreadState::Running);
+    WebAssemblyMainThread->SetData(threadData);
+
     CLogger::LogPrintf("Web assembly engine built.\n");
 }
 
@@ -460,8 +924,10 @@ void CWebAssemblyContext::DeleteWebAssemblyEngine()
     WebAssemblyEngine->Destroy();
 
     delete WebAssemblyEngine;
-
     WebAssemblyEngine = NULL;
+
+    delete WebAssemblyMainThread;
+    WebAssemblyMainThread = NULL;
 }
 
 CWebAssemblyEngine* CWebAssemblyContext::GetWebAssemblyEngine()
@@ -472,6 +938,11 @@ CWebAssemblyEngine* CWebAssemblyContext::GetWebAssemblyEngine()
 CGame* CWebAssemblyContext::GetGameObject()
 {
     return pGame;
+}
+
+CWebAssemblyThread* CWebAssemblyContext::GetMainThread()
+{
+    return WebAssemblyMainThread;
 }
 
 bool CWebAssemblyContext::IsWebAssemblyBinary(const char* binary)
@@ -493,6 +964,7 @@ CWebAssemblyScript::CWebAssemblyScript()
     m_pContextStore = NULL;
 
     m_pModule = NULL;
+    m_pSharedModule = NULL;
     m_pInstance = NULL;
 
     m_pMemory = NULL;
@@ -503,6 +975,7 @@ CWebAssemblyScript::CWebAssemblyScript(CWebAssemblyContext* context)
     m_pContextStore = context;
 
     m_pModule = NULL;
+    m_pSharedModule = NULL;
     m_pInstance = NULL;
 
     m_pMemory = NULL;
@@ -642,22 +1115,36 @@ void CWebAssemblyScript::Destroy()
         wasm_instance_delete(m_pInstance);
     }
 
+    if (m_pSharedModule)
+    {
+        wasm_shared_module_delete(m_pSharedModule);
+    }
+
     if (m_pModule)
     {
         wasm_module_delete(m_pModule);
     }
+
+    m_pInstance = NULL;
+    m_pSharedModule = NULL;
+    m_pInstance = NULL;
 }
 
-CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const size_t& binarySize, const SString& fileName)
+CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const size_t& binarySize, const SString& fileName, CWebAssemblySharedScriptData* sharedScriptData)
 {
-    if (binarySize < 1)
-    {
-        return CWebAssemblyLoadState::Failed;
-    }
+    bool isValidSharedData = sharedScriptData && sharedScriptData->script && sharedScriptData->store;
 
-    if (!CWebAssemblyContext::IsWebAssemblyBinary(binary))
+    if (!isValidSharedData)
     {
-        return CWebAssemblyLoadState::Failed;
+        if (binarySize < 1)
+        {
+            return CWebAssemblyLoadState::Failed;
+        }
+
+        if (!CWebAssemblyContext::IsWebAssemblyBinary(binary))
+        {
+            return CWebAssemblyLoadState::Failed;
+        }
     }
 
     if (!m_pContextStore)
@@ -671,8 +1158,23 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     }
 
     m_strScriptFile = fileName;
-    
-    CWebAssemblyStoreContext store = m_pContextStore->GetStore()->GetContext();
+
+    m_pStore = (
+        (sharedScriptData && sharedScriptData->store) ?
+        sharedScriptData->store :
+        (
+            (sharedScriptData && sharedScriptData->script) ?
+            sharedScriptData->script->GetStore() :
+            m_pContextStore->GetStore()
+        )
+    );
+
+    if (!m_pStore)
+    {
+        return CWebAssemblyLoadState::Failed;
+    }
+
+    CWebAssemblyStoreContext store = m_pStore->GetContext();
 
     if (!store)
     {
@@ -690,23 +1192,39 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
     wasm_byte_vec_t binaryBuffer;
     binaryBuffer.data = NULL;
 
-    wasm_byte_vec_new_uninitialized(&binaryBuffer, binarySize);
-
-    memcpy(binaryBuffer.data, binary, binarySize);
-
-    if (!wasm_module_validate(store, &binaryBuffer))
+    if (isValidSharedData)
     {
-        goto Fail;
+        m_pModule = wasm_module_obtain(store, sharedScriptData->script->GetSharedModule());
+
+        if (!m_pModule)
+        {
+            goto Fail;
+        }
+
+        m_pSharedModule = wasm_module_share(m_pModule);
     }
-
-    m_pModule = wasm_module_new(store, &binaryBuffer);
-
-    wasm_byte_vec_delete(&binaryBuffer);
-    binaryBuffer.data = NULL;
-
-    if (!m_pModule)
+    else
     {
-        goto Fail;
+        wasm_byte_vec_new_uninitialized(&binaryBuffer, binarySize);
+
+        memcpy(binaryBuffer.data, binary, binarySize);
+
+        if (!wasm_module_validate(store, &binaryBuffer))
+        {
+            goto Fail;
+        }
+
+        m_pModule = wasm_module_new(store, &binaryBuffer);
+
+        wasm_byte_vec_delete(&binaryBuffer);
+        binaryBuffer.data = NULL;
+
+        if (!m_pModule)
+        {
+            goto Fail;
+        }
+
+        m_pSharedModule = wasm_module_share(m_pModule);
     }
 
     CWebAssemblyTrap* trap = NULL;
@@ -735,6 +1253,65 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
 
             if (moduleName == WEB_ASSEMBLY_API_MODULE_NAME)
             {
+                wasm_externtype_t* importExternType = (wasm_externtype_t*)wasm_importtype_type(importType);
+
+                switch (wasm_externtype_kind(importExternType))
+                {
+                    case WASM_EXTERN_FUNC:
+                        break;
+                    case WASM_EXTERN_MEMORY:
+#if WASM_COMPILER_CAN_USE_SHAERD_MEMORY
+                        {
+                            wasm_memorytype_t* memoryType = wasm_externtype_as_memorytype(importExternType);
+
+                            const wasm_limits_t* limits = wasm_memorytype_limits(memoryType);
+
+                            CWebAssemblyScript* parentScript = isValidSharedData ? sharedScriptData->script : NULL;
+
+                            wasm_memory_t* memoryObject = parentScript ? parentScript->GetMemory()->GetContext() : wasm_memory_new(store, memoryType);
+
+                            if (!memoryObject)
+                            {
+                                goto Fail;
+                            }
+
+                            if (parentScript)
+                            {
+                                wasm_memorytype_t* memoryObjectType = wasm_memory_type(memoryObject);
+
+                                const wasm_limits_t* memoryObjectLimits = wasm_memorytype_limits(memoryObjectType);
+
+                                if (memoryObjectLimits)
+                                {
+                                    if (limits->min != memoryObjectLimits->min || limits->max != memoryObjectLimits->max)
+                                    {
+                                        CLogger::ErrorPrintf("Can't import memory from other scripts with different memory size. [\"@%s/%s\"]\n", m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+
+                                        goto Fail;
+                                    }
+                                }
+                            }
+
+                            m_pMemory = new CWebAssemblyMemory(this, memoryObject);
+
+                            imports[i] = wasm_memory_as_extern(memoryObject);
+
+                            continue;
+                        }
+#else
+                        CLogger::LogPrintf("Gnine can't import wasm memory yet! but it will be able to do that in future updates. [\"@%s/%s\"]\n", m_pContextStore->GetResource()->GetName().c_str(), fileName.c_str());
+                        goto Fail;
+#endif
+
+                        break;
+                    case WASM_EXTERN_GLOBAL:
+                    case WASM_EXTERN_TABLE:
+                        goto Fail;
+                        break;
+                    default:
+                        break;
+                }
+
                 CWebAssemblyFunctionType apiFunctionType;
                 CWebAssemblyFunctionType globalFunctionType;
                 CWebAssemblyFunctionType importFuncType;
@@ -755,7 +1332,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 }
 
                 CWebAssemblyFunction* apiFunction = m_mpApiFunctions[importName];
-                
+
                 apiFunctionType = apiFunction->GetFunctionType();
 
                 if (!apiFunctionType.Compare(importFuncType))
@@ -806,10 +1383,10 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 continue;
                 
             ImportFail:
-                CWebAssemblyFunction dummyFunction;
+                CWebAssemblyFunction     dummyFunction;
 
                 dummyFunction.SetFunctionType(importFuncType);
-
+                
                 RegisterGlobalFunction(importName, &dummyFunction, true);
 
                 if (!DoesGlobalFunctionExist(importName))
@@ -910,7 +1487,11 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
 
     BuildExportedFunctions();
     BuildInternalFunctions();
-    BuildMemory();
+
+    if (!m_pMemory)
+    {
+        BuildMemory();
+    }
 
     InsertSharedGlobalFunctions();
 
@@ -1100,7 +1681,12 @@ WebAssemblyApi(CWebAssemblyScript::Wasm_CallLuaImportedFunction, env, args, resu
 
     CWebAssemblyArgReader argStream(env, args, results);
 
-    size_t argCount = argStream.GetArgumentCount() - 2;
+    int32_t argCount = (int32_t)argStream.GetArgumentCount() - 2;
+
+    if (argCount < 0)
+    {
+        argCount = 0;
+    }
 
     argStream.Skip(argCount);
 
@@ -1295,9 +1881,19 @@ CWebAssemblyContext* CWebAssemblyScript::GetStoreContext()
     return m_pContextStore;
 }
 
+CWebAssemblyStore* CWebAssemblyScript::GetStore()
+{
+    return m_pStore;
+}
+
 CWebAssemblyModuleContext CWebAssemblyScript::GetModule()
 {
     return m_pModule;
+}
+
+CWebAssemblyModuleContext CWebAssemblyScript::GetSharedModule()
+{
+    return m_pSharedModule;
 }
 
 CWebAssemblyInstanceContext CWebAssemblyScript::GetInstance()
@@ -1821,9 +2417,37 @@ CWebAssemblyApiEnviornment CWebAssemblyScript::CreateApiEnvironment(const SStrin
     return env;
 }
 
+CWebAssemblySharedScriptData* CWebAssemblyScript::CreateSharedScriptData(CWebAssemblyStore* store, pthread_t* threadId)
+{
+    CWebAssemblySharedScriptData* sharedScriptData = (CWebAssemblySharedScriptData*)malloc(sizeof(CWebAssemblySharedScriptData));
+
+    if (!sharedScriptData)
+    {
+        return NULL;
+    }
+
+    memset(sharedScriptData, 0, sizeof(CWebAssemblySharedScriptData));
+
+    sharedScriptData->script = this;
+    sharedScriptData->store = store ? store : m_pStore;
+    sharedScriptData->threadId = threadId ? *threadId : pthread_self();
+
+    return sharedScriptData;
+}
+
 bool CWebAssemblyScript::IsExternValid(const CWebAssemblyExtern& waExtern)
 {
     return waExtern.context != NULL;
+}
+
+void CWebAssemblyScript::DeleteSharedScriptData(CWebAssemblySharedScriptData* sharedScriptData)
+{
+    if (!sharedScriptData)
+    {
+        return;
+    }
+
+    free((void*)sharedScriptData);
 }
 
 CWebAssemblyMemory::CWebAssemblyMemory()
