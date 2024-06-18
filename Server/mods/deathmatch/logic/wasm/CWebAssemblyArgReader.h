@@ -25,6 +25,7 @@
 
 #define ELEMENT_TO_WASM_USERDATA(element) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((element)->GetID().Value()))
 #define RESOURCE_TO_WASM_USERDATA(resource) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((resource)->GetScriptID()))
+#define TIMER_TO_WASM_USERDATA(timer) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(timer->GetScriptID()))
 
 class CWebAssemblyScript;
 

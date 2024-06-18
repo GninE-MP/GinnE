@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <utility>
 #ifndef GNINE_HEADER
 #define GNINE_HEADER
 
@@ -123,6 +124,7 @@ typedef GNINE_USERDATA GNINE_ACCOUNT;
 typedef GNINE_USERDATA GNINE_BAN;
 typedef GNINE_USERDATA GNINE_WORKER;
 typedef GNINE_USERDATA GNINE_MUTEX;
+typedef GNINE_USERDATA GNINE_TIMER;
 //typedef GNINE_USERDATA GNINE_THREAD;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
@@ -208,6 +210,12 @@ enum GNINE_WORKER_STATE : GNINE_WORKER_STATE_TYPE {
 };
 
 typedef void (*GNINE_WORKER_HANDLER)(GNINE_SHARED_POINTER_ADDRESS data);
+
+struct GNINE_TIMER_DETAILS {
+    GNINE_UI32 timeLeft;
+    GNINE_UI32 repeats;
+    GNINE_UI32 delay;
+};
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
 
@@ -453,6 +461,13 @@ GNINE_API_IMPORT(lock_mutex, (GNINE_MUTEX mutex), bool);
 GNINE_API_IMPORT(unlock_mutex, (GNINE_MUTEX mutex), bool);
 GNINE_API_IMPORT(is_mutex, (GNINE_MUTEX mutex), bool);
 
+GNINE_API_IMPORT(set_timer, (GNINE_CALLABLE_REF function, GNINE_UI32 time_interval, GNINE_UI32 time_to_execute, GNINE_ARGUMENTS arguments), GNINE_TIMER);
+GNINE_API_IMPORT(kill_timer, (GNINE_TIMER timer), bool);
+GNINE_API_IMPORT(reset_timer, (GNINE_TIMER timer), bool);
+GNINE_API_IMPORT(get_timers, (GNINE_F64 time, GNINE_TIMER* out_timers, GNINE_UI32 max_item_count), GNINE_UI32);
+GNINE_API_IMPORT(is_timer, (GNINE_TIMER timer), bool);
+GNINE_API_IMPORT(get_timer_details, (GNINE_TIMER timer, struct GNINE_TIMER_DETAILS* out_timer_details), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -541,6 +556,8 @@ namespace GNINE_NAMESPACE {
 
     using WorkerId = GNINE_WORKER;
     using WorkerMutexId = GNINE_MUTEX;
+
+    using TimerId = GNINE_TIMER;
 
     using RealTimeData = GNINE_REAL_TIME;
 
@@ -661,6 +678,11 @@ namespace GNINE_NAMESPACE {
 
                     void Push(Arguments arg) {
                         gnine_args_push_list(m_pArgs, (GNINE_ARGUMENTS)arg);
+                    }
+
+                    template<typename Type>
+                    void Push(Type* arg) {
+                        gnine_args_push_number(m_pArgs, (LuaNumber)(IntPtr)arg);
                     }
 
                     UInt32 Count() const {
@@ -3511,6 +3533,113 @@ namespace GNINE_NAMESPACE {
             WorkerId m_pWorkerId;
 
             bool m_bAutoTerminator;
+    };
+    
+    using TimerList = STD_NAMESPACE::vector<class Timer>;
+
+    class Timer {
+        public:
+            using TimerDetails = GNINE_TIMER_DETAILS;
+
+            Timer(TimerId timerId) {
+                Drop();
+
+                m_pTimerId = timerId;
+            }
+
+            Timer(const Timer& timer) {
+                Drop();
+
+                m_pTimerId = timer.m_pTimerId;
+            }
+
+            Timer(Callable function, UInt32 interval, UInt32 repeats = 1, Callable::Arguments arguments = NULL) {
+                m_pTimerId = gnine_set_timer(function, interval, repeats, arguments);
+            }
+
+            template<typename... Args>
+            Timer(Callable function, UInt32 interval, UInt32 repeats, Args... args) {
+                if (!m_pTimerArguments) {
+                    m_pTimerArguments = new Callable::Arguments();
+                }
+
+                AddArgument(args...);
+
+                m_pTimerId = gnine_set_timer(function, interval, repeats, *m_pTimerArguments);
+
+                delete m_pTimerArguments;
+                m_pTimerArguments = NULL;
+            }
+
+            ~Timer() {
+                Drop();
+            }
+
+            void Drop() {
+                m_pTimerId = NULL;
+            }
+
+            void Kill() {
+                gnine_kill_timer(m_pTimerId);
+            }
+
+            void Reset() {
+                gnine_reset_timer(m_pTimerId);
+            }
+
+            TimerDetails GetDetails() {
+                TimerDetails details;
+
+                gnine_get_timer_details(m_pTimerId, &details);
+
+                return details;
+            }
+
+            operator TimerId() {
+                return m_pTimerId;
+            }
+
+            operator String() {
+                char buff[50];
+                memset((MemoryPointer)buff, 0, sizeof(buff));
+                
+                Int32 size = sprintf(buff, "timer:" GNINE_MEMORY_POINTER_ADDRESS_STRING, (int)m_pTimerId);
+
+                return String(buff, size);
+            }
+
+            operator bool() {
+                return gnine_is_timer(m_pTimerId);
+            }
+
+            static TimerList GetTimers(Float64 time, UInt32 maxItemCount = 500) {
+                TimerList list;
+
+                TimerId timers[maxItemCount];
+                memset((MemoryPointer)timers, 0, sizeof(timers));
+
+                UInt32 count = gnine_get_timers(time, timers, maxItemCount);
+
+                for (UInt32 i = 0; i < count; i++) list.push_back(timers[i]);
+
+                return list;
+            }
+
+        private:
+            TimerId m_pTimerId;
+
+            Callable::Arguments* m_pTimerArguments;
+
+            template<typename Arg>
+            void AddArgument(Arg arg) {
+                Callable::AddCallableArgumentToArguments(m_pTimerArguments, (Callable::Argument)arg);
+            }
+
+            template<typename Arg, typename... Args>
+            void AddArgument(Arg arg, Args... args) {
+                Callable::AddCallableArgumentToArguments(m_pTimerArguments, (Callable::Argument)arg);
+                AddArgument(args...);
+            }
     };
 
     inline SharedMemoryPointer GetSharedPointerAddress(MemoryPointer ptr) {
