@@ -29,6 +29,12 @@ public:
     DEFINE_WASM_FUNCTION(GetWorkerState, env, args, results);
     DEFINE_WASM_FUNCTION(IsWorker, env, args, results);
 
+    DEFINE_WASM_FUNCTION(CreateMutex_, env, args, results);
+    DEFINE_WASM_FUNCTION(DestroyMutex_, env, args, results);
+    DEFINE_WASM_FUNCTION(LockMutex_, env, args, results);
+    DEFINE_WASM_FUNCTION(UnlockMutex_, env, args, results);
+    DEFINE_WASM_FUNCTION(IsMutex_, env, args, results);
+
     DEFINE_WASM_FUNCTION(CreateThread, env, args, results);
     DEFINE_WASM_FUNCTION(TerminateThread, env, args, results);
     //DEFINE_WASM_FUNCTION(JoinThread, env, args, results);

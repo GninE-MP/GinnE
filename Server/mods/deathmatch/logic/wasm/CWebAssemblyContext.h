@@ -26,6 +26,9 @@ typedef CFastHashMap<SString, CWebAssemblyFunction*> CWebAssemblyFunctionMap;
 
 typedef std::vector<CWebAssemblyFunction*> CWebAssemblyInternalFunctions;
 
+typedef pthread_mutex_t               CWebAssemblyThreadMutex;
+typedef std::vector<CWebAssemblyThreadMutex*> CWebAssemblyThreadMutexList;
+
 enum class CWebAssemblyLoadState
 {
     Succeed,
@@ -111,7 +114,6 @@ struct CWebAssemblyThreadData
     CWebAssemblyScript* mainScript;
     uint32_t            functionIndex;
     void*               data;
-    uint32_t            dataSize;
 };
 
 class CWebAssemblyThread
@@ -132,7 +134,8 @@ public:
     void SetState(CWebAssemblyThreadState state);
     void SetData(CWebAssemblyThreadData data);
 
-    void SetContext(CWebAssemblyContext* context);
+    void SetWasmContext(CWebAssemblyContext* context);
+    void SetWasmStore(CWebAssemblyStore* store);
     void SetExecutorScript(CWebAssemblyScript* script);
 
     pthread_t               GetId();
@@ -141,8 +144,8 @@ public:
     uint32_t                GetSleepingTime();
 
     CWebAssemblyContext*          GetWasmContext();
+    CWebAssemblyStore*            GetWasmStore();
     CWebAssemblyScript*           GetExecutorScript();
-    CWebAssemblySharedScriptData* GetSharedScriptData();
 
     void* GetThreadArg();
 
@@ -155,8 +158,8 @@ private:
     uint32_t                m_uiSleepedFor;
 
     CWebAssemblyContext*          m_pContext;
+    CWebAssemblyStore*            m_pStore;
     CWebAssemblyScript*           m_pExecutorScript;
-    CWebAssemblySharedScriptData* m_pSharedScriptData;
 
     void* m_pThreadArg;
 
@@ -174,15 +177,23 @@ public:
 
     CWebAssemblyScript*   CreateScript();
     CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, const char* binary, const size_t& binarySize, const SString& fileName, bool executeMain = true);
+    CWebAssemblyLoadState LoadScriptBinary(CWebAssemblyScript* script, CWebAssemblySharedScriptData* sharedData, bool executeMain = true);
     void                  DestroyScript(CWebAssemblyScript* script);
 
     CWebAssemblyThread* CreateThread(CWebAssemblyThreadData threadData);
     void                DestroyThread(CWebAssemblyThread* thread);
 
-    CWebAssemblyScriptList& GetScripts();
-    CWebAssemblyThreadList& GetThreads();
-    void                    ClearScripts();
-    void                    ClearThreads();
+    CWebAssemblyThreadMutex* CreateThreadMutex();
+    bool                     DestroyThreadMutex(CWebAssemblyThreadMutex* mutex);
+    bool                     LockMutex(CWebAssemblyThreadMutex* mutex);
+    bool                     UnlockMutex(CWebAssemblyThreadMutex* mutex);
+
+    CWebAssemblyScriptList&      GetScripts();
+    CWebAssemblyThreadList&      GetThreads();
+    CWebAssemblyThreadMutexList& GetThreadMutexes();
+    void                         ClearScripts();
+    void                         ClearThreads();
+    void                         ClearThreadMutexes();
 
     void       SetResource(CResource* resource);
     CResource* GetResource();
@@ -206,6 +217,7 @@ public:
 
     bool DoesOwnScript(CWebAssemblyScript* script);
     bool DoesOwnThread(CWebAssemblyThread* thread);
+    bool DoesOwnThreadMutex(CWebAssemblyThreadMutex* mutex);
 
     static void                InitializeWebAssemblyEngine(CGame* pGameObject);
     static void                DeleteWebAssemblyEngine();
@@ -219,8 +231,9 @@ private:
     CResource*         m_pResource;
     CWebAssemblyStore* m_pStore;
 
-    CWebAssemblyScriptList m_lsScripts;
-    CWebAssemblyThreadList m_lsThreads;
+    CWebAssemblyScriptList      m_lsScripts;
+    CWebAssemblyThreadList      m_lsThreads;
+    CWebAssemblyThreadMutexList m_lsThreadMutexes;
 
     CWebAssemblyFunctionMap m_mpGlobalFunctions;
 

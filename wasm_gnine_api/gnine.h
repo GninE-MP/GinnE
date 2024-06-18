@@ -122,6 +122,7 @@ typedef GNINE_USERDATA GNINE_RESOURCE;
 typedef GNINE_USERDATA GNINE_ACCOUNT;
 typedef GNINE_USERDATA GNINE_BAN;
 typedef GNINE_USERDATA GNINE_WORKER;
+typedef GNINE_USERDATA GNINE_MUTEX;
 //typedef GNINE_USERDATA GNINE_THREAD;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
@@ -206,7 +207,7 @@ enum GNINE_WORKER_STATE : GNINE_WORKER_STATE_TYPE {
     GNINE_WORKER_STATE_FINISHED = 5
 };
 
-typedef void (*GNINE_WORKER_HANDLER)(GNINE_PTR data, GNINE_PTR result);
+typedef void (*GNINE_WORKER_HANDLER)(GNINE_SHARED_POINTER_ADDRESS data);
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
 
@@ -436,7 +437,7 @@ GNINE_API_IMPORT(set_team_name, (GNINE_TEAM team, GNINE_STRING name), bool);
 GNINE_API_IMPORT(set_team_color, (GNINE_TEAM team, struct GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_team_friendly_fire, (GNINE_TEAM team, bool friend_fire), bool);
 
-GNINE_API_IMPORT(create_worker, (GNINE_WORKER_HANDLER function, GNINE_PTR data_to_send_to_worker, GNINE_I_PTR data_size), GNINE_WORKER);
+GNINE_API_IMPORT(create_worker, (GNINE_WORKER_HANDLER function, GNINE_PTR data_to_send_to_worker), GNINE_WORKER);
 GNINE_API_IMPORT(terminate_worker, (GNINE_WORKER worker), bool);
 GNINE_API_IMPORT(run_worker, (GNINE_WORKER worker), bool);
 GNINE_API_IMPORT(worker_join, (GNINE_WORKER worker), bool);
@@ -445,6 +446,12 @@ GNINE_API_IMPORT(get_main_worker, (), GNINE_WORKER);
 GNINE_API_IMPORT(sleep_worker, (GNINE_UI32 milli_seconds), void);
 GNINE_API_IMPORT(get_worker_state, (GNINE_WORKER worker), GNINE_WORKER_STATE_TYPE);
 GNINE_API_IMPORT(is_worker, (GNINE_WORKER worker), bool);
+
+GNINE_API_IMPORT(create_mutex, (), GNINE_MUTEX);
+GNINE_API_IMPORT(destroy_mutex, (GNINE_MUTEX mutex), bool);
+GNINE_API_IMPORT(lock_mutex, (GNINE_MUTEX mutex), bool);
+GNINE_API_IMPORT(unlock_mutex, (GNINE_MUTEX mutex), bool);
+GNINE_API_IMPORT(is_mutex, (GNINE_MUTEX mutex), bool);
 
 /*
     Gnine still can't use shared memory for web assembly modules.
@@ -531,6 +538,9 @@ namespace GNINE_NAMESPACE {
     using MarkerId = GNINE_MARKER;
     using PlayerId = GNINE_PLAYER;
     using TeamId = GNINE_TEAM;
+
+    using WorkerId = GNINE_WORKER;
+    using WorkerMutexId = GNINE_MUTEX;
 
     using RealTimeData = GNINE_REAL_TIME;
 
@@ -817,6 +827,12 @@ namespace GNINE_NAMESPACE {
             }
 
             Callable& operator=(GNINE_CALLABLE_REF ref) {
+                if (*this) {
+                    if (m_bAutoCleanup) {
+                        Free();
+                    }
+                }
+
                 memcpy((MemoryPointer)m_rFunctionRef, (MemoryPointer)ref, sizeof(GNINE_CALLABLE_REF));
 
                 return *this;
@@ -830,6 +846,12 @@ namespace GNINE_NAMESPACE {
 
             template<typename Function>
             Callable& operator=(Function function) {
+                if (*this) {
+                    if (m_bAutoCleanup) {
+                        Free();
+                    }
+                }
+
                 gnine_c_function_to_callable(function, m_rFunctionRef);
 
                 return *this;
@@ -2559,7 +2581,7 @@ namespace GNINE_NAMESPACE {
                 char buff[50];
                 memset((MemoryPointer)buff, 0, sizeof(buff));
                 
-                Int32 size = sprintf(buff, "element:%08X", (int)m_pElementId);
+                Int32 size = sprintf(buff, "element:" GNINE_MEMORY_POINTER_ADDRESS_STRING, (int)m_pElementId);
 
                 return String(buff, size);
             }
@@ -3216,6 +3238,281 @@ namespace GNINE_NAMESPACE {
             }
     };
 
+    class Worker {
+        public:
+            using WorkerHandler = GNINE_WORKER_HANDLER;
+
+            enum class State : Byte {
+                Off = GNINE_WORKER_STATE_OFF,
+                Starting = GNINE_WORKER_STATE_STARTING,
+                Running = GNINE_WORKER_STATE_RUNNING,
+                Waiting = GNINE_WORKER_STATE_WAITING,
+                Terminated = GNINE_WORKER_STATE_TERMINATED,
+                Finished = GNINE_WORKER_STATE_FINISHED
+            };
+
+            class Mutex {
+                public:
+                    Mutex() {
+                        Drop();
+
+                        m_pMutexId = gnine_create_mutex();
+                    }
+
+                    Mutex(WorkerMutexId mutexId) {
+                        Drop();
+
+                        m_pMutexId = mutexId;
+                    }
+
+                    Mutex(const Mutex& mutex) {
+                        TakeOwnership(*(Mutex*)(&mutex));
+                    }
+
+                    ~Mutex() {
+                        if (m_bAutoCleanup) {
+                            Destroy();
+                        }
+
+                        Drop();
+                    }
+
+                    void TakeOwnership(Mutex& mutex) {
+                        if (*this) {
+                            if (m_bAutoCleanup) {
+                                Destroy();
+                            }
+                        }
+
+                        m_pMutexId = mutex.m_pMutexId;
+                        m_bAutoCleanup = mutex.m_bAutoCleanup;
+
+                        mutex.DisableAutoCleanup();
+                    }
+
+                    void Drop() {
+                        m_pMutexId = NULL;
+                        m_bAutoCleanup = true;
+                    }
+
+                    bool Destroy() {
+                        return gnine_destroy_mutex(m_pMutexId);
+                    }
+
+                    bool Lock() {
+                        return gnine_lock_mutex(m_pMutexId);
+                    }
+
+                    bool Unlock() {
+                        return gnine_unlock_mutex(m_pMutexId);
+                    }
+
+                    void DisableAutoCleanup(bool disabled = true) {
+                        m_bAutoCleanup = !disabled;
+                    }
+
+                    bool IsAutoCleanupDisabled() const {
+                        return !m_bAutoCleanup;
+                    }
+
+                    bool operator==(WorkerMutexId mutexId) {
+                        return m_pMutexId = mutexId;
+                    }
+
+                    bool operator==(Mutex mutex) {
+                        return m_pMutexId = mutex.m_pMutexId;
+                    }
+
+                    Mutex& operator=(WorkerMutexId mutexId) {
+                        if (*this) {
+                            if (m_bAutoCleanup) {
+                                Destroy();
+                            }
+                        }
+
+                        m_pMutexId = mutexId;
+
+                        return *this;
+                    }
+
+                    Mutex& operator=(const Mutex& mutex) {
+                        TakeOwnership(*(Mutex*)(&mutex));
+
+                        return *this;
+                    } 
+
+                    operator WorkerMutexId() const {
+                        return m_pMutexId;
+                    }
+
+                    operator String() {
+                        char buff[50];
+                        memset((MemoryPointer)buff, 0, sizeof(buff));
+                        
+                        Int32 size = sprintf(buff, "worker_mutex:" GNINE_MEMORY_POINTER_ADDRESS_STRING, (int)m_pMutexId);
+
+                        return String(buff, size);
+                    }
+
+                    operator bool() {
+                        return gnine_is_mutex(m_pMutexId);
+                    }
+
+                private:
+                    WorkerMutexId m_pMutexId;
+                    
+                    bool m_bAutoCleanup;
+            };
+
+            Worker(WorkerId workerId) {
+                Drop();
+
+                m_pWorkerId = workerId;
+            }
+
+            Worker(const Worker& worker) {
+                TakeOwnership(*(Worker*)(&worker));
+            }
+
+            Worker(WorkerHandler function, MemoryPointer dataToSendToWorker) {
+                Drop();
+
+                if (!function) {
+                    return;
+                }
+
+                m_pWorkerId = gnine_create_worker(function, dataToSendToWorker);
+            }
+
+            ~Worker() {
+                if (m_bAutoTerminator) {
+                    Terminate();
+                }
+
+                Drop();
+            }
+
+            void TakeOwnership(Worker& worker) {
+                if (*this) {
+                    if (m_bAutoTerminator) {
+                        Terminate();
+                    }
+                }
+
+                m_pWorkerId = worker.m_pWorkerId;
+                m_bAutoTerminator = worker.m_bAutoTerminator;
+
+                worker.DisableAutoTerminator();
+            }
+
+            void Drop() {
+                m_pWorkerId = NULL;
+                m_bAutoTerminator = true;
+            }
+
+            bool Run(bool waitUntilStartCompeletlly = true) {
+                bool result = gnine_run_worker(m_pWorkerId);
+
+                if (result && waitUntilStartCompeletlly) {
+                    while ((Int32)GetState() < (Int32)State::Running) {
+                        Sleep(1);
+                    }
+                }
+
+                return result;
+            }
+
+            bool Terminate() {
+                return gnine_terminate_worker(m_pWorkerId);
+            }
+
+            bool Join() {
+                return gnine_worker_join(m_pWorkerId);
+            }
+
+            State GetState() const {
+                if (!*this) {
+                    return State::Off;
+                }
+
+                return (State)gnine_get_worker_state(m_pWorkerId);
+            }
+
+            void DisableAutoTerminator(bool disabled = true) {
+                m_bAutoTerminator = !disabled;
+            }
+
+            bool IsAutoTerminatorDisabled() const {
+                return !m_bAutoTerminator;
+            }
+
+            bool operator==(const WorkerId& workerId) const {
+                return m_pWorkerId == workerId;
+            }
+
+            bool operator==(const Worker& worker) const {
+                return m_pWorkerId == worker.m_pWorkerId;
+            }
+
+            Worker& operator=(WorkerId workerId) {
+                if (m_bAutoTerminator) {
+                    Terminate();
+                }
+
+                m_pWorkerId = workerId;
+
+                return *this;
+            }
+
+            Worker& operator=(const Worker& worker) {
+                TakeOwnership(*(Worker*)(&worker));
+
+                return *this;
+            }
+
+            operator WorkerId() const {
+                return m_pWorkerId;
+            }
+
+            operator String() const {
+                char buff[50];
+                memset((MemoryPointer)buff, 0, sizeof(buff));
+                
+                Int32 size = sprintf(buff, "worker:" GNINE_MEMORY_POINTER_ADDRESS_STRING, (int)m_pWorkerId);
+
+                return String(buff, size);
+            }
+
+            operator bool() const {
+                return gnine_is_worker(m_pWorkerId);
+            }
+
+            static Worker GetCurrentWorker() {
+                Worker worker = gnine_get_current_worker();
+
+                worker.DisableAutoTerminator();
+
+                return worker;
+            }
+
+            static Worker GetMainWorker() {
+                Worker worker = gnine_get_main_worker();
+
+                worker.DisableAutoTerminator();
+
+                return worker;
+            }
+
+            static void Sleep(UInt32 milliSeconds) {
+                gnine_sleep_worker(milliSeconds);
+            }
+
+        private:
+            WorkerId m_pWorkerId;
+
+            bool m_bAutoTerminator;
+    };
+
     inline SharedMemoryPointer GetSharedPointerAddress(MemoryPointer ptr) {
         return gnine_get_shared_pointer_address(ptr);
     }
@@ -3236,8 +3533,18 @@ namespace GNINE_NAMESPACE {
         return gnine_read_shared_pointer_address(sharedPtr, data, size);
     }
 
+    template<typename Type>
+    inline UIntPtr ReadSharedPointerAddress(SharedMemoryPointer sharedPtr, Type* data) {
+        return gnine_read_shared_pointer_address(sharedPtr, (Byte*)data, sizeof(Type));
+    }
+
     inline UIntPtr WriteSharedPointerAddress(SharedMemoryPointer sharedPtr, Byte* data, UIntPtr size) {
         return gnine_write_shared_pointer_address(sharedPtr, data, size);
+    }
+
+    template<typename Type>
+    inline UIntPtr WriteSharedPointerAddress(SharedMemoryPointer sharedPtr, Type* data) {
+        return gnine_write_shared_pointer_address(sharedPtr, (Byte*)data, sizeof(Type));
     }
 
     inline UIntPtr GetMaxSharedPointerSize(SharedMemoryPointer sharedPtr) {
@@ -3343,7 +3650,7 @@ namespace GNINE_NAMESPACE {
 };
 
 namespace STD_NAMESPACE {
-    inline string to_string(GNINE_NAMESPACE::MemoryPointer ptr) {
+    inline string to_string(const GNINE_NAMESPACE::MemoryPointer& ptr) {
         using namespace GNINE_NAMESPACE;
 
         char buffer[50];
@@ -3354,7 +3661,7 @@ namespace STD_NAMESPACE {
         return string(buffer, size);
     }
 
-    inline string to_string(GNINE_NAMESPACE::Userdata userdata) {
+    inline string to_string(const GNINE_NAMESPACE::Userdata& userdata) {
         using namespace GNINE_NAMESPACE;
 
         char buffer[50];
@@ -3365,13 +3672,13 @@ namespace STD_NAMESPACE {
         return string(buffer, size);
     }
 
-    inline string to_string(bool boolean) {
+    inline string to_string(const bool& boolean) {
         using namespace GNINE_NAMESPACE;
 
         return boolean ? "true" : "false";
     }
 
-    inline string to_string(string str) {
+    inline string to_string(const string& str) {
         if (str.empty()) {
             return str;
         }
@@ -3387,7 +3694,7 @@ namespace STD_NAMESPACE {
     }
 
     template<typename Arg>
-    inline string to_string(Arg arg) {
+    inline string to_string(const Arg& arg) {
         return (string)arg;
     }
 }
@@ -3396,7 +3703,7 @@ namespace GNINE_NAMESPACE {
     inline String __OUTPUT_DATA__ = String();
 
     template<typename Arg>
-    inline void Print(Arg arg) {
+    inline void Print(const Arg& arg) {
         __OUTPUT_DATA__ += STD_NAMESPACE::to_string(arg);
         __OUTPUT_DATA__ += "    ";
 
@@ -3406,7 +3713,7 @@ namespace GNINE_NAMESPACE {
     }
 
     template<typename Arg, typename ...Args>
-    inline void Print(Arg arg, Args... args) {
+    inline void Print(const Arg& arg, Args... args) {
         __OUTPUT_DATA__ += STD_NAMESPACE::to_string(arg);
         __OUTPUT_DATA__ += "    ";
 

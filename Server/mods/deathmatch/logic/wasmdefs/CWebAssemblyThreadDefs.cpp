@@ -24,26 +24,9 @@
 
 #include <pthread.h>
 
-struct WorkerArg
-{
-    CWebAssemblyScript* mainScript;
-    uint32_t            functionIndex;
-    void*               data;
-    uint32_t            dataSize;
-    pthread_t*          workerThread;
-};
-
-struct ThreadArg
-{
-    CLuaFunctionRef function;
-    CLuaArguments   arguments;
-    CLuaMain*       luaMain;
-    pthread_t*      thread;
-};
-
 void CWebAssemblyThreadDefs::RegisterFunctionTypes()
 {
-    SetFunctionType("create_worker", "u**x");
+    SetFunctionType("create_worker", "u**");
     SetFunctionType("terminate_worker", "bu");
     SetFunctionType("run_worker", "bu");
     SetFunctionType("worker_join", "bu");
@@ -52,6 +35,12 @@ void CWebAssemblyThreadDefs::RegisterFunctionTypes()
     SetFunctionType("sleep_worker", "vi");
     SetFunctionType("get_worker_state", "iu");
     SetFunctionType("is_worker", "bu");
+
+    SetFunctionType("create_mutex", "u");
+    SetFunctionType("destroy_mutex", "bu");
+    SetFunctionType("lock_mutex", "bu");
+    SetFunctionType("unlock_mutex", "bu");
+    SetFunctionType("is_mutex", "bu");
 }
 
 void CWebAssemblyThreadDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -67,6 +56,12 @@ void CWebAssemblyThreadDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "get_worker_state", GetWorkerState },
         { "is_worker", IsWorker },
 
+        { "create_mutex", CreateMutex_ },
+        { "destroy_mutex", DestroyMutex_ },
+        { "lock_mutex", LockMutex_ },
+        { "unlock_mutex", UnlockMutex_ },
+        { "is_mutex", IsMutex_ }
+
         //{ "create_thread", CreateThread },
         //{ "terminate_thread", TerminateThread }
     };
@@ -78,13 +73,11 @@ WebAssemblyApi(CWebAssemblyThreadDefs::CreateWorker, env, args, results)
 {
     uint32_t                         functionIndex;
     CWebAssemblyMemoryPointerAddress dataPtr;
-    uint32_t                         dataSize;
 
     CWebAssemblyArgReader argStream(env, args, results);
 
     argStream.ReadUInt32(functionIndex);
     argStream.ReadPointerAddress(dataPtr);
-    argStream.ReadUInt32(dataSize, 0xffffffff);
 
     CWebAssemblyScript* script = GetWebAssemblyEnvScript(env);
 
@@ -98,17 +91,7 @@ WebAssemblyApi(CWebAssemblyThreadDefs::CreateWorker, env, args, results)
 
     threadData.mainScript = script;
     threadData.functionIndex = functionIndex;
-
-    if (dataPtr != WEB_ASSEMBLY_NULL_PTR && dataSize > 0)
-    {
-        threadData.data = malloc(dataSize);
-
-        if (threadData.data)
-        {
-            threadData.dataSize = dataSize;
-            memcpy(threadData.data, script->GetMemory()->GetMemoryPhysicalPointer(dataPtr), dataSize);
-        }
-    }
+    threadData.data = script->GetMemory()->GetMemoryPhysicalPointer(dataPtr);
 
     CWebAssemblyThread* worker = GetWebAssemblyEnvContext(env)->CreateThread(threadData);
 
@@ -137,7 +120,9 @@ WebAssemblyApi(CWebAssemblyThreadDefs::TerminateWorker, env, args, results)
         return argStream.Return(false);
     }
 
-    return argStream.Return(worker->Terminate());
+    GetWebAssemblyEnvContext(env)->DestroyThread(worker);
+
+    return argStream.Return(true);
 }
 
 WebAssemblyApi(CWebAssemblyThreadDefs::RunWorker, env, args, results)
@@ -271,6 +256,85 @@ WebAssemblyApi(CWebAssemblyThreadDefs::IsWorker, env, args, results)
 
     return argStream.Return(GetWebAssemblyEnvContext(env)->DoesOwnThread(worker));
 }
+
+WebAssemblyApi(CWebAssemblyThreadDefs::CreateMutex_, env, args, results)
+{
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    return argStream.ReturnSystemPointer(GetWebAssemblyEnvContext(env)->CreateThreadMutex());
+}
+
+WebAssemblyApi(CWebAssemblyThreadDefs::DestroyMutex_, env, args, results)
+{
+    CWebAssemblyThreadMutex* mutex;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(mutex);
+
+    if (!mutex)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(GetWebAssemblyEnvContext(env)->DestroyThreadMutex(mutex));
+}
+
+WebAssemblyApi(CWebAssemblyThreadDefs::LockMutex_, env, args, results)
+{
+    CWebAssemblyThreadMutex* mutex;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(mutex);
+
+    if (!mutex)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(GetWebAssemblyEnvContext(env)->LockMutex(mutex));
+}
+
+WebAssemblyApi(CWebAssemblyThreadDefs::UnlockMutex_, env, args, results)
+{
+    CWebAssemblyThreadMutex* mutex;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(mutex);
+
+    if (!mutex)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(GetWebAssemblyEnvContext(env)->UnlockMutex(mutex));
+}
+
+WebAssemblyApi(CWebAssemblyThreadDefs::IsMutex_, env, args, results)
+{
+    CWebAssemblyThreadMutex* mutex;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadSystemPointer(mutex);
+
+    if (!mutex)
+    {
+        return argStream.Return(false);
+    }
+
+    return argStream.Return(GetWebAssemblyEnvContext(env)->DoesOwnThreadMutex(mutex));
+}
+
+struct ThreadArg
+{
+    CLuaFunctionRef function;
+    CLuaArguments   arguments;
+    CLuaMain*       luaMain;
+    pthread_t*      thread;
+};
 
 void* ThreadExecutor(void* arg)
 {

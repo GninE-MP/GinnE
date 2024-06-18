@@ -165,13 +165,26 @@ CWebAssemblyThread::CWebAssemblyThread(CWebAssemblyContext* context, CWebAssembl
 {
     Drop();
 
-    SetContext(context);
+    SetWasmContext(context);
     SetData(data);
 }
 
 CWebAssemblyThread::~CWebAssemblyThread()
 {
     Terminate();
+
+    if (m_pExecutorScript)
+    {
+        m_pExecutorScript->GetStoreContext()->DestroyScript(m_pExecutorScript);
+        m_pExecutorScript = NULL;
+    }
+
+    if (m_pStore)
+    {
+        delete m_pStore;
+        m_pStore = NULL;
+    }
+
     Drop();
 }
 
@@ -192,16 +205,7 @@ bool CWebAssemblyThread::Start()
         return false;
     }
 
-    void* threadArg = malloc(sizeof(m_ThreadData));
-
-    if (!threadArg)
-    {
-        return false;
-    }
-
-    memcpy(threadArg, &m_ThreadData, sizeof(m_ThreadData));
-
-    int result = pthread_create(&m_ThreadId, NULL, ThreadExecutor, threadArg);
+    int result = pthread_create(&m_ThreadId, NULL, ThreadExecutor, &m_ThreadData);
 
     SetState(result == 0 ? CWebAssemblyThreadState::Starting : CWebAssemblyThreadState::Off);
 
@@ -210,30 +214,33 @@ bool CWebAssemblyThread::Start()
 
 bool CWebAssemblyThread::Terminate()
 {
-    if (m_ThreadState != CWebAssemblyThreadState::Running && m_ThreadState != CWebAssemblyThreadState::Waiting)
+    if (m_ThreadState != CWebAssemblyThreadState::Running && m_ThreadState != CWebAssemblyThreadState::Waiting && m_ThreadState != CWebAssemblyThreadState::Finished)
     {
         return false;
     }
 
     if (m_ThreadId.p == WebAssemblyMainThread->GetId().p)
     {
-        return NULL;
+        return false;
     }
 
     int result = pthread_cancel(m_ThreadId);
 
     SetState(CWebAssemblyThreadState::Terminated);
 
-    if (result == 0)
+    if (m_pExecutorScript)
     {
-        if (m_pExecutorScript)
-        {
-            delete m_pExecutorScript;
-            m_pExecutorScript = NULL;
-        }
+        m_pExecutorScript->GetStoreContext()->DestroyScript(m_pExecutorScript);
+        m_pExecutorScript = NULL;
     }
 
-    return result == 0;
+    if (m_pStore)
+    {
+        delete m_pStore;
+        m_pStore = NULL;
+    }
+
+    return result == 0 || result == 3;
 }
 
 bool CWebAssemblyThread::Join()
@@ -279,11 +286,15 @@ void CWebAssemblyThread::SetData(CWebAssemblyThreadData data)
     m_ThreadData = data;
 }
 
-void CWebAssemblyThread::SetContext(CWebAssemblyContext* context)
+void CWebAssemblyThread::SetWasmContext(CWebAssemblyContext* context)
 {
     m_pContext = context;
 }
 
+void CWebAssemblyThread::SetWasmStore(CWebAssemblyStore* store)
+{
+    m_pStore = store;
+}
 
 void CWebAssemblyThread::SetExecutorScript(CWebAssemblyScript* script)
 {
@@ -315,14 +326,14 @@ CWebAssemblyContext* CWebAssemblyThread::GetWasmContext()
     return m_pContext;
 }
 
+CWebAssemblyStore* CWebAssemblyThread::GetWasmStore()
+{
+    return m_pStore;
+}
+
 CWebAssemblyScript* CWebAssemblyThread::GetExecutorScript()
 {
     return m_pExecutorScript;
-}
-
-CWebAssemblySharedScriptData* CWebAssemblyThread::GetSharedScriptData()
-{
-    return m_pSharedScriptData;
 }
 
 void* CWebAssemblyThread::GetThreadArg()
@@ -383,13 +394,13 @@ void* CWebAssemblyThread::ThreadExecutor(void* threadArg)
         return NULL;
     }
 
+    data->thread->SetWasmStore(workerStore);
+
     workerStore->Build();
 
     if (!*workerStore)
     {
         data->thread->SetState(CWebAssemblyThreadState::Finished);
-
-        delete workerStore;
 
         pthread_exit(NULL);
 
@@ -404,45 +415,38 @@ void* CWebAssemblyThread::ThreadExecutor(void* threadArg)
 
         pthread_exit(NULL);
 
-        delete workerStore;
-
         return NULL;
     }
 
     CWebAssemblyScript* workerScript = context->CreateScript();
 
+    if (!workerScript)
+    {
+        data->thread->SetState(CWebAssemblyThreadState::Finished);
+
+        CWebAssemblyScript::DeleteSharedScriptData(sharedData);
+
+        pthread_exit(NULL);
+
+        return NULL;
+    }
+
+    data->thread->SetExecutorScript(workerScript);
+
     CWebAssemblyDefs::RegisterApi(workerScript);
 
-    CWebAssemblyLoadState loadState = workerScript->LoadBinary(NULL, 0, data->mainScript->GetScriptFile(), sharedData);
+    CWebAssemblyLoadState loadState = context->LoadScriptBinary(workerScript, sharedData, false);
 
     if (loadState == CWebAssemblyLoadState::Succeed)
     {
         CWebAssemblyVariables args;
 
-        CWebAssemblyMemory* memory = workerScript->GetMemory();
-
-        if (data->data && data->dataSize > 0)
-        {
-            void* dataPtr;
-
-            args.Push((int32_t)memory->Malloc(data->dataSize, &dataPtr));
-
-            if (dataPtr)
-            {
-                memcpy(dataPtr, data->data, data->dataSize);
-            }
-        }
-        else
-        {
-            args.Push(NULL);
-        }
+        args.Push((intptr_t)data->data);
 
         data->thread->SetState(CWebAssemblyThreadState::Running);
 
         workerScript->CallInternalFunction(data->functionIndex, &args, NULL);
     }
-
-    delete workerScript;
 
     CWebAssemblyScript::DeleteSharedScriptData(sharedData);
 
@@ -491,6 +495,7 @@ CWebAssemblyContext::~CWebAssemblyContext()
 void CWebAssemblyContext::Destroy()
 {
     ClearThreads();
+    ClearThreadMutexes();
     ClearScripts();
     ClearGlobalFunctions();
 
@@ -529,6 +534,33 @@ CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* 
     return state;
 }
 
+CWebAssemblyLoadState CWebAssemblyContext::LoadScriptBinary(CWebAssemblyScript* script, CWebAssemblySharedScriptData* sharedData, bool executeMain)
+{
+    if (!script)
+    {
+        return CWebAssemblyLoadState::Failed;
+    }
+
+    if (!sharedData || !sharedData->script)
+    {
+        return CWebAssemblyLoadState::Failed;
+    }
+
+    CWebAssemblyLoadState state = script->LoadBinary(NULL, 0, sharedData->script->GetScriptFile(), sharedData);
+
+    if (state == CWebAssemblyLoadState::Succeed)
+    {
+        m_lsScripts.push_back(script);
+
+        if (executeMain)
+        {
+            script->CallMainFunction({ GetResource()->GetName(), sharedData->script->GetScriptFile(), std::to_string(m_lsScripts.size()) });
+        }
+    }
+
+    return state;
+}
+
 void CWebAssemblyContext::DestroyScript(CWebAssemblyScript* script)
 {
     if (!DoesOwnScript(script))
@@ -543,14 +575,15 @@ void CWebAssemblyContext::DestroyScript(CWebAssemblyScript* script)
         if (m_lsScripts[i] == script)
         {
             index = i;
+            break;
         }
     }
 
     if (index >= 0)
     {
-        m_lsScripts.erase(m_lsScripts.begin() + index);
-
         delete script;
+
+        m_lsScripts.erase(m_lsScripts.begin() + index);
     }
 }
 
@@ -587,15 +620,86 @@ void CWebAssemblyContext::DestroyThread(CWebAssemblyThread* thread)
         if (m_lsThreads[i] == thread)
         {
             index = i;
+            break;
         }
     }
 
     if (index >= 0)
     {
-        m_lsThreads.erase(m_lsThreads.begin() + index);
-
         delete thread;
+
+        m_lsThreads.erase(m_lsThreads.begin() + index);
     }
+}
+
+CWebAssemblyThreadMutex* CWebAssemblyContext::CreateThreadMutex()
+{
+    CWebAssemblyThreadMutex* mutex = new CWebAssemblyThreadMutex();
+
+    if (!mutex)
+    {
+        return NULL;
+    }
+
+    if (pthread_mutex_init(mutex, NULL) != 0)
+    {
+        delete mutex;
+        return NULL;
+    }
+
+    m_lsThreadMutexes.push_back(mutex);
+
+    return mutex;
+}
+
+bool CWebAssemblyContext::DestroyThreadMutex(CWebAssemblyThreadMutex* mutex)
+{
+    if (!DoesOwnThreadMutex(mutex))
+    {
+        return false;
+    }
+
+    bool result = pthread_mutex_destroy(mutex);
+
+    int index = -1;
+
+    for (int i = 0; i < m_lsThreadMutexes.size(); i++)
+    {
+        if (m_lsThreadMutexes[i] == mutex)
+        {
+            index = i;
+            break;
+        }
+    }
+
+    if (index >= 0)
+    {
+        delete mutex;
+
+        m_lsThreadMutexes.erase(m_lsThreadMutexes.begin() + index);
+    }
+
+    return result == 0;
+}
+
+bool CWebAssemblyContext::LockMutex(CWebAssemblyThreadMutex* mutex)
+{
+    if (!DoesOwnThreadMutex(mutex))
+    {
+        return false;
+    }
+
+    return pthread_mutex_lock(mutex) == 0;
+}
+
+bool CWebAssemblyContext::UnlockMutex(CWebAssemblyThreadMutex* mutex)
+{
+    if (!DoesOwnThreadMutex(mutex))
+    {
+        return false;
+    }
+
+    return pthread_mutex_unlock(mutex) == 0;
 }
 
 CWebAssemblyScriptList& CWebAssemblyContext::GetScripts()
@@ -603,10 +707,14 @@ CWebAssemblyScriptList& CWebAssemblyContext::GetScripts()
     return m_lsScripts;
 }
 
-
 CWebAssemblyThreadList& CWebAssemblyContext::GetThreads()
 {
     return m_lsThreads;
+}
+
+CWebAssemblyThreadMutexList& CWebAssemblyContext::GetThreadMutexes()
+{
+    return m_lsThreadMutexes;
 }
 
 void CWebAssemblyContext::ClearScripts()
@@ -631,7 +739,6 @@ void CWebAssemblyContext::ClearScripts()
     m_lsScripts.clear();
 }
 
-
 void CWebAssemblyContext::ClearThreads()
 {
     if (m_lsThreads.empty())
@@ -652,6 +759,28 @@ void CWebAssemblyContext::ClearThreads()
     }
 
     m_lsThreads.clear();
+}
+
+void CWebAssemblyContext::ClearThreadMutexes()
+{
+    if (m_lsThreadMutexes.empty())
+    {
+        return;
+    }
+
+    size_t length = m_lsThreadMutexes.size();
+
+    for (size_t i = 0; i < length; i++)
+    {
+        CWebAssemblyThreadMutex* mutex = m_lsThreadMutexes[i];
+
+        if (mutex)
+        {
+            pthread_mutex_destroy(mutex);
+        }
+    }
+
+    m_lsThreadMutexes.clear();
 }
 
 void CWebAssemblyContext::SetResource(CResource* resource)
@@ -874,6 +1003,24 @@ bool CWebAssemblyContext::DoesOwnThread(CWebAssemblyThread* thread)
     for (CWebAssemblyThread* th : m_lsThreads)
     {
         if (th == thread)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool CWebAssemblyContext::DoesOwnThreadMutex(CWebAssemblyThreadMutex* mutex)
+{
+    if (!mutex || m_lsThreadMutexes.empty())
+    {
+        return false;
+    }
+
+    for (CWebAssemblyThreadMutex* mut : m_lsThreadMutexes)
+    {
+        if (mut == mutex)
         {
             return true;
         }
