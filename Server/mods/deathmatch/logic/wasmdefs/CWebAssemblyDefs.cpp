@@ -24,6 +24,8 @@
 #include "CWebAssemblyCameraDefs.h"
 #include "CWebAssemblyNetworkDefs.h"
 #include "CWebAssemblyVoiceDefs.h"
+#include "CWebAssemblyWaterDefs.h"
+#include "CWebAssemblyRadarAreaDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
@@ -38,6 +40,8 @@ void CWebAssemblyDefs::RegisterApiFunctionTypes()
     CWebAssemblyCameraDefs::RegisterFunctionTypes();
     CWebAssemblyNetworkDefs::RegisterFunctionTypes();
     CWebAssemblyVoiceDefs::RegisterFunctionTypes();
+    CWebAssemblyWaterDefs::RegisterFunctionTypes();
+    CWebAssemblyRadarAreaDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
@@ -51,6 +55,8 @@ void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
     CWebAssemblyCameraDefs::RegisterFunctions(script);
     CWebAssemblyNetworkDefs::RegisterFunctions(script);
     CWebAssemblyVoiceDefs::RegisterFunctions(script);
+    CWebAssemblyWaterDefs::RegisterFunctions(script);
+    CWebAssemblyRadarAreaDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)

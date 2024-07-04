@@ -139,6 +139,7 @@ typedef GNINE_ELEMENT GNINE_PLAYER;
 typedef GNINE_ELEMENT GNINE_TEAM;
 
 typedef GNINE_ELEMENT GNINE_WATER;
+typedef GNINE_ELEMENT GNINE_RADAR_AREA;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -567,6 +568,17 @@ GNINE_API_IMPORT(get_water_color, (GNINE_COLOR* out_color), bool);
 GNINE_API_IMPORT(set_water_color, (GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(reset_water_color, (), bool);
 
+GNINE_API_IMPORT(create_radar_area, (GNINE_VECTOR2* position, GNINE_VECTOR2* size, GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_RADAR_AREA);
+
+GNINE_API_IMPORT(get_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* out_size), bool);
+GNINE_API_IMPORT(get_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(is_radar_area_flashing, (GNINE_RADAR_AREA radar_area), bool);
+GNINE_API_IMPORT(is_inside_radar_area, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* position), bool);
+
+GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* size), bool);
+GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_radar_area_flashing, (GNINE_RADAR_AREA radar_area, bool flash), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -683,6 +695,7 @@ namespace GNINE_NAMESPACE {
     using PlayerId = GNINE_PLAYER;
     using TeamId = GNINE_TEAM;
     using WaterId = GNINE_WATER;
+    using RadarAreaId = GNINE_RADAR_AREA;
 
     using RemoteRequestId = GNINE_REMOTE_REQUEST;
 
@@ -2812,6 +2825,10 @@ namespace GNINE_NAMESPACE {
                 return list;
             }
 
+            static Element GetRootElement() {
+                return NULL;
+            }
+
         private:
             ElementId m_pElementId;
     };
@@ -3562,6 +3579,74 @@ namespace GNINE_NAMESPACE {
 
             static bool ResetWaterColor() {
                 return gnine_reset_water_color();
+            }
+    };
+
+    class RadarArea : public Element {
+        public: 
+            RadarArea() {
+                Drop();
+            }
+
+            RadarArea(RadarAreaId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~RadarArea() = default;
+
+            RadarArea& operator=(RadarArea radarArea) {
+                SetId(radarArea);
+
+                return *this;
+            }
+
+            Vector2 GetSize() {
+                GNINE_VECTOR2 size;
+                
+                gnine_get_radar_area_size(*this, &size);
+
+                return Vector2(size.x, size.y);
+            }
+
+            Color GetColor() {
+                Color color;
+
+                gnine_get_radar_area_color(*this, &color);
+
+                return color;
+            }
+
+            bool IsFlashing() {
+                return gnine_is_radar_area_flashing(*this);
+            }
+
+            bool IsPositionInside(Vector2 position) {
+                GNINE_VECTOR2 pos = position;
+
+                return gnine_is_inside_radar_area(*this, &pos);
+            }
+
+            bool SetSize(Vector2 size) {
+                GNINE_VECTOR2 s = size;
+
+                return gnine_set_radar_area_size(*this, &s);
+            }
+
+            bool SetColor(Color color) {
+                return gnine_set_radar_area_color(*this, &color);
+            }
+
+            bool SetFlashing(bool flashing) {
+                return gnine_set_radar_area_flashing(*this, flashing);
+            }
+
+            static RadarArea CreateRadarArea(Vector2 position, Vector2 size, Color color = { 0, 0, 255, 255 }, Element visibleTo = GetRootElement()) {
+                GNINE_VECTOR2 pos = position;
+                GNINE_VECTOR2 s = size;
+
+                return gnine_create_radar_area(&pos, &s, &color, visibleTo);
             }
     };
 
