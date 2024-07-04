@@ -21,6 +21,9 @@
 #include "CWebAssemblyTeamDefs.h"
 #include "CWebAssemblyThreadDefs.h"
 #include "CWebAssemblyTimerDefs.h"
+#include "CWebAssemblyCameraDefs.h"
+#include "CWebAssemblyNetworkDefs.h"
+#include "CWebAssemblyVoiceDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
@@ -32,6 +35,9 @@ void CWebAssemblyDefs::RegisterApiFunctionTypes()
     CWebAssemblyTeamDefs::RegisterFunctionTypes();
     CWebAssemblyThreadDefs::RegisterFunctionTypes();
     CWebAssemblyTimerDefs::RegisterFunctionTypes();
+    CWebAssemblyCameraDefs::RegisterFunctionTypes();
+    CWebAssemblyNetworkDefs::RegisterFunctionTypes();
+    CWebAssemblyVoiceDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
@@ -42,6 +48,9 @@ void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
     CWebAssemblyTeamDefs::RegisterFunctions(script);
     CWebAssemblyThreadDefs::RegisterFunctions(script);
     CWebAssemblyTimerDefs::RegisterFunctions(script);
+    CWebAssemblyCameraDefs::RegisterFunctions(script);
+    CWebAssemblyNetworkDefs::RegisterFunctions(script);
+    CWebAssemblyVoiceDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)

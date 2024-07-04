@@ -88,6 +88,8 @@ void CWebAssemblyUtilDefs::RegisterFunctionTypes()
     SetFunctionType("args_get_arg_as_list", "uui");
     SetFunctionType("args_get_arg_count", "iu");
     SetFunctionType("args_clone", "uu");
+
+    SetFunctionType("execute_lua_code", "xsu*sx");
 }
 
 void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
@@ -146,7 +148,9 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         { "args_get_arg_as_userdata", ArgsGetArgAsUserdata },
         { "args_get_arg_as_list", ArgsGetArgAsList },
         { "args_get_arg_count", ArgsGetArgCount },
-        { "args_clone", ArgsClone }
+        { "args_clone", ArgsClone },
+        
+        { "execute_lua_code", ExecuteLuaCode }
     };
 
     WASM_REGISTER_API(script, functions);
@@ -1278,4 +1282,142 @@ WebAssemblyApi(CWebAssemblyUtilDefs::ArgsClone, env, args, results)
     memcpy(clone->data, argsL->data, clone->dataSize);
 
     return argStream.ReturnSystemPointer(clone);
+}
+
+WebAssemblyApi(CWebAssemblyUtilDefs::ExecuteLuaCode, env, args, results)
+{
+    SString                          luaCode;
+    CLuaArguments                    luaArguments;
+    CWebAssemblyMemoryPointerAddress luaResults;
+    CWebAssemblyMemoryPointerAddress outError;
+    uint32_t                         maxErrorSize;
+
+    CWebAssemblyArgReader argStream(env, args, results);
+
+    argStream.ReadString(luaCode);
+    argStream.ReadLuaArguments(luaArguments);
+    argStream.ReadPointerAddress(luaResults);
+    argStream.ReadPointerAddress(outError);
+    argStream.ReadUInt32(maxErrorSize, 0xffffffff);
+
+    if (luaCode.empty())
+    {
+        return argStream.Return(0);
+    }
+
+    lua_State* luaVM = GetWebAssemblyLuaVM(env);
+
+    if (!luaVM)
+    {
+        return argStream.Return(0);
+    }
+
+    if (luaCode.BeginsWith("(") && luaCode.EndsWith(")"))
+    {
+        auto TrimString = [](SString str, bool end) -> SString
+        {
+            if (str.empty())
+            {
+                return "";
+            }
+
+            int length = str.size();
+
+            int pos = 0;
+
+            if (end)
+            {
+                for (int i = length - 1; i >= 0; i--)
+                {
+                    if (str[i] != ' ')
+                    {
+                        pos = i;
+                        break;
+                    }
+                }
+
+                return str.SubStr(0, pos + 1);
+            }
+
+            for (int i = 0; i < length; i++)
+            {
+                if (str[i] != ' ')
+                {
+                    pos = i;
+                    break;
+                }
+            }
+
+            return str.SubStr(pos);
+        };
+
+        luaCode = TrimString(luaCode, false);
+        luaCode = TrimString(luaCode, true);
+        luaCode = luaCode.SubStr(1, luaCode.size() - 2);
+        luaCode = TrimString(luaCode, false);
+        luaCode = TrimString(luaCode, true);
+    }
+
+    luaL_loadstring(luaVM, luaCode.c_str());
+
+    if (lua_type(luaVM, -1) != LUA_TFUNCTION)
+    {
+        SString errorMessage = "Failed to load lua code.";
+
+        if (lua_type(luaVM, -1) == LUA_TSTRING)
+        {
+            errorMessage = lua_tostring(luaVM, -1);
+        }
+
+        uint32_t length = std::min((uint32_t)errorMessage.size(), maxErrorSize);
+
+        argStream.WritePointer(outError, errorMessage.data(), length);
+
+        lua_pop(luaVM, 1);
+
+        return argStream.Return(length);
+    }
+
+    int lastTop = lua_gettop(luaVM);
+
+    luaArguments.PushArguments(luaVM);
+
+    if (lua_pcall(luaVM, luaArguments.Count(), LUA_MULTRET, 0) != 0)
+    {
+        SString errorMessage = lua_tostring(luaVM, -1);
+
+        uint32_t length = std::min((uint32_t)errorMessage.length(), maxErrorSize);
+
+        argStream.WritePointer(outError, errorMessage.data(), length);
+
+        lua_pop(luaVM, 1);
+
+        return argStream.Return(length);
+    }
+
+    int resultsLength = lua_gettop(luaVM) - lastTop;
+
+    if (luaResults != WEB_ASSEMBLY_NULL_PTR)
+    {
+        CLuaArguments res;
+
+        res.ReadArguments(luaVM, lastTop);
+
+        cargs* resL = args_create();
+
+        std::vector<CLuaArgument*>::const_iterator iter = res.IterBegin();
+
+        for (; iter != res.IterEnd(); iter++)
+        {
+            args_read_clua_argument(resL, *iter);
+        }
+
+        CWebAssemblyUserData udata = (CWebAssemblyUserData)resL;
+
+        argStream.WritePointer(luaResults, &udata);
+    }
+
+    lua_pop(luaVM, resultsLength);
+
+    return argStream.Return(0);
 }

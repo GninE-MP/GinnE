@@ -22,8 +22,6 @@
 
 #include "CWebAssemblyTimerDefs.h"
 
-#include <pthread.h>
-
 void CWebAssemblyTimerDefs::RegisterFunctionTypes()
 {
     SetFunctionType("set_timer", "u*iiu");

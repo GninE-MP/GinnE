@@ -48,6 +48,7 @@
 
 #define GetWebAssemblyEnvObject(env) ((CWebAssemblyApiEnviornment)env)
 #define GetWebAssemblyEnvScript(env) (GetWebAssemblyEnvObject(env)->script)
+#define GetWebAssemblyEnvMemory(env) (GetWebAssemblyEnvScript(env)->GetMemory())
 #define GetWebAssemblyEnvFunctionName(env) (GetWebAssemblyEnvObject(env)->functionName)
 #define GetWebAssemblyEnvContext(env) (GetWebAssemblyEnvScript(env)->GetStoreContext())
 #define GetWebAssemblyEnvResource(env) (GetWebAssemblyEnvContext(env)->GetResource())

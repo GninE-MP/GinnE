@@ -26,6 +26,7 @@
 #define ELEMENT_TO_WASM_USERDATA(element) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((element)->GetID().Value()))
 #define RESOURCE_TO_WASM_USERDATA(resource) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>((resource)->GetScriptID()))
 #define TIMER_TO_WASM_USERDATA(timer) ((CWebAssemblyUserData)(void*)reinterpret_cast<unsigned int*>(timer->GetScriptID()))
+#define POINTER_TO_WASM_SYSTEM_POINTER(pointer) ((CWebAssemblyUserData)(void*)(CWebAssemblyUserData*)pointer)
 
 class CWebAssemblyScript;
 
@@ -141,6 +142,27 @@ public:
             ReadInt32(userdata);
         #endif
 
+        if (!userdata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        lua_State* luaVM = m_pScript->GetStoreContext()->GetResource()->GetVirtualMachine()->GetVM();
+        PTR* udata = (PTR*)UserDataCast((PTR*)(void*)userdata, luaVM);
+
+        if (!udata)
+        {
+            out = defaultValue;
+            return;
+        }
+
+        out = udata; 
+    }
+    
+    template<typename PTR>
+    void ExtractUserData(CWebAssemblyUserData userdata, PTR*& out, PTR* defaultValue = NULL)
+    {
         if (!userdata)
         {
             out = defaultValue;
