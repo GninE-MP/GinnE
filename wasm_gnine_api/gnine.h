@@ -140,6 +140,7 @@ typedef GNINE_ELEMENT GNINE_TEAM;
 
 typedef GNINE_ELEMENT GNINE_WATER;
 typedef GNINE_ELEMENT GNINE_RADAR_AREA;
+typedef GNINE_ELEMENT GNINE_PICKUP;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -284,6 +285,15 @@ struct GNINE_REMOTE_REQUEST_INFO {
     GNINE_UI32     bytesReceived;
     GNINE_UI32     bytesTotal;
     GNINE_UI32     currentAttempt;
+};
+
+typedef GNINE_I32 GNINE_PICKUP_TYPE_T;
+enum GNINE_PICKUP_TYPE : GNINE_PICKUP_TYPE_T {
+    GNINE_PICKUP_TYPE_INVALID = -1,
+    GNINE_PICKUP_TYPE_HEALTH = 0,
+    GNINE_PICKUP_TYPE_ARMOR = 1,
+    GNINE_PICKUP_TYPE_WEAPON = 2,
+    GNINE_PICKUP_TYPE_CUSTOM = 3
 };
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
@@ -579,6 +589,19 @@ GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR
 GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_radar_area_flashing, (GNINE_RADAR_AREA radar_area, bool flash), bool);
 
+GNINE_API_IMPORT(create_pickup, (GNINE_VECTOR3* position, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_UI32 respawn_time, GNINE_I32 ammo), GNINE_PICKUP);
+
+GNINE_API_IMPORT(get_pickup_type, (GNINE_PICKUP pickup), GNINE_PICKUP_TYPE_T);
+GNINE_API_IMPORT(get_pickup_weapon, (GNINE_PICKUP pickup), GNINE_I32);
+GNINE_API_IMPORT(get_pickup_amount, (GNINE_PICKUP pickup), GNINE_F32);
+GNINE_API_IMPORT(get_pickup_ammo, (GNINE_PICKUP pickup), GNINE_I32);
+GNINE_API_IMPORT(get_pickup_respawn_interval, (GNINE_PICKUP pickup), GNINE_UI32);
+GNINE_API_IMPORT(is_pickup_spawned, (GNINE_PICKUP pickup), bool);
+
+GNINE_API_IMPORT(set_pickup_type, (GNINE_PICKUP pickup, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_I32 ammo), bool);
+GNINE_API_IMPORT(set_pickup_respawn_interval, (GNINE_PICKUP pickup, GNINE_UI32 time_ms), bool);
+GNINE_API_IMPORT(use_pickup, (GNINE_PICKUP pickup, GNINE_PLAYER player), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -696,6 +719,7 @@ namespace GNINE_NAMESPACE {
     using TeamId = GNINE_TEAM;
     using WaterId = GNINE_WATER;
     using RadarAreaId = GNINE_RADAR_AREA;
+    using PickupId = GNINE_PICKUP;
 
     using RemoteRequestId = GNINE_REMOTE_REQUEST;
 
@@ -3583,7 +3607,7 @@ namespace GNINE_NAMESPACE {
     };
 
     class RadarArea : public Element {
-        public: 
+        public:
             RadarArea() {
                 Drop();
             }
@@ -3647,6 +3671,77 @@ namespace GNINE_NAMESPACE {
                 GNINE_VECTOR2 s = size;
 
                 return gnine_create_radar_area(&pos, &s, &color, visibleTo);
+            }
+    };
+
+    class Pickup : public Element {
+        public:
+            enum class PickupType : GNINE_PICKUP_TYPE_T {
+                Invalid = GNINE_PICKUP_TYPE_INVALID,
+                Health = GNINE_PICKUP_TYPE_HEALTH,
+                Armor = GNINE_PICKUP_TYPE_ARMOR,
+                Weapon = GNINE_PICKUP_TYPE_WEAPON,
+                Custom = GNINE_PICKUP_TYPE_CUSTOM
+            };
+
+            Pickup() {
+                Drop();
+            }
+
+            Pickup(PickupId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Pickup() = default;
+
+            Pickup& operator=(Pickup pickup) {
+                SetId(pickup);
+
+                return *this;
+            }
+
+            PickupType GetType() {
+                return (PickupType)gnine_get_pickup_type(*this);
+            }
+
+            Int32 GetWeapon() {
+                return gnine_get_pickup_weapon(*this);
+            }
+
+            Float32 GetAmount() {
+                return gnine_get_pickup_amount(*this);
+            }
+
+            Int32 GetAmmo() {
+                return gnine_get_pickup_ammo(*this);
+            }
+
+            UInt32 GetRespawnInterval() {
+                return gnine_get_pickup_respawn_interval(*this);
+            }
+
+            bool IsSpawned() {
+                return gnine_is_pickup_spawned(*this);
+            }
+
+            bool SetType(PickupType type, Int32 value, Int32 ammo) {
+                return gnine_set_pickup_type(*this, (GNINE_PICKUP_TYPE_T)type, value, ammo);
+            }
+
+            bool SetRespawnInterval(UInt32 interval) {
+                return gnine_set_pickup_respawn_interval(*this, interval);
+            }
+
+            bool Use(Player player) {
+                return gnine_use_pickup(*this, player);
+            }
+
+            static Pickup CreatePickup(Vector3 position, PickupType type, Int32 value, UInt32 respawnTime = 30000, Int32 ammo = 50) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_create_pickup(&pos, (GNINE_PICKUP_TYPE_T)type, value, respawnTime, ammo);
             }
     };
 
