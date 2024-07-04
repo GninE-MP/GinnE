@@ -11,7 +11,6 @@
 
 #pragma once
 
-#include <utility>
 #ifndef GNINE_HEADER
 #define GNINE_HEADER
 
@@ -53,14 +52,17 @@
 #define NULL (0)
 #endif
 
+#define GNINE_DECONST(type) *(type*)&
+
 #define GNINE_MAIN GNINE_EXPORT_NAME(ModuleMain)
 
-#define GNINE_NULL 0
+#define GNINE_NULL NULL
 #define GNINE_NULL_PTR nullptr
 
 #define GNINE_IMPORT(name, args, ret) __attribute__((import_module("env"), import_name(#name))) GNINE_API ret name args
 #define GNINE_IMPORT_NAME(name, functionName, args, ret) __attribute__((import_module("env"), import_name(#name))) GNINE_API ret functionName args
 #define GNINE_API_IMPORT(name, args, ret) GNINE_IMPORT(gnine_##name, args, ret)
+#define GNINE_API_IMPORT_NAME(name, functionName, args, ret) GNINE_IMPORT_NAME(gnine_##name, functionName, args, ret)
 
 #ifdef GNINE_CPP
 #define GNINE_LUA_IMPORT(function, ...) GNINE_IMPORT(function, (__VA_ARGS__, GNINE_PTR returnValue = NULL, GNINE_I_PTR max_return_size = 0xffffffff), GNINE_I_PTR)
@@ -116,6 +118,8 @@ typedef GNINE_I32 GNINE_SHARED_POINTER_ADDRESS;
 
 #endif
 
+#define GNINE_REMOTE_REQUEST_DEFAULT_QUEUE_NAME "default"
+
 typedef GNINE_USERDATA_T* GNINE_USERDATA;
 
 typedef GNINE_USERDATA GNINE_ELEMENT;
@@ -125,6 +129,7 @@ typedef GNINE_USERDATA GNINE_BAN;
 typedef GNINE_USERDATA GNINE_WORKER;
 typedef GNINE_USERDATA GNINE_MUTEX;
 typedef GNINE_USERDATA GNINE_TIMER;
+typedef GNINE_USERDATA GNINE_REMOTE_REQUEST;
 //typedef GNINE_USERDATA GNINE_THREAD;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
@@ -132,6 +137,8 @@ typedef GNINE_ELEMENT GNINE_MARKER;
 
 typedef GNINE_ELEMENT GNINE_PLAYER;
 typedef GNINE_ELEMENT GNINE_TEAM;
+
+typedef GNINE_ELEMENT GNINE_WATER;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -217,6 +224,67 @@ struct GNINE_TIMER_DETAILS {
     GNINE_UI32 delay;
 };
 
+struct GNINE_CAMERA_MATRIX {
+    GNINE_VECTOR3 position;
+    GNINE_VECTOR3 lookAt;
+    GNINE_F32     roll;
+    GNINE_F32     fov;
+};
+
+/*
+    header & formFields code example:
+    {
+        GNINE_STRING headers[4] = { // 4 strings for 2 headers
+            "Content-Type", "application/json",
+            "User", "Gnine"
+        };
+        GNINE_STRING formFields[6] = {
+            "name", "Gnine",
+            "version", "1.0.0",
+            "age", "1"
+        };
+        
+        GNINE_REMOTE_REQUEST_OPTIONS options;
+        options.headers = headers;
+        options.headersCount = 2; // size of the `headers` array which is `4` devided by 2
+        options.formFields = formFields;
+        options.formFieldsCount = 3;
+    }
+*/
+struct GNINE_REMOTE_REQUEST_OPTIONS {
+    GNINE_UI32    connectionAttempts;
+    GNINE_UI32    connectTimeout;
+    GNINE_STRING  method;
+    GNINE_STRING  queueName;
+    GNINE_STRING  postData;
+    bool          postIsBinary;
+    GNINE_UI32    maxRedirects;
+    GNINE_STRING  username;
+    GNINE_STRING  password;
+    GNINE_STRING* headers;    //this is a list which contains 2 strings for each header. first one is `header_name` and second one is `header_value`.
+    GNINE_UI32    headersCount;
+    GNINE_STRING* formFields;
+    GNINE_UI32    formFieldsCount;
+};
+
+struct GNINE_REMOTE_REQUEST_INFO {
+    bool           isFetch;
+    GNINE_STRING   url;
+    GNINE_STRING   queue;
+    GNINE_RESOURCE resource;
+    GNINE_UI64     start;
+    GNINE_STRING   postData;
+    GNINE_UI32     postDataSize;
+    GNINE_STRING*  headers;       // this headers are like `GNINE_REMOTE_REQUEST_OPTIONS` headers. that means you can select header name with `headers[0]` and header value `header[1]`
+    GNINE_UI32     headersCount;  // if we had 2 items in `headers` that means this `headersCount` will equal to `1`
+    GNINE_STRING   method;
+    GNINE_UI32     connectionAttempts;
+    GNINE_UI32     connectionTimeout;
+    GNINE_UI32     bytesReceived;
+    GNINE_UI32     bytesTotal;
+    GNINE_UI32     currentAttempt;
+};
+
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
 
 GNINE_API_IMPORT(get_shared_pointer_address, (GNINE_PTR ptr), GNINE_SHARED_POINTER_ADDRESS);
@@ -271,6 +339,8 @@ GNINE_API_IMPORT(args_get_arg_as_userdata, (GNINE_ARGUMENTS args, GNINE_I32 inde
 GNINE_API_IMPORT(args_get_arg_as_list, (GNINE_ARGUMENTS args, GNINE_I32 index), GNINE_ARGUMENTS);
 GNINE_API_IMPORT(args_get_arg_count, (GNINE_ARGUMENTS args), GNINE_UI32);
 GNINE_API_IMPORT(args_clone, (GNINE_ARGUMENTS args), GNINE_ARGUMENTS);
+
+GNINE_API_IMPORT_NAME(execute_lua_code, __gnine_execute_lua_code, (GNINE_STRING code, GNINE_ARGUMENTS arguments, GNINE_ARGUMENTS* results, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_I_PTR);
 
 GNINE_API_IMPORT(get_c_function_numeric_position, (GNINE_PTR function), GNINE_UI32);
 
@@ -468,6 +538,35 @@ GNINE_API_IMPORT(get_timers, (GNINE_F64 time, GNINE_TIMER* out_timers, GNINE_UI3
 GNINE_API_IMPORT(is_timer, (GNINE_TIMER timer), bool);
 GNINE_API_IMPORT(get_timer_details, (GNINE_TIMER timer, struct GNINE_TIMER_DETAILS* out_timer_details), bool);
 
+GNINE_API_IMPORT(get_camera_matrix, (GNINE_PLAYER player, struct GNINE_CAMERA_MATRIX* out_camera_matrix), bool);
+GNINE_API_IMPORT(get_camera_target, (GNINE_PLAYER player), GNINE_ELEMENT);
+GNINE_API_IMPORT(get_camera_interior, (GNINE_PLAYER player), GNINE_I32);
+
+GNINE_API_IMPORT(set_camera_matrix, (GNINE_PLAYER player, struct GNINE_CAMERA_MATRIX* camera_matrix), bool);
+GNINE_API_IMPORT(set_camera_target, (GNINE_PLAYER player, GNINE_ELEMENT target), bool);
+GNINE_API_IMPORT(set_camera_interior, (GNINE_PLAYER player, GNINE_I32 interior), bool);
+GNINE_API_IMPORT(fade_camera, (GNINE_PLAYER player, bool fade_in, float time_to_fade, GNINE_COLOR* screen_color), bool);
+
+GNINE_API_IMPORT(call_remote, (GNINE_STRING url, GNINE_STRING queue_name, GNINE_UI32 connection_attempts, GNINE_UI32 connection_timeout, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
+GNINE_API_IMPORT(fetch_remote, (GNINE_STRING url, struct GNINE_REMOTE_REQUEST_OPTIONS* options, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
+GNINE_API_IMPORT(get_remote_requests, (GNINE_RESOURCE resource, GNINE_REMOTE_REQUEST* out_remote_request, GNINE_UI32 max_item_count), GNINE_UI32);
+GNINE_API_IMPORT(get_remote_request_info, (GNINE_REMOTE_REQUEST request, struct GNINE_REMOTE_REQUEST_INFO* out_info, GNINE_I32 post_data_length, bool include_headers), bool);
+GNINE_API_IMPORT(cleanup_remote_request_info, (struct GNINE_REMOTE_REQUEST_INFO* info), bool);
+GNINE_API_IMPORT(abort_remote_request, (GNINE_REMOTE_REQUEST request), bool);
+
+GNINE_API_IMPORT(is_voice_enabled, (), bool);
+GNINE_API_IMPORT(set_player_voice_broadcast_to, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
+GNINE_API_IMPORT(set_player_voice_ignore_from, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
+
+GNINE_API_IMPORT(create_water, (GNINE_VECTOR3* v1, GNINE_VECTOR3* v2, GNINE_VECTOR3* v3, GNINE_VECTOR3* v4, bool shallow), GNINE_WATER);
+GNINE_API_IMPORT(set_water_level, (GNINE_WATER water, GNINE_F32 level, bool include_world_non_sea_level, bool include_all_water_elements, bool include_world_sea_level, bool include_outside_world_level), bool);
+GNINE_API_IMPORT(reset_water_level, (), bool);
+GNINE_API_IMPORT(get_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* out_position), bool);
+GNINE_API_IMPORT(set_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(get_water_color, (GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(set_water_color, (GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(reset_water_color, (), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -504,9 +603,34 @@ GNINE_API void gnine_print(GNINE_STRING format, ...) {
 }
 
 #ifdef GNINE_CPP
+GNINE_API GNINE_INLINE GNINE_ARGUMENTS gnine_execute_lua_code(GNINE_STRING code, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size, bool void_state) {
+#else
+GNINE_API GNINE_ARGUMENTS gnine_execute_lua_code(GNINE_STRING code, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size, bool void_state) {
+#endif
+    GNINE_ARGUMENTS results = NULL;
+
+    if (void_state) {
+        __gnine_execute_lua_code(code, arguments, NULL, out_error, max_error_size);
+
+        return NULL;
+    }
+
+    __gnine_execute_lua_code(code, arguments, &results, out_error, max_error_size);
+
+    return results;
+}
+
+#ifndef GNINE_CPP
+#define GNINE_LUA(code, args) gnine_execute_lua_code(#code, args, NULL, 0, false)
+#define GNINE_LUA_VOID(code, args) gnine_execute_lua_code(#code, args, NULL, 0, true)
+#endif
+
+#ifdef GNINE_CPP
 
 #include <exception>
 #include <optional>
+#include <map>
+#include <unordered_map>
 
 /*
     MACRO: GNINE_LAMBDA
@@ -539,6 +663,11 @@ namespace GNINE_NAMESPACE {
     using CXString = GNINE_XSTRING;
     using String = STD_NAMESPACE::string;
     using StringList = STD_NAMESPACE::vector<String>;
+    
+    template<typename ValueType = String>
+    using StringMap = STD_NAMESPACE::map<String, ValueType>;
+    template<typename ValueType = String>
+    using StringUnorderedMap = STD_NAMESPACE::unordered_map<String, ValueType>;
 
     using LuaNumber = GNINE_LUA_NUMBER;
 
@@ -553,6 +682,9 @@ namespace GNINE_NAMESPACE {
     using MarkerId = GNINE_MARKER;
     using PlayerId = GNINE_PLAYER;
     using TeamId = GNINE_TEAM;
+    using WaterId = GNINE_WATER;
+
+    using RemoteRequestId = GNINE_REMOTE_REQUEST;
 
     using WorkerId = GNINE_WORKER;
     using WorkerMutexId = GNINE_MUTEX;
@@ -565,7 +697,19 @@ namespace GNINE_NAMESPACE {
 
     using ProcessMemoryStats = GNINE_PROCESS_MEMORY_STATS;
 
+    using CameraMatrix = GNINE_CAMERA_MATRIX;
+
     static constexpr Float32 FLOAT_EPSILON = 0.0001f;
+
+    template<typename TypeX, typename TypeY>
+    inline constexpr bool IsSameType() {
+        return String(typeid(TypeX).name()) == String(typeid(TypeY).name());
+    }
+
+    template<typename With, typename Value>
+    inline constexpr bool InstanceOf(Value value) {
+        return IsSameType<Value, With>();
+    }
 
     class Exception : public STD_NAMESPACE::exception {
         public:
@@ -2768,6 +2912,94 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
+            bool SetVoiceIgnoreFrom(PlayerList players) {
+                if (players.empty()) {
+                    return false;
+                }
+
+                STD_NAMESPACE::vector<GNINE_PLAYER> playerRefs;
+
+                UInt32 count = players.size();
+
+                for (UInt32 i = 0; i < count; i++) {
+                    playerRefs[i] = (GNINE_PLAYER)players[i];
+                }
+
+                return gnine_set_player_voice_ignore_from(*this, playerRefs.data(), count);
+            }
+
+            bool SetVoiceIgnoreFrom(Player player) {
+                PlayerList list;
+                list.push_back(player);
+
+                return SetVoiceIgnoreFrom(list);
+            }
+
+            bool SetVoiceIgnoreFrom() {
+                return gnine_set_player_voice_ignore_from(*this, NULL, 0);
+            }
+
+            bool SetVoiceBroadcastTo(PlayerList players) {
+                if (players.empty()) {
+                    return false;
+                }
+
+                STD_NAMESPACE::vector<GNINE_PLAYER> playerRefs;
+
+                UInt8 count = players.size();
+
+                playerRefs.resize(count);
+
+                for (UInt32 i = 0; i < count; i++) {
+                    playerRefs[i] = (GNINE_PLAYER)players[i];
+                }
+
+                return gnine_set_player_voice_broadcast_to(*this, playerRefs.data(), count);
+            }
+
+            bool SetVoiceBroadcastTo(Player player) {
+                PlayerList list;
+                list.push_back(player);
+
+                return SetVoiceBroadcastTo(list);
+            }
+
+            bool SetVoiceBroadcastTo() {
+                return gnine_set_player_voice_broadcast_to(*this, NULL, 0);
+            }
+
+            bool FadeCamera(bool fadeIn, Float32 timeToFade = 1.0f, Color screenColor = { 0, 0, 0, 255 }) {
+                return gnine_fade_camera(*this, fadeIn, timeToFade, &screenColor);
+            }
+
+            bool SetCameraInterior(Int32 interior) {
+                return gnine_set_camera_interior(*this, interior);
+            }
+
+            bool SetCameraTarget(Element target) {
+                return gnine_set_camera_target(*this, target);
+            }
+
+            bool SetCameraMatrix(CameraMatrix matrix) {
+                return gnine_set_camera_matrix(*this, &matrix);
+            }
+
+            Int32 GetCameraInterior() {
+                return gnine_get_camera_interior(*this);
+            }
+
+            Element GetCameraTarget() {
+                return gnine_get_camera_target(*this);
+            }
+
+            CameraMatrix GetCameraMatrix() {
+                CameraMatrix matrix;
+
+                gnine_get_camera_matrix(*this, &matrix);
+
+                return matrix;
+            }
+
             bool SetTeam(TeamId team) {
                 return gnine_set_player_team(*this, team);
             }
@@ -3190,8 +3422,8 @@ namespace GNINE_NAMESPACE {
 
             ~Team() = default;
 
-            Team& operator=(Team player) {
-                SetId(player);
+            Team& operator=(Team team) {
+                SetId(team);
 
                 return *this;
             }
@@ -3257,6 +3489,79 @@ namespace GNINE_NAMESPACE {
 
             static Team GetTeamFromName(String name) {
                 return gnine_get_team_from_name(name.c_str());
+            }
+    };
+
+    class Water : public Element {
+        public:
+            Water() {
+                Drop();
+            }
+
+            Water(WaterId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Water() = default;
+
+            Water& operator=(Water water) {
+                SetId(water);
+
+                return *this;
+            }
+
+            bool SetLevel(Float32 level) {
+                return gnine_set_water_level(*this, level, true, true, true, false);
+            }
+
+            Vector3 GetVertexPosition(Int32 vertexIndex) {
+                GNINE_VECTOR3 pos;
+                memset((MemoryPointer)&pos, 0, sizeof(pos));
+
+                gnine_get_water_vertex_position(*this, vertexIndex, &pos);
+
+                return Vector3(pos.x, pos.y, pos.z);
+            }
+
+            bool SetVertexPosition(Int32 vertexIndex, Vector3 position) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_set_water_vertex_position(*this, vertexIndex, &pos);
+            }
+
+            static Water CreateWater(Vector3 v1, Vector3 v2, Vector3 v3, Vector3 v4, bool shallow = false) {
+                GNINE_VECTOR3 pv1 = v1;
+                GNINE_VECTOR3 pv2 = v2;
+                GNINE_VECTOR3 pv3 = v3;
+                GNINE_VECTOR3 pv4 = v4;
+
+                return gnine_create_water(&pv1, &pv2, &pv3, &pv4, shallow);
+            }
+
+            static bool SetWaterLevel(Float32 level, bool includeWorldNonSeaLevel = true, bool includeAllWaterElements = true, bool includeWorldSeaLevel = true, bool includeOutsideWorldLevel = false) {
+                return gnine_set_water_level(NULL, level, includeWorldNonSeaLevel, includeAllWaterElements, includeWorldSeaLevel, includeOutsideWorldLevel);
+            }
+
+            static bool ResetWaterLevel() {
+                return gnine_reset_water_level();
+            }
+
+            static Color GetWaterColor() {
+                Color color;
+
+                gnine_get_water_color(&color);
+
+                return color;
+            }
+
+            static bool SetWaterColor(Color color) {
+                return gnine_set_water_color(&color);
+            }
+
+            static bool ResetWaterColor() {
+                return gnine_reset_water_color();
             }
     };
 
@@ -3385,6 +3690,10 @@ namespace GNINE_NAMESPACE {
                     
                     bool m_bAutoCleanup;
             };
+
+            Worker() {
+                Drop();
+            }
 
             Worker(WorkerId workerId) {
                 Drop();
@@ -3541,6 +3850,10 @@ namespace GNINE_NAMESPACE {
         public:
             using TimerDetails = GNINE_TIMER_DETAILS;
 
+            Timer() {
+                Drop();
+            }
+
             Timer(TimerId timerId) {
                 Drop();
 
@@ -3587,7 +3900,7 @@ namespace GNINE_NAMESPACE {
                 gnine_reset_timer(m_pTimerId);
             }
 
-            TimerDetails GetDetails() {
+            TimerDetails GetDetails() const {
                 TimerDetails details;
 
                 gnine_get_timer_details(m_pTimerId, &details);
@@ -3595,11 +3908,29 @@ namespace GNINE_NAMESPACE {
                 return details;
             }
 
-            operator TimerId() {
+            bool operator==(const TimerId& timerId) {
+                return m_pTimerId == timerId;
+            }
+
+            bool operator==(const Timer& timer) {
+                return m_pTimerId == timer.m_pTimerId;
+            }
+
+            Timer& operator=(const TimerId& timerId) {
+                m_pTimerId = timerId;
+                return *this;
+            }
+
+            Timer& operator=(const Timer& timer) {
+                m_pTimerId = timer.m_pTimerId;
+                return *this;
+            }
+
+            operator TimerId() const {
                 return m_pTimerId;
             }
 
-            operator String() {
+            operator String() const {
                 char buff[50];
                 memset((MemoryPointer)buff, 0, sizeof(buff));
                 
@@ -3608,7 +3939,7 @@ namespace GNINE_NAMESPACE {
                 return String(buff, size);
             }
 
-            operator bool() {
+            operator bool() const {
                 return gnine_is_timer(m_pTimerId);
             }
 
@@ -3640,6 +3971,359 @@ namespace GNINE_NAMESPACE {
                 Callable::AddCallableArgumentToArguments(m_pTimerArguments, (Callable::Argument)arg);
                 AddArgument(args...);
             }
+    };
+    
+    // class Resource {};
+    using Resource = ResourceId;
+
+    struct RemoteRequestOptions {
+        UInt32     connectionAttempts;
+        UInt32     connectTimeout;
+        String               method;
+        String               queueName;
+        String               postData;
+        bool                 postIsBinary;
+        UInt32               maxRedirects;
+        String               username;
+        String               password;
+        StringUnorderedMap<> headers;
+        StringUnorderedMap<> formFields;
+
+        RemoteRequestOptions() {
+            connectionAttempts = 10;
+            connectTimeout = 10000;
+            method = "";
+            queueName = GNINE_REMOTE_REQUEST_DEFAULT_QUEUE_NAME;
+            postData = "";
+            postIsBinary = false;
+            maxRedirects = 8;
+            username = "";
+            password = "";
+            headers = StringUnorderedMap<>();
+            formFields = StringUnorderedMap<>();
+        }
+
+        RemoteRequestOptions(GNINE_REMOTE_REQUEST_OPTIONS options) {
+            Read(&options);
+        }
+
+        void Read(GNINE_REMOTE_REQUEST_OPTIONS* options) {
+            if (!options) {
+                return;
+            }
+
+            connectionAttempts = options->connectionAttempts;
+            connectTimeout = options->connectTimeout;
+            method = options->method;
+            queueName = options->queueName;
+            postData = options->postData;
+            postIsBinary = options->postIsBinary;
+            maxRedirects = options->maxRedirects;
+            username = options->username;
+            password = options->password;
+            headers = StringUnorderedMap<>();
+            formFields = StringUnorderedMap<>();
+
+            if (options->headers && options->headersCount > 0) {
+                for (UInt32 i = 0; i < (options->headersCount * 2); i += 2) {
+                    headers[options->headers[i]] = options->headers[i + 1];
+                }
+            }
+
+            if (options->formFields && options->formFieldsCount > 0) {
+                for (UInt32 i = 0; i < (options->formFieldsCount * 2); i += 2) {
+                    formFields[options->formFields[i]] = options->formFields[i + 1];
+                }
+            }
+        }
+
+        void Write(GNINE_REMOTE_REQUEST_OPTIONS* options) const {
+            if (!options) {
+                return;
+            }
+
+            memset((MemoryPointer)options, 0, sizeof(*options));
+
+            options->connectionAttempts = connectionAttempts;
+            options->connectTimeout = connectTimeout;
+            options->method = method.c_str();
+            options->queueName = queueName.c_str();
+            options->postData = postData.c_str();
+            options->postIsBinary = postIsBinary;
+            options->maxRedirects = maxRedirects;
+            options->username = username.c_str();
+            options->password = password.c_str();
+            
+            UInt32 headersSize = headers.size();
+            UInt32 formFieldsSize = formFields.max_size();
+
+            if (headersSize > 0) {
+                options->headers = (CString*)malloc(headersSize * (sizeof(CString) * 2));
+
+                if (options->headers) {
+                    UInt32 i = 0;
+
+                    for (const auto& header : headers) {
+                        options->headers[i] = header.first.c_str();
+                        options->headers[i + 1] = header.second.c_str();
+
+                        i += 2;
+                    }
+
+                    options->headersCount = headersSize;
+                }
+            }
+
+            if (formFieldsSize > 0) {
+                options->formFields = (CString*)malloc(formFieldsSize * (sizeof(CString) * 2));
+
+                if (options->formFields) {
+                    UInt32 i = 0;
+
+                    for (const auto& form : formFields) {
+                        options->formFields[i] = form.first.c_str();
+                        options->formFields[i + 1] = form.second.c_str();
+
+                        i += 2;
+                    }
+
+                    options->formFieldsCount = formFieldsSize;
+                }
+            }
+        }
+
+        void ClearWrite(GNINE_REMOTE_REQUEST_OPTIONS* options) const {
+            if (!options) {
+                return;
+            }
+
+            if (options->headers) {
+                free(options->headers);
+            }
+
+            if (options->formFields) {
+                free(options->formFields);
+            }
+        }
+    };
+
+    struct RemoteRequestInfo {
+        bool                  isFetch;
+        String                url;
+        String                queue;
+        Resource              resource;
+        UInt64                start;
+        String                postData;
+        StringUnorderedMap<>  headers;       // this headers are like `GNINE_REMOTE_REQUEST_OPTIONS` headers. that means you can select header name with `headers[0]` and header value `header[1]`
+        String                method;
+        UInt32                connectionAttempts;
+        UInt32                connectionTimeout;
+        UInt32                bytesReceived;
+        UInt32                bytesTotal;
+        UInt32                currentAttempt;
+
+        RemoteRequestInfo() {
+            isFetch = false;
+            url = "";
+            queue = "";
+            resource = NULL;
+            start = 0;
+            postData = "";
+            headers = StringUnorderedMap<>();
+            method = "";
+            connectionAttempts = 0;
+            connectionTimeout = 0;
+            bytesReceived = 0;
+            bytesTotal = 0;
+            currentAttempt = 0;
+        }
+
+        RemoteRequestInfo(GNINE_REMOTE_REQUEST_INFO info) {
+            Read(&info);
+        }
+
+        void Read(GNINE_REMOTE_REQUEST_INFO* info) {
+            if (!info) {
+                return;
+            }
+
+            isFetch = info->isFetch;
+            url = info->url;
+            queue = info->queue;
+            resource = info->resource;
+            start = info->start;
+            postData = info->postData;
+            headers = StringUnorderedMap<>();
+            method = info->method;
+            connectionAttempts = info->connectionAttempts;
+            connectionTimeout = info->connectionTimeout;
+            bytesReceived = info->bytesReceived;
+            bytesTotal = info->bytesTotal;
+            currentAttempt = info->currentAttempt;
+
+            if (info->headers && info->headersCount > 0) {
+                for (UInt32 i = 0; i < (info->headersCount * 2); i += 2) {
+                    headers[info->headers[i]] = info->headers[i + 1];
+                }
+            }
+        }
+    };
+
+    class RemoteRequest;
+    using RemoteRequestList = STD_NAMESPACE::vector<RemoteRequest>;
+
+    class RemoteRequest {
+        public:
+            RemoteRequest() {
+                Drop();
+            }
+            
+            RemoteRequest(RemoteRequestId id) {
+                Drop();
+
+                m_pRemoteRequestId = id;
+            }
+
+            RemoteRequest(RemoteRequestOptions options) {
+                Drop();
+                m_mpOptions = options;
+            }
+
+            RemoteRequest(const RemoteRequest& request) {
+                Drop();
+
+                m_pRemoteRequestId = request.m_pRemoteRequestId;
+                m_mpOptions = request.m_mpOptions;
+            }
+
+            ~RemoteRequest() {
+                Drop();
+            }
+
+            void Drop() {
+                m_pRemoteRequestId = NULL;
+                m_mpOptions = RemoteRequestOptions();
+            }
+
+            bool Abort() {
+                return gnine_abort_remote_request(m_pRemoteRequestId);
+            }
+
+            RemoteRequestInfo GetInfo(UInt32 postDataLength = 0, bool includeHeaders = false) const {
+                RemoteRequestInfo info;
+
+                GNINE_REMOTE_REQUEST_INFO cInfo;
+
+                if (!gnine_get_remote_request_info(m_pRemoteRequestId, &cInfo, postDataLength, includeHeaders)) {
+                    return info;
+                }
+
+                info.Read(&cInfo);
+
+                gnine_cleanup_remote_request_info(&cInfo);
+
+                return info;
+            }
+
+            void SetOptions(RemoteRequestOptions options) {
+                m_mpOptions = options;
+            }
+
+            RemoteRequestOptions GetOptions() const {
+                return m_mpOptions;
+            }
+
+            bool Call(String url, Callable callbackFunction, String queueName = GNINE_REMOTE_REQUEST_DEFAULT_QUEUE_NAME, UInt32 connectionAttempts = 10, UInt32 connectionTimeout = 10000, Callable::Arguments arguments = NULL) {
+                m_pRemoteRequestId = gnine_call_remote(url.c_str(), queueName.c_str(), connectionAttempts, connectionTimeout, callbackFunction, arguments);
+
+                if (m_pRemoteRequestId) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            bool Fetch(String url, Callable callbackFunction, Callable::Arguments arguments = NULL) {
+                GNINE_REMOTE_REQUEST_OPTIONS options;
+
+                m_mpOptions.Write(&options);
+
+                m_pRemoteRequestId = gnine_fetch_remote(url.c_str(), &options, callbackFunction, arguments);
+
+                m_mpOptions.ClearWrite(&options);
+
+                if (m_pRemoteRequestId) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            bool operator==(RemoteRequestId id) const {
+                return m_pRemoteRequestId == id;
+            }
+
+            bool operator==(const RemoteRequest& request) const {
+                return m_pRemoteRequestId == request.m_pRemoteRequestId;
+            }
+
+            RemoteRequest& operator=(RemoteRequestId id) {
+                m_pRemoteRequestId = id;
+
+                return *this;
+            }
+
+            RemoteRequest& operator=(const RemoteRequest& request) {
+                m_pRemoteRequestId = request.m_pRemoteRequestId;
+                m_mpOptions = request.m_mpOptions;
+
+                return *this;
+            }
+
+            operator RemoteRequestId() const {
+                return m_pRemoteRequestId;
+            }
+
+            operator String() const {
+                char buff[50];
+                memset((MemoryPointer)buff, 0, sizeof(buff));
+                
+                RemoteRequestInfo info = GetInfo();
+                
+                Int32 progress = 0;
+
+                if (info.bytesTotal > 0) {
+                    progress = (info.bytesReceived / info.bytesTotal) * 100;
+                }
+                
+                Int32 size = sprintf(buff, "remote_request{%d}:" GNINE_MEMORY_POINTER_ADDRESS_STRING, progress, (int)m_pRemoteRequestId);
+
+                return String(buff, size);
+            }
+
+            operator bool() const {
+                return m_pRemoteRequestId == NULL ? false : true;
+            }
+
+            static RemoteRequestList GetRemoteRequests(Resource resource = NULL, UInt32 maxItemCount = 500) {
+                RemoteRequestList list;
+
+                RemoteRequestId remotes[maxItemCount];
+                memset((MemoryPointer)remotes, 0, sizeof(remotes));
+
+                UInt32 count = gnine_get_remote_requests(resource, remotes, maxItemCount);
+
+                list.resize(count);
+
+                for (UInt32 i = 0; i < count; i++) {
+                    list[i] = remotes[i];
+                }
+
+                return list;
+            }
+        private:
+            RemoteRequestId      m_pRemoteRequestId;
+            RemoteRequestOptions m_mpOptions;
     };
 
     inline SharedMemoryPointer GetSharedPointerAddress(MemoryPointer ptr) {
@@ -3772,6 +4456,10 @@ namespace GNINE_NAMESPACE {
         return stats;
     }
 
+    inline bool IsVoiceEnabled() {
+        return gnine_is_voice_enabled();
+    }
+
     template<typename ...Args>
     inline void Printf(String format, Args... args) {
         gnine_print(format.c_str(), args...);
@@ -3848,7 +4536,70 @@ namespace GNINE_NAMESPACE {
 
         Print(args...);
     }
+
+    inline Callable::Arguments* __LUA_CODE_ARGS__ = NULL;
+    
+    template<typename Arg>
+    inline void __ADD_LUA_CODE_ARG__(Arg arg) {
+        Callable::AddCallableArgumentToArguments(__LUA_CODE_ARGS__, (Callable::Argument)arg);
+    }
+    
+    template<typename Arg, typename... Args>
+    inline void __ADD_LUA_CODE_ARG__(Arg arg, Args... args) {
+        Callable::AddCallableArgumentToArguments(__LUA_CODE_ARGS__, (Callable::Argument)arg);
+
+        __ADD_LUA_CODE_ARG__(args...);
+    }
+    
+    inline Callable::Arguments ExecuteLuaCode(GNINE_STRING code) {
+        GNINE_ARGUMENTS results = NULL;
+
+        __gnine_execute_lua_code(code, NULL, &results, NULL, 0);
+
+        return results;
+    }
+
+    template<typename... Args>
+    inline Callable::Arguments ExecuteLuaCode(GNINE_STRING code, Args... args) {
+        GNINE_ARGUMENTS results = NULL;
+
+        if (!__LUA_CODE_ARGS__) {
+            __LUA_CODE_ARGS__ = new Callable::Arguments();
+        }
+
+        __ADD_LUA_CODE_ARG__(args...);
+
+        __gnine_execute_lua_code(code, *__LUA_CODE_ARGS__, &results, NULL, 0);
+
+        delete __LUA_CODE_ARGS__;
+        __LUA_CODE_ARGS__ = NULL;
+
+        return results;
+    }
+    
+    inline void ExecuteLuaCodeVoid(GNINE_STRING code) {
+        __gnine_execute_lua_code(code, NULL, NULL, NULL, 0);
+    }
+
+    template<typename... Args>
+    inline void ExecuteLuaCodeVoid(GNINE_STRING code, Args... args) {
+        if (!__LUA_CODE_ARGS__) {
+            __LUA_CODE_ARGS__ = new Callable::Arguments();
+        }
+
+        __ADD_LUA_CODE_ARG__(args...);
+
+        __gnine_execute_lua_code(code, *__LUA_CODE_ARGS__, NULL, NULL, 0);
+
+        delete __LUA_CODE_ARGS__;
+        __LUA_CODE_ARGS__ = NULL;
+    }
 }
+
+#define GNINE_LUA(code, ...) GNINE_NAMESPACE::ExecuteLuaCode(#code, __VA_ARGS__)
+#define GNINE_LUA_VOID(code, ...) GNINE_NAMESPACE::ExecuteLuaCodeVoid(#code, __VA_ARGS__)
+#define GNINE_LUA_NO_ARGS(code) GNINE_NAMESPACE::ExecuteLuaCode(#code)
+#define GNINE_LUA_VOID_NO_ARGS(code) GNINE_NAMESPACE::ExecuteLuaCodeVoid(#code)
 
 #endif
 
