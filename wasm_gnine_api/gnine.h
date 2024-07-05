@@ -84,6 +84,10 @@
 
 #define gnine_get_player_ac_info(player, info, max_strings_size) gnine_get_player_ac_info_r(player, (info)->DetectedAC, &((info)->d3d9Size), (info)->d3d9MD5, (info)->d3d9SHA256, max_strings_size)
 
+#if !defined(GNINE_PRINT_BUFFER_SIZE)
+#define GNINE_PRINT_BUFFER_SIZE (0xfff)
+#endif
+
 typedef char GNINE_I8;
 typedef unsigned char GNINE_UI8;
 typedef GNINE_UI8 GNINE_BYTE;
@@ -294,6 +298,21 @@ enum GNINE_PICKUP_TYPE : GNINE_PICKUP_TYPE_T {
     GNINE_PICKUP_TYPE_ARMOR = 1,
     GNINE_PICKUP_TYPE_WEAPON = 2,
     GNINE_PICKUP_TYPE_CUSTOM = 3
+};
+
+struct GNINE_COL_POLYGON_HEIGHT {
+    GNINE_F32 floor;
+    GNINE_F32 ceil;
+};
+
+typedef GNINE_UI32 GNINE_COL_SHAPE_TYPE_T;
+enum GNINE_COL_SHAPE_TYPE : GNINE_COL_SHAPE_TYPE_T {
+    GNINE_COL_SHAPE_CIRCLE = 0,
+    GNINE_COL_SHAPE_CUBOID = 1,
+    GNINE_COL_SHAPE_SPHERE = 2,
+    GNINE_COL_SHAPE_RECTANGLE = 3,
+    GNINE_COL_SHAPE_POLYGON = 4,
+    GNINE_COL_SHAPE_TUBE = 5
 };
 
 GNINE_API_IMPORT(print_data, (GNINE_STRING data), void);
@@ -617,6 +636,29 @@ GNINE_API_IMPORT(set_marker_color, (GNINE_MARKER marker, struct GNINE_COLOR* col
 GNINE_API_IMPORT(set_marker_target, (GNINE_MARKER marker, struct GNINE_VECTOR3* target), bool);
 GNINE_API_IMPORT(set_marker_icon, (GNINE_MARKER marker, GNINE_STRING icon), bool);
 
+GNINE_API_IMPORT(create_col_circle, (struct GNINE_VECTOR2* position, GNINE_F32 radius), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_cuboid, (struct GNINE_VECTOR3* position, struct GNINE_VECTOR3* size), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_sphere, (struct GNINE_VECTOR3* position, GNINE_F32 radius), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_rectangle, (struct GNINE_VECTOR2* position, struct GNINE_VECTOR2* size), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_polygon, (struct GNINE_VECTOR2* center, struct GNINE_VECTOR2* point_list, GNINE_UI32 point_count), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_tube, (struct GNINE_VECTOR3* position, GNINE_F32 radius, GNINE_F32 height), GNINE_COL_SHAPE);
+
+GNINE_API_IMPORT(get_col_shape_radius, (GNINE_COL_SHAPE col_shape), GNINE_F32);
+GNINE_API_IMPORT(set_col_shape_radius, (GNINE_COL_SHAPE col_shape, GNINE_F32 radius), bool);
+GNINE_API_IMPORT(get_col_shape_size, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* out_size), bool);
+GNINE_API_IMPORT(set_col_shape_size, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* size), bool);
+GNINE_API_IMPORT(get_col_polygon_points, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR2* out_points, GNINE_UI32 max_item_size), GNINE_UI32);
+GNINE_API_IMPORT(get_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, struct GNINE_VECTOR2* out_position), bool);
+GNINE_API_IMPORT(set_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, struct GNINE_VECTOR2* position), bool);
+GNINE_API_IMPORT(add_col_polygon_point, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR2* point_position, GNINE_UI32 point_index), bool);
+GNINE_API_IMPORT(remove_col_polygon_point, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index), bool);
+
+GNINE_API_IMPORT(is_inside_col_shape, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(get_col_shape_type, (GNINE_COL_SHAPE col_shape), GNINE_COL_SHAPE_TYPE_T);
+
+GNINE_API_IMPORT(get_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32* floor, GNINE_F32* ceil), bool);
+GNINE_API_IMPORT(set_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32 floor, GNINE_F32 ceil), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -640,7 +682,8 @@ GNINE_API GNINE_INLINE void gnine_print(GNINE_STRING format, ...) {
 #else
 GNINE_API void gnine_print(GNINE_STRING format, ...) {
 #endif
-    GNINE_I8 buffer[0xfff];
+    GNINE_I8 buffer[GNINE_PRINT_BUFFER_SIZE + 1];
+    memset((GNINE_PTR)buffer, 0, GNINE_PRINT_BUFFER_SIZE + 1);
 
     va_list args;
     va_start(args, format);
@@ -648,6 +691,8 @@ GNINE_API void gnine_print(GNINE_STRING format, ...) {
     vsprintf(buffer, format, args);
 
     va_end(args);
+
+    buffer[GNINE_PRINT_BUFFER_SIZE] = '\0';
 
     gnine_print_data(buffer);
 }
@@ -2871,9 +2916,20 @@ namespace GNINE_NAMESPACE {
         private:
             ElementId m_pElementId;
     };
+    
+    using ColPolygonPoints = STD_NAMESPACE::vector<Vector2>;
 
     class ColShape : public Element {
         public:
+            enum ColShapeType : GNINE_COL_SHAPE_TYPE_T {
+                Circle = GNINE_COL_SHAPE_CIRCLE,
+                Cuboid = GNINE_COL_SHAPE_CUBOID,
+                Sphere = GNINE_COL_SHAPE_SPHERE,
+                Rectangle = GNINE_COL_SHAPE_RECTANGLE,
+                Polygon = GNINE_COL_SHAPE_POLYGON,
+                Tube = GNINE_COL_SHAPE_TUBE
+            };
+
             ColShape() {
                 Drop();
             }
@@ -2885,6 +2941,90 @@ namespace GNINE_NAMESPACE {
             }
 
             ~ColShape() = default;
+
+            bool SetColPolygonHeight(Float32 floor, Float32 ceil) {
+                return gnine_set_col_polygon_height(*this, floor, ceil);
+            }
+
+            bool GetColPolygonHeight(Float32& floor, Float32& ceil) const {
+                return gnine_get_col_polygon_height(*this, &floor, &ceil);
+            }
+
+            ColShapeType GetShapeType() const {
+                return (ColShapeType)gnine_get_col_shape_type(*this);
+            }
+
+            bool IsPointInside(Vector3 point) const {
+                GNINE_VECTOR3 p = point;
+
+                return gnine_is_inside_col_shape(*this, &p);
+            }
+
+            bool RemoveColPolygonPoint(UInt32 pointIndex) {
+                return gnine_remove_col_polygon_point(*this, pointIndex);
+            }
+
+            bool AddColPolygonPoint(Vector2 position, UInt32 pointIndex = 0) {
+                GNINE_VECTOR2 pos = position;
+                
+                return gnine_add_col_polygon_point(*this, &pos, pointIndex);
+            }
+
+            bool SetColPolygonPointPosition(UInt32 pointIndex, Vector2 position) {
+                GNINE_VECTOR2 pos = position;
+
+                return gnine_set_col_polygon_point_position(*this, pointIndex, &pos);
+            }
+
+            Vector2 GetColPolygonPointPosition(UInt32 pointIndex) const {
+                GNINE_VECTOR2 pos;
+                memset((MemoryPointer)&pos, 0, sizeof(pos));
+
+                gnine_get_col_polygon_point_position(*this, pointIndex, &pos);
+
+                return Vector2(pos.x, pos.y);
+            }
+
+            ColPolygonPoints GetColPolygonPoints(UInt32 maxPointCount = 500) const {
+                ColPolygonPoints points;
+
+                GNINE_VECTOR2 pointsList[maxPointCount];
+                memset((MemoryPointer)pointsList, 0, sizeof(pointsList));
+
+                UInt32 count = gnine_get_col_polygon_points(*this, pointsList, maxPointCount);
+
+                points.resize(count);
+
+                for (UInt32 i = 0; i < count; i++) {
+                    points[i].fX = pointsList[i].x;
+                    points[i].fX = pointsList[i].y;
+                }
+
+                return points;
+            }
+
+            bool SetColSize(Vector3 size) {
+                GNINE_VECTOR3 s = size;
+
+                return gnine_set_col_shape_size(*this, &s);
+            }
+
+            Vector3 GetColSize() const {
+                GNINE_VECTOR3 size;
+                memset((MemoryPointer)&size, 0, sizeof(size));
+
+                gnine_get_col_shape_size(*this, &size);
+
+                return Vector3(size.x, size.y, size.z);
+            }
+
+            bool SetColRadius(Float32 radius) {
+                return gnine_set_col_shape_radius(*this, radius);
+            }
+
+            Float32 GetColRadius() const {
+                return gnine_get_col_shape_radius(*this);
+            }
 
             ElementList GetElementsInside(String elementType = "", UInt32 maxSize = 500) const {
                 ElementList list;
@@ -2913,6 +3053,56 @@ namespace GNINE_NAMESPACE {
 
             static ColShape GetElementColShape(Element element) {
                 return gnine_get_element_col_shape(element);
+            }
+
+            static ColShape CreateColCircle(Vector2 position, Float32 radius) {
+                GNINE_VECTOR2 pos = position;
+
+                return gnine_create_col_circle(&pos, radius);
+            }
+
+            static ColShape CreateColCuboid(Vector3 position, Vector3 size) {
+                GNINE_VECTOR3 pos = position;
+                GNINE_VECTOR3 s = size;
+
+                return gnine_create_col_cuboid(&pos, &s);
+            }
+
+            static ColShape CreateColSphere(Vector3 position, Float32 radius) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_create_col_sphere(&pos, radius);
+            }
+
+            static ColShape CreateColRectange(Vector2 position, Vector2 size) {
+                GNINE_VECTOR2 pos = position;
+                GNINE_VECTOR2 s = size;
+
+                return gnine_create_col_rectangle(&pos, &s);
+            }
+
+            static ColShape CreateColPolygon(Vector2 center, const ColPolygonPoints& points) {
+                GNINE_VECTOR2 c = center;
+
+                UInt32 count = points.size();
+                
+                GNINE_VECTOR2 pointList[count];
+                memset((MemoryPointer)pointList, 0, sizeof(pointList));
+
+                for (UInt32 i = 0; i < count; i++) {
+                    Vector2 point = points[i];
+
+                    (pointList + i)->x = point.fX;
+                    (pointList + i)->y = point.fY;
+                }
+
+                return gnine_create_col_polygon(&c, pointList, count);
+            }
+
+            static ColShape CreateColTube(Vector3 position, Float32 radius, Float32 height) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_create_col_tube(&pos, radius, height);
             }
     };
 
@@ -4318,8 +4508,8 @@ namespace GNINE_NAMESPACE {
     using Resource = ResourceId;
 
     struct RemoteRequestOptions {
-        UInt32     connectionAttempts;
-        UInt32     connectTimeout;
+        UInt32               connectionAttempts;
+        UInt32               connectTimeout;
         String               method;
         String               queueName;
         String               postData;
@@ -4455,7 +4645,7 @@ namespace GNINE_NAMESPACE {
         Resource              resource;
         UInt64                start;
         String                postData;
-        StringUnorderedMap<>  headers;       // this headers are like `GNINE_REMOTE_REQUEST_OPTIONS` headers. that means you can select header name with `headers[0]` and header value `header[1]`
+        StringUnorderedMap<>  headers;
         String                method;
         UInt32                connectionAttempts;
         UInt32                connectionTimeout;

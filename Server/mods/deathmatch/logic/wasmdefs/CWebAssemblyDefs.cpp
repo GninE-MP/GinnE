@@ -28,6 +28,7 @@
 #include "CWebAssemblyRadarAreaDefs.h"
 #include "CWebAssemblyPickupDefs.h"
 #include "CWebAssemblyMarkerDefs.h"
+#include "CWebAssemblyColShapeDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
@@ -46,6 +47,7 @@ void CWebAssemblyDefs::RegisterApiFunctionTypes()
     CWebAssemblyRadarAreaDefs::RegisterFunctionTypes();
     CWebAssemblyPickupDefs::RegisterFunctionTypes();
     CWebAssemblyMarkerDefs::RegisterFunctionTypes();
+    CWebAssemblyColShapeDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
@@ -63,6 +65,7 @@ void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
     CWebAssemblyRadarAreaDefs::RegisterFunctions(script);
     CWebAssemblyPickupDefs::RegisterFunctions(script);
     CWebAssemblyMarkerDefs::RegisterFunctions(script);
+    CWebAssemblyColShapeDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)

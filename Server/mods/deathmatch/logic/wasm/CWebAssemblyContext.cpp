@@ -26,7 +26,6 @@
         (g_pGame->GetResourceManager()->GetResourceFromScriptID(reinterpret_cast<unsigned long>((CResource*)lua_touserdata(luaVM, index))))
 #endif
 
-
 CGame*              pGame = NULL;
 CWebAssemblyEngine* WebAssemblyEngine = NULL;
 CWebAssemblyThread* WebAssemblyMainThread = NULL;
