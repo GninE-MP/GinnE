@@ -27,6 +27,7 @@
 #include "CWebAssemblyWaterDefs.h"
 #include "CWebAssemblyRadarAreaDefs.h"
 #include "CWebAssemblyPickupDefs.h"
+#include "CWebAssemblyMarkerDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
@@ -44,6 +45,7 @@ void CWebAssemblyDefs::RegisterApiFunctionTypes()
     CWebAssemblyWaterDefs::RegisterFunctionTypes();
     CWebAssemblyRadarAreaDefs::RegisterFunctionTypes();
     CWebAssemblyPickupDefs::RegisterFunctionTypes();
+    CWebAssemblyMarkerDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
@@ -60,6 +62,7 @@ void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
     CWebAssemblyWaterDefs::RegisterFunctions(script);
     CWebAssemblyRadarAreaDefs::RegisterFunctions(script);
     CWebAssemblyPickupDefs::RegisterFunctions(script);
+    CWebAssemblyMarkerDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)

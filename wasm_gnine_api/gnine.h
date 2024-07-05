@@ -556,7 +556,7 @@ GNINE_API_IMPORT(get_camera_interior, (GNINE_PLAYER player), GNINE_I32);
 GNINE_API_IMPORT(set_camera_matrix, (GNINE_PLAYER player, struct GNINE_CAMERA_MATRIX* camera_matrix), bool);
 GNINE_API_IMPORT(set_camera_target, (GNINE_PLAYER player, GNINE_ELEMENT target), bool);
 GNINE_API_IMPORT(set_camera_interior, (GNINE_PLAYER player, GNINE_I32 interior), bool);
-GNINE_API_IMPORT(fade_camera, (GNINE_PLAYER player, bool fade_in, float time_to_fade, GNINE_COLOR* screen_color), bool);
+GNINE_API_IMPORT(fade_camera, (GNINE_PLAYER player, bool fade_in, float time_to_fade, struct GNINE_COLOR* screen_color), bool);
 
 GNINE_API_IMPORT(call_remote, (GNINE_STRING url, GNINE_STRING queue_name, GNINE_UI32 connection_attempts, GNINE_UI32 connection_timeout, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
 GNINE_API_IMPORT(fetch_remote, (GNINE_STRING url, struct GNINE_REMOTE_REQUEST_OPTIONS* options, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
@@ -569,27 +569,27 @@ GNINE_API_IMPORT(is_voice_enabled, (), bool);
 GNINE_API_IMPORT(set_player_voice_broadcast_to, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
 GNINE_API_IMPORT(set_player_voice_ignore_from, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
 
-GNINE_API_IMPORT(create_water, (GNINE_VECTOR3* v1, GNINE_VECTOR3* v2, GNINE_VECTOR3* v3, GNINE_VECTOR3* v4, bool shallow), GNINE_WATER);
+GNINE_API_IMPORT(create_water, (struct GNINE_VECTOR3* v1, struct GNINE_VECTOR3* v2, struct GNINE_VECTOR3* v3, struct GNINE_VECTOR3* v4, bool shallow), GNINE_WATER);
 GNINE_API_IMPORT(set_water_level, (GNINE_WATER water, GNINE_F32 level, bool include_world_non_sea_level, bool include_all_water_elements, bool include_world_sea_level, bool include_outside_world_level), bool);
 GNINE_API_IMPORT(reset_water_level, (), bool);
-GNINE_API_IMPORT(get_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* out_position), bool);
-GNINE_API_IMPORT(set_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* position), bool);
-GNINE_API_IMPORT(get_water_color, (GNINE_COLOR* out_color), bool);
-GNINE_API_IMPORT(set_water_color, (GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(get_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, struct GNINE_VECTOR3* out_position), bool);
+GNINE_API_IMPORT(set_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, struct GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(get_water_color, (struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(set_water_color, (struct GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(reset_water_color, (), bool);
 
-GNINE_API_IMPORT(create_radar_area, (GNINE_VECTOR2* position, GNINE_VECTOR2* size, GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_RADAR_AREA);
+GNINE_API_IMPORT(create_radar_area, (struct GNINE_VECTOR2* position, struct GNINE_VECTOR2* size, struct GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_RADAR_AREA);
 
-GNINE_API_IMPORT(get_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* out_size), bool);
-GNINE_API_IMPORT(get_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_radar_area_size, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* out_size), bool);
+GNINE_API_IMPORT(get_radar_area_color, (GNINE_RADAR_AREA radar_area, struct GNINE_COLOR* out_color), bool);
 GNINE_API_IMPORT(is_radar_area_flashing, (GNINE_RADAR_AREA radar_area), bool);
-GNINE_API_IMPORT(is_inside_radar_area, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* position), bool);
+GNINE_API_IMPORT(is_inside_radar_area, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* position), bool);
 
-GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* size), bool);
-GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* size), bool);
+GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, struct GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_radar_area_flashing, (GNINE_RADAR_AREA radar_area, bool flash), bool);
 
-GNINE_API_IMPORT(create_pickup, (GNINE_VECTOR3* position, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_UI32 respawn_time, GNINE_I32 ammo), GNINE_PICKUP);
+GNINE_API_IMPORT(create_pickup, (struct GNINE_VECTOR3* position, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_UI32 respawn_time, GNINE_I32 ammo), GNINE_PICKUP);
 
 GNINE_API_IMPORT(get_pickup_type, (GNINE_PICKUP pickup), GNINE_PICKUP_TYPE_T);
 GNINE_API_IMPORT(get_pickup_weapon, (GNINE_PICKUP pickup), GNINE_I32);
@@ -601,6 +601,21 @@ GNINE_API_IMPORT(is_pickup_spawned, (GNINE_PICKUP pickup), bool);
 GNINE_API_IMPORT(set_pickup_type, (GNINE_PICKUP pickup, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_I32 ammo), bool);
 GNINE_API_IMPORT(set_pickup_respawn_interval, (GNINE_PICKUP pickup, GNINE_UI32 time_ms), bool);
 GNINE_API_IMPORT(use_pickup, (GNINE_PICKUP pickup, GNINE_PLAYER player), bool);
+
+GNINE_API_IMPORT(create_marker, (struct GNINE_VECTOR3* position, GNINE_STRING type, GNINE_F32 size, struct GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_MARKER);
+
+GNINE_API_IMPORT(get_marker_count, (), GNINE_UI32);
+GNINE_API_IMPORT(get_marker_type, (GNINE_MARKER marker, GNINE_XSTRING out_string, GNINE_I_PTR max_size), GNINE_I_PTR);
+GNINE_API_IMPORT(get_marker_size, (GNINE_MARKER marker), GNINE_F32);
+GNINE_API_IMPORT(get_marker_color, (GNINE_MARKER marker, struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_marker_target, (GNINE_MARKER marker, struct GNINE_VECTOR3* out_target), bool);
+GNINE_API_IMPORT(get_marker_icon, (GNINE_MARKER marker, GNINE_XSTRING out_icon, GNINE_I_PTR max_size), GNINE_I_PTR);
+
+GNINE_API_IMPORT(set_marker_type, (GNINE_MARKER marker, GNINE_STRING type), bool);
+GNINE_API_IMPORT(set_marker_size, (GNINE_MARKER marker, GNINE_F32 size), bool);
+GNINE_API_IMPORT(set_marker_color, (GNINE_MARKER marker, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_marker_target, (GNINE_MARKER marker, struct GNINE_VECTOR3* target), bool);
+GNINE_API_IMPORT(set_marker_icon, (GNINE_MARKER marker, GNINE_STRING icon), bool);
 
 /*
     Gnine still can't use shared memory for web assembly modules.
@@ -2901,8 +2916,38 @@ namespace GNINE_NAMESPACE {
             }
     };
 
+    #define MARKER_TYPES_NAME_ARRAY_SIZE (5)
+    inline String MARKER_TYPES_NAME[MARKER_TYPES_NAME_ARRAY_SIZE] = {
+        "checkpoint",
+        "ring",
+        "cylinder",
+        "arrow",
+        "corona"
+    };
+
+    #define MARKER_ICONS_NAME_ARRAY_SIZE (3)
+    inline String MARKER_ICONS_NAME[MARKER_ICONS_NAME_ARRAY_SIZE] = {
+        "none",
+        "arrow",
+        "finish"
+    };
+
     class Marker : public Element {
         public:
+            enum class MarkerType : UInt32 {
+                Checkpoint = 0,
+                Ring = 1,
+                Cylinder = 2,
+                Arrow = 3,
+                Corona = 4
+            };
+
+            enum class MarkerIcon : UInt32 {
+                None = 0,
+                Arrow = 1,
+                Finish = 2
+            };
+
             Marker() {
                 Drop();
             }
@@ -2923,6 +2968,122 @@ namespace GNINE_NAMESPACE {
                 SetId(element);
 
                 return *this;
+            }
+
+            String GetMarkerTypeName(UInt32 maxSize = 64) const {
+                Int8 type[maxSize];
+                memset((MemoryPointer)type, 0, maxSize);
+
+                UIntPtr size = gnine_get_marker_type(*this, type, maxSize);
+
+                return String(type, size);
+            }
+
+            MarkerType GetMarkerType() const {
+                String typeName = GetMarkerTypeName();
+
+                UInt32 index = 0;
+
+                for (UInt32 i = 0; i < MARKER_TYPES_NAME_ARRAY_SIZE; i++) {
+                    if (typeName == MARKER_TYPES_NAME[i]) {
+                        index = i;
+                        break;
+                    }
+                }
+
+                return (MarkerType)index;
+            }
+
+            Float32 GetSize() const {
+                return gnine_get_marker_size(*this);
+            }
+
+            Color GetColor() const {
+                Color color;
+
+                gnine_get_marker_color(*this, &color);
+
+                return color;
+            }
+
+            Vector3 GetTarget() const {
+                GNINE_VECTOR3 target;
+
+                gnine_get_marker_target(*this, &target);
+
+                return Vector3(target.x, target.y, target.z);
+            }
+
+            String GetIconName(UInt32 maxSize = 64) const {
+                Int8 icon[maxSize];
+                memset((MemoryPointer)icon, 0, maxSize);
+
+                UIntPtr size = gnine_get_marker_type(*this, icon, maxSize);
+
+                return String(icon, size);
+            }
+
+            MarkerIcon GetIcon() const {
+                String iconName = GetIconName();
+
+                UInt32 index = 0;
+
+                for (UInt32 i = 0; i < MARKER_ICONS_NAME_ARRAY_SIZE; i++) {
+                    if (iconName == MARKER_ICONS_NAME[i]) {
+                        index = i;
+                        break;
+                    }
+                }
+
+                return (MarkerIcon)index;
+            }
+
+            bool SetMarkerType(String type) {
+                return gnine_set_marker_type(*this, type.c_str());
+            }
+
+            bool SetMarkerType(MarkerType type) {
+                return gnine_set_marker_type(*this, MARKER_TYPES_NAME[(UInt32)type].c_str());
+            }
+
+            bool SetSize(Float32 size) {
+                return gnine_set_marker_size(*this, size);
+            }
+
+            bool SetColor(Color color) {
+                return gnine_set_marker_color(*this, &color);
+            }
+
+            bool SetTarget(Vector3 target) {
+                GNINE_VECTOR3 t = target;
+
+                return gnine_set_marker_target(*this, &t);
+            }
+
+            bool SetIcon(String icon) {
+                return gnine_set_marker_icon(*this, icon.c_str());
+            }
+
+            bool SetIcon(MarkerIcon icon) {
+                return gnine_set_marker_icon(*this, MARKER_ICONS_NAME[(UInt32)icon].c_str());
+            }
+
+            static Marker CreateMarker(Vector3 position, String type = MARKER_TYPES_NAME[(UInt32)MarkerType::Checkpoint], Float32 size = 4.0f, Color color = { 255, 0, 0, 255 }, Element visibleTo = GetRootElement()) {
+                GNINE_VECTOR3 pos = position;
+
+                return gnine_create_marker(&pos, type.c_str(), size, &color, visibleTo);
+            }
+
+            static Marker CreateMarker(Vector3 position, MarkerType type, Float32 size = 4.0f, Color color = { 255, 0, 0, 255 }, Element visibleTo = GetRootElement()) {
+                GNINE_VECTOR3 pos = position;
+
+                String typeStr = MARKER_TYPES_NAME[(UInt32)type];
+
+                return gnine_create_marker(&pos, typeStr.c_str(), size, &color, visibleTo);
+            }
+
+            static UInt32 GetMarkerCount() {
+                return gnine_get_marker_count();
             }
     };
 
@@ -3025,15 +3186,15 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_camera_matrix(*this, &matrix);
             }
 
-            Int32 GetCameraInterior() {
+            Int32 GetCameraInterior() const {
                 return gnine_get_camera_interior(*this);
             }
 
-            Element GetCameraTarget() {
+            Element GetCameraTarget() const {
                 return gnine_get_camera_target(*this);
             }
 
-            CameraMatrix GetCameraMatrix() {
+            CameraMatrix GetCameraMatrix() const {
                 CameraMatrix matrix;
 
                 gnine_get_camera_matrix(*this, &matrix);
@@ -3061,7 +3222,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_show_cursor(*this, show, toggleControls);
             }
 
-            bool IsCursorShowing() {
+            bool IsCursorShowing() const {
                 return gnine_is_cursor_showing(*this);
             }
 
@@ -3091,15 +3252,15 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_control_state(*this, control.c_str(), state);
             }
 
-            bool IsControlEnabled(String control) {
+            bool IsControlEnabled(String control) const {
                 return gnine_is_control_enabled(*this, control.c_str());
             }
 
-            bool GetControlState(String control) {
+            bool GetControlState(String control) const {
                 return gnine_get_control_state(*this, control.c_str());
             }
 
-            String GetKeyBoundToFunction(Callable function, UInt32 maxSize = 1024) {
+            String GetKeyBoundToFunction(Callable function, UInt32 maxSize = 1024) const {
                 Int8 key[maxSize];
                 memset((MemoryPointer)key, 0, sizeof(key));
 
@@ -3108,7 +3269,7 @@ namespace GNINE_NAMESPACE {
                 return String(key, size);
             }
 
-            CallableList GetFunctionsBoundToKey(String key, String hitState, UInt32 maxItemCount = 500) {
+            CallableList GetFunctionsBoundToKey(String key, String hitState, UInt32 maxItemCount = 500) const {
                 CallableList list;
 
                 GNINE_CALLABLE_REF callables[maxItemCount];
@@ -3125,7 +3286,7 @@ namespace GNINE_NAMESPACE {
                 return STD_NAMESPACE::move(list);
             }
 
-            bool IsKeyBound(String key, String hitState, Callable function) {
+            bool IsKeyBound(String key, String hitState, Callable function) const {
                 return gnine_is_key_bound(*this, key.c_str(), hitState.c_str(), function);
             }
 
@@ -3157,7 +3318,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_player_announce_value(*this, key.c_str(), value.c_str());
             }
 
-            String GetAnnounceValue(String key, UInt32 maxSize = 1024) {
+            String GetAnnounceValue(String key, UInt32 maxSize = 1024) const {
                 Int8 value[maxSize];
                 memset((MemoryPointer)value, 0, sizeof(value));
 
@@ -3170,7 +3331,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_player_script_debug_level(*this, level);
             }
 
-            bool TakeScreenShot(UInt32 width, UInt32 height, String tag = "", UInt32 quality = 30, UInt32 maxBandwidth = 5000, UInt32 maxPacketSize = 500) {
+            bool TakeScreenShot(UInt32 width, UInt32 height, String tag = "", UInt32 quality = 30, UInt32 maxBandwidth = 5000, UInt32 maxPacketSize = 500) const {
                 return gnine_take_player_screen_shot(*this, width, height, tag.c_str(), quality, maxBandwidth, maxPacketSize);
             }
 
@@ -3236,11 +3397,11 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_player_money(*this, money, instant);
             }
 
-            UInt32 GetScriptDebugLevel() {
+            UInt32 GetScriptDebugLevel() const {
                 return gnine_get_player_script_debug_level(*this);
             }
 
-            ACInfo GetACInfo(UInt32 maxStringsSize = 1024) {
+            ACInfo GetACInfo(UInt32 maxStringsSize = 1024) const {
                 Int8   DetectedAC[maxStringsSize];
                 UInt32 d3d9Size = 0;
                 Int8   d3d9MD5[maxStringsSize];
@@ -3263,7 +3424,7 @@ namespace GNINE_NAMESPACE {
                 return info;
             }
 
-            String GetVersion(UInt32 maxSize = 1024) {
+            String GetVersion(UInt32 maxSize = 1024) const {
                 Int8 version[maxSize];
                 memset((MemoryPointer)version, 0, sizeof(version));
 
@@ -3272,11 +3433,11 @@ namespace GNINE_NAMESPACE {
                 return String(version, size);
             }
 
-            AccountId GetAccount() {
+            AccountId GetAccount() const {
                 return gnine_get_player_account(*this);
             }
 
-            String GetIP(UInt32 maxSize = 1024) {
+            String GetIP(UInt32 maxSize = 1024) const {
                 Int8 ip[maxSize];
                 memset((MemoryPointer)ip, 0, sizeof(ip));
 
@@ -3285,7 +3446,7 @@ namespace GNINE_NAMESPACE {
                 return String(ip, size);
             }
 
-            String GetName(UInt32 maxSize = 1024) {
+            String GetName(UInt32 maxSize = 1024) const {
                 Int8 name[maxSize];
                 memset((MemoryPointer)name, 0, sizeof(name));
 
@@ -3294,11 +3455,11 @@ namespace GNINE_NAMESPACE {
                 return String(name, size);
             }
 
-            Int32 GetBlurLevel() {
+            Int32 GetBlurLevel() const {
                 return gnine_get_player_blur_level(*this);
             }
 
-            String GetUsername(UInt32 maxSize = 1024) {
+            String GetUsername(UInt32 maxSize = 1024) const {
                 Int8 username[maxSize];
                 memset((MemoryPointer)username, 0, sizeof(username));
 
@@ -3307,7 +3468,7 @@ namespace GNINE_NAMESPACE {
                 return String(username, size);
             }
 
-            String GetCommunityId(UInt32 maxSize = 1024) {
+            String GetCommunityId(UInt32 maxSize = 1024) const {
                 Int8 id[maxSize];
                 memset((MemoryPointer)id, 0, sizeof(id));
 
@@ -3316,7 +3477,7 @@ namespace GNINE_NAMESPACE {
                 return String(id, size);
             }
 
-            String GetSerial(UInt32 index = 0, UInt32 maxSize = 1024) {
+            String GetSerial(UInt32 index = 0, UInt32 maxSize = 1024) const {
                 Int8 serial[maxSize];
                 memset((MemoryPointer)serial, 0, sizeof(serial));
 
@@ -3325,11 +3486,11 @@ namespace GNINE_NAMESPACE {
                 return String(serial, size);
             }
 
-            bool IsNametagShowing() {
+            bool IsNametagShowing() const {
                 return gnine_is_player_nametag_showing(*this);
             }
 
-            Color GetNametagColor() {
+            Color GetNametagColor() const {
                 Color color;
 
                 gnine_get_player_nametag_color(*this, &color);
@@ -3337,7 +3498,7 @@ namespace GNINE_NAMESPACE {
                 return color;
             }
 
-            String GetNametagText(UInt32 maxSize = 1024) {
+            String GetNametagText(UInt32 maxSize = 1024) const {
                 Int8 text[maxSize];
                 memset((MemoryPointer)text, 0, sizeof(text));
 
@@ -3346,39 +3507,39 @@ namespace GNINE_NAMESPACE {
                 return String(text, size);
             }
 
-            bool IsMapForced() {
+            bool IsMapForced() const {
                 return gnine_is_player_map_forced(*this);
             }
 
-            bool IsScoreboardForced() {
+            bool IsScoreboardForced() const {
                 return gnine_is_player_scoreboard_forced(*this);
             }
 
-            Int64 GetIdleTime() {
+            Int64 GetIdleTime() const {
                 return gnine_get_player_idle_time(*this);
             }
 
-            UInt32 GetWantedLevel() {
+            UInt32 GetWantedLevel() const {
                 return gnine_get_player_wanted_level(*this);
             }
 
-            bool CanUseFunction(String functionName) {
+            bool CanUseFunction(String functionName) const {
                 return gnine_can_player_use_function(*this, functionName.c_str());
             }
 
-            TeamId GetTeam() {
+            TeamId GetTeam() const {
                 return gnine_get_player_team(*this);
             }
 
-            bool IsMuted() {
+            bool IsMuted() const {
                 return gnine_is_player_muted(*this);
             }
 
-            UInt32 GetPing() {
+            UInt32 GetPing() const {
                 return gnine_get_player_ping(*this);
             }
 
-            Int32 GetMoney() {
+            Int32 GetMoney() const {
                 return gnine_get_player_money(*this);
             }
 
@@ -3481,11 +3642,11 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_team_name(*this, name.c_str());
             }
 
-            UInt32 CountPlayers() {
+            UInt32 CountPlayers() const {
                 return gnine_count_players_in_team(*this); 
             }
 
-            PlayerList GetPlayers(UInt32 maxItemSize = 500) {
+            PlayerList GetPlayers(UInt32 maxItemSize = 500) const {
                 PlayerList list;
 
                 PlayerId players[maxItemSize];
@@ -3502,11 +3663,11 @@ namespace GNINE_NAMESPACE {
                 return std::move(list);
             }
 
-            bool GetFriendlyFire() {
+            bool GetFriendlyFire() const {
                 return gnine_get_team_friendly_fire(*this);
             }
 
-            Color GetColor() {
+            Color GetColor() const {
                 Color color;
                 memset((MemoryPointer)&color, 0, sizeof(color));
 
@@ -3515,7 +3676,7 @@ namespace GNINE_NAMESPACE {
                 return color;
             }
 
-            String GetName(UIntPtr maxSize = 1024) {
+            String GetName(UIntPtr maxSize = 1024) const {
                 Int8 name[maxSize];
                 memset((MemoryPointer)name, 0, maxSize);
 
@@ -3557,7 +3718,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_set_water_level(*this, level, true, true, true, false);
             }
 
-            Vector3 GetVertexPosition(Int32 vertexIndex) {
+            Vector3 GetVertexPosition(Int32 vertexIndex) const {
                 GNINE_VECTOR3 pos;
                 memset((MemoryPointer)&pos, 0, sizeof(pos));
 
@@ -3626,7 +3787,7 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            Vector2 GetSize() {
+            Vector2 GetSize() const {
                 GNINE_VECTOR2 size;
                 
                 gnine_get_radar_area_size(*this, &size);
@@ -3634,7 +3795,7 @@ namespace GNINE_NAMESPACE {
                 return Vector2(size.x, size.y);
             }
 
-            Color GetColor() {
+            Color GetColor() const {
                 Color color;
 
                 gnine_get_radar_area_color(*this, &color);
@@ -3642,11 +3803,11 @@ namespace GNINE_NAMESPACE {
                 return color;
             }
 
-            bool IsFlashing() {
+            bool IsFlashing() const {
                 return gnine_is_radar_area_flashing(*this);
             }
 
-            bool IsPositionInside(Vector2 position) {
+            bool IsPositionInside(Vector2 position) const {
                 GNINE_VECTOR2 pos = position;
 
                 return gnine_is_inside_radar_area(*this, &pos);
@@ -3702,27 +3863,27 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            PickupType GetType() {
+            PickupType GetType() const {
                 return (PickupType)gnine_get_pickup_type(*this);
             }
 
-            Int32 GetWeapon() {
+            Int32 GetWeapon() const {
                 return gnine_get_pickup_weapon(*this);
             }
 
-            Float32 GetAmount() {
+            Float32 GetAmount() const {
                 return gnine_get_pickup_amount(*this);
             }
 
-            Int32 GetAmmo() {
+            Int32 GetAmmo() const {
                 return gnine_get_pickup_ammo(*this);
             }
 
-            UInt32 GetRespawnInterval() {
+            UInt32 GetRespawnInterval() const {
                 return gnine_get_pickup_respawn_interval(*this);
             }
 
-            bool IsSpawned() {
+            bool IsSpawned() const {
                 return gnine_is_pickup_spawned(*this);
             }
 
@@ -3822,12 +3983,12 @@ namespace GNINE_NAMESPACE {
                         return !m_bAutoCleanup;
                     }
 
-                    bool operator==(WorkerMutexId mutexId) {
-                        return m_pMutexId = mutexId;
+                    bool operator==(WorkerMutexId mutexId) const {
+                        return m_pMutexId == mutexId;
                     }
 
-                    bool operator==(Mutex mutex) {
-                        return m_pMutexId = mutex.m_pMutexId;
+                    bool operator==(Mutex mutex) const {
+                        return m_pMutexId == mutex.m_pMutexId;
                     }
 
                     Mutex& operator=(WorkerMutexId mutexId) {
@@ -3852,7 +4013,7 @@ namespace GNINE_NAMESPACE {
                         return m_pMutexId;
                     }
 
-                    operator String() {
+                    operator String() const {
                         char buff[50];
                         memset((MemoryPointer)buff, 0, sizeof(buff));
                         
@@ -3861,7 +4022,7 @@ namespace GNINE_NAMESPACE {
                         return String(buff, size);
                     }
 
-                    operator bool() {
+                    operator bool() const {
                         return gnine_is_mutex(m_pMutexId);
                     }
 
@@ -4088,11 +4249,11 @@ namespace GNINE_NAMESPACE {
                 return details;
             }
 
-            bool operator==(const TimerId& timerId) {
+            bool operator==(const TimerId& timerId) const {
                 return m_pTimerId == timerId;
             }
 
-            bool operator==(const Timer& timer) {
+            bool operator==(const Timer& timer) const {
                 return m_pTimerId == timer.m_pTimerId;
             }
 
