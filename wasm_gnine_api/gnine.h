@@ -27,6 +27,7 @@
 #ifdef __cplusplus
 
 #define GNINE_API extern "C"
+#define GNINE_OWN extern "C"
 #define GNINE_EXPORT extern "C"
 #define GNINE_EXPORT_NAME(name) extern "C" __attribute__((export_name(#name)))
 #define GNINE_CPP
@@ -43,6 +44,7 @@
 #else
 
 #define GNINE_API
+#define GNINE_OWN
 #define GNINE_EXPORT
 #define GNINE_EXPORT_NAME(name) __attribute__((export_name(#name)))
 
@@ -146,6 +148,8 @@ typedef GNINE_ELEMENT GNINE_WATER;
 typedef GNINE_ELEMENT GNINE_RADAR_AREA;
 typedef GNINE_ELEMENT GNINE_PICKUP;
 
+typedef GNINE_ELEMENT GNINE_BLIP;
+
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
     sizeof(GNINE_USERDATA_T)*2 +                 // 'resource' and 'reference'
@@ -231,10 +235,10 @@ struct GNINE_TIMER_DETAILS {
 };
 
 struct GNINE_CAMERA_MATRIX {
-    GNINE_VECTOR3 position;
-    GNINE_VECTOR3 lookAt;
-    GNINE_F32     roll;
-    GNINE_F32     fov;
+    struct GNINE_VECTOR3 position;
+    struct GNINE_VECTOR3 lookAt;
+    GNINE_F32            roll;
+    GNINE_F32            fov;
 };
 
 /*
@@ -659,6 +663,21 @@ GNINE_API_IMPORT(get_col_shape_type, (GNINE_COL_SHAPE col_shape), GNINE_COL_SHAP
 GNINE_API_IMPORT(get_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32* floor, GNINE_F32* ceil), bool);
 GNINE_API_IMPORT(set_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32 floor, GNINE_F32 ceil), bool);
 
+GNINE_API_IMPORT(create_blip, (struct GNINE_VECTOR3* position, GNINE_I32 icon, GNINE_I32 size, struct GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
+GNINE_API_IMPORT(create_blip_attached_to, (GNINE_ELEMENT element, GNINE_I32 icon, GNINE_I32 size, struct GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
+
+GNINE_API_IMPORT(get_blip_icon, (GNINE_BLIP blip), GNINE_I32);
+GNINE_API_IMPORT(get_blip_size, (GNINE_BLIP blip), GNINE_I32);
+GNINE_API_IMPORT(get_blip_color, (GNINE_BLIP blip, struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_blip_ordering, (GNINE_BLIP blip), GNINE_I32);
+GNINE_API_IMPORT(get_blip_visible_distance, (GNINE_BLIP blip), GNINE_I32);
+
+GNINE_API_IMPORT(set_blip_icon, (GNINE_BLIP blip, GNINE_I32 icon), bool);
+GNINE_API_IMPORT(set_blip_size, (GNINE_BLIP blip, GNINE_I32 size), bool);
+GNINE_API_IMPORT(set_blip_color, (GNINE_BLIP blip, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_blip_ordering, (GNINE_BLIP blip, GNINE_I32 ordering), bool);
+GNINE_API_IMPORT(set_blip_visible_distance, (GNINE_BLIP blip, GNINE_I32 visible_distance), bool);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -780,6 +799,7 @@ namespace GNINE_NAMESPACE {
     using WaterId = GNINE_WATER;
     using RadarAreaId = GNINE_RADAR_AREA;
     using PickupId = GNINE_PICKUP;
+    using BlipId = GNINE_BLIP;
 
     using RemoteRequestId = GNINE_REMOTE_REQUEST;
 
@@ -4053,7 +4073,7 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            PickupType GetType() const {
+            PickupType GetPickupType() const {
                 return (PickupType)gnine_get_pickup_type(*this);
             }
 
@@ -4077,7 +4097,7 @@ namespace GNINE_NAMESPACE {
                 return gnine_is_pickup_spawned(*this);
             }
 
-            bool SetType(PickupType type, Int32 value, Int32 ammo) {
+            bool SetPickupType(PickupType type, Int32 value, Int32 ammo) {
                 return gnine_set_pickup_type(*this, (GNINE_PICKUP_TYPE_T)type, value, ammo);
             }
 
@@ -4093,6 +4113,81 @@ namespace GNINE_NAMESPACE {
                 GNINE_VECTOR3 pos = position;
 
                 return gnine_create_pickup(&pos, (GNINE_PICKUP_TYPE_T)type, value, respawnTime, ammo);
+            }
+    };
+
+    class Blip : public Element {
+        public:
+            Blip() {
+                Drop();
+            }
+
+            Blip(BlipId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Blip() = default;
+
+            Blip& operator=(Blip blip) {
+                SetId(blip);
+
+                return *this;
+            }
+
+            Int32 GetIcon() {
+                return gnine_get_blip_icon(*this);
+            }
+
+            Int32 GetSize() {
+                return gnine_get_blip_size(*this);
+            }
+
+            Color GetColor() {
+                Color color;
+
+                gnine_get_blip_color(*this, &color);
+
+                return color;
+            }
+
+            Int32 GetOrdering() {
+                return gnine_get_blip_ordering(*this);
+            }
+
+            Int32 GetVisibleDistance() {
+                return gnine_get_blip_visible_distance(*this);
+            }
+
+            bool SetIcon(Int32 icon) {
+                return gnine_set_blip_icon(*this, icon);
+            }
+
+            bool SetSize(Int32 size) {
+                return gnine_set_blip_size(*this, size);
+            }
+
+            bool SetColor(Color color) {
+                return gnine_set_blip_color(*this, &color);
+            }
+
+            bool SetOrdering(Int32 ordering) {
+                return gnine_set_blip_ordering(*this, ordering);
+            }
+
+            bool SetVisibleDistance(Int32 visibleDistance) {
+                return gnine_set_blip_visible_distance(*this, visibleDistance);
+            }
+
+            static Blip CreateBlip(Vector3 position, Int32 icon = 0, Int32 size = 2, Color color = { 0, 0, 255, 255 }, Int32 ordering = 0, Int32 visibleDistance = 16383, Element visibleTo = GetRootElement()) {
+                GNINE_VECTOR3 pos = position;
+                
+                return gnine_create_blip(&pos, icon, size, &color, ordering, visibleDistance, visibleTo);
+            }
+
+            static Blip CreateBlipAttachedTo(Element element, Int32 icon = 0, Int32 size = 2, Color color = { 0, 0, 255, 255 }, Int32 ordering = 0, Int32 visibleDistance = 16383, Element visibleTo = GetRootElement()) {
+                return gnine_create_blip_attached_to(element, icon, size, &color, ordering, visibleDistance, visibleTo);
             }
     };
 
@@ -4976,6 +5071,24 @@ namespace GNINE_NAMESPACE {
 
     inline Int32 ToColor(Int32 r, Int32 g, Int32 b, Int32 a = 0xff) {
         return gnine_to_color(r, g, b, a);
+    }
+
+    inline Int32 ToColor(Color color) {
+        return *((Int32*)&color);
+    }
+
+    inline Color ToColorStruct(Int32 r, Int32 g, Int32 b, Int32 a = 0xff) {
+        Color color;
+        color.r = r;
+        color.g = g;
+        color.b = b;
+        color.a = a;
+
+        return color;
+    }
+
+    inline Color ToColorStruct(Int32 color) {
+        return *((Color*)&color);
     }
 
     inline ProcessMemoryStats GetProcessMemoryStats() {
