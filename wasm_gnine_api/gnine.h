@@ -90,6 +90,10 @@
 #define GNINE_PRINT_BUFFER_SIZE (0xfff)
 #endif
 
+#if !defined(GNINE_DATABASE_RESULT_STRING_SIZE)
+#define GNINE_DATABASE_RESULT_STRING_SIZE (1024)
+#endif
+
 typedef char GNINE_I8;
 typedef unsigned char GNINE_UI8;
 typedef GNINE_UI8 GNINE_BYTE;
@@ -136,6 +140,7 @@ typedef GNINE_USERDATA GNINE_WORKER;
 typedef GNINE_USERDATA GNINE_MUTEX;
 typedef GNINE_USERDATA GNINE_TIMER;
 typedef GNINE_USERDATA GNINE_REMOTE_REQUEST;
+typedef GNINE_USERDATA GNINE_QUERY_HANDLE;
 //typedef GNINE_USERDATA GNINE_THREAD;
 
 typedef GNINE_ELEMENT GNINE_COL_SHAPE;
@@ -149,6 +154,8 @@ typedef GNINE_ELEMENT GNINE_RADAR_AREA;
 typedef GNINE_ELEMENT GNINE_PICKUP;
 
 typedef GNINE_ELEMENT GNINE_BLIP;
+
+typedef GNINE_ELEMENT GNINE_DATABASE;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -678,6 +685,21 @@ GNINE_API_IMPORT(set_blip_color, (GNINE_BLIP blip, struct GNINE_COLOR* color), b
 GNINE_API_IMPORT(set_blip_ordering, (GNINE_BLIP blip, GNINE_I32 ordering), bool);
 GNINE_API_IMPORT(set_blip_visible_distance, (GNINE_BLIP blip, GNINE_I32 visible_distance), bool);
 
+GNINE_API_IMPORT(db_connect, (GNINE_STRING type, GNINE_STRING host, GNINE_STRING username, GNINE_STRING password, GNINE_STRING options), GNINE_DATABASE);
+GNINE_API_IMPORT(db_exec, (GNINE_DATABASE database, GNINE_STRING query, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), bool);
+GNINE_API_IMPORT(db_query, (GNINE_DATABASE database, GNINE_STRING query, GNINE_ARGUMENTS arguments, GNINE_CALLABLE_REF callback, GNINE_ARGUMENTS callback_arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_QUERY_HANDLE);
+GNINE_API_IMPORT(db_free, (GNINE_QUERY_HANDLE query_handle), bool);
+GNINE_API_IMPORT(db_poll, (GNINE_QUERY_HANDLE query_handle, GNINE_I32 timeout, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_ARGUMENTS);
+GNINE_API_IMPORT(db_prepare_string, (GNINE_DATABASE database, GNINE_STRING query, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_string, GNINE_I_PTR max_string_size, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_I_PTR);
+
+GNINE_API_IMPORT(execute_sql_create_table, (GNINE_STRING table, GNINE_STRING definition), bool);
+GNINE_API_IMPORT(execute_sql_drop_table, (GNINE_STRING table), bool);
+GNINE_API_IMPORT(execute_sql_delete, (GNINE_STRING table, GNINE_STRING definition, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), bool);
+GNINE_API_IMPORT(execute_sql_insert, (GNINE_STRING table, GNINE_STRING definition, GNINE_STRING columns, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), bool);
+GNINE_API_IMPORT(execute_sql_select, (GNINE_STRING table, GNINE_STRING columns, GNINE_STRING where, GNINE_UI32 limit, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_ARGUMENTS);
+GNINE_API_IMPORT(execute_sql_update, (GNINE_STRING table, GNINE_STRING set, GNINE_STRING where, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), bool);
+GNINE_API_IMPORT(execute_sql_query, (GNINE_STRING query, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_ARGUMENTS);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -741,7 +763,7 @@ GNINE_API GNINE_ARGUMENTS gnine_execute_lua_code(GNINE_STRING code, GNINE_ARGUME
 
 #ifdef GNINE_CPP
 
-#include <exception>
+// #include <exception>
 #include <optional>
 #include <map>
 #include <unordered_map>
@@ -801,6 +823,9 @@ namespace GNINE_NAMESPACE {
     using PickupId = GNINE_PICKUP;
     using BlipId = GNINE_BLIP;
 
+    using DatabaseId = GNINE_DATABASE;
+    using DatabaseQueryHandle = GNINE_QUERY_HANDLE;
+
     using RemoteRequestId = GNINE_REMOTE_REQUEST;
 
     using WorkerId = GNINE_WORKER;
@@ -828,6 +853,8 @@ namespace GNINE_NAMESPACE {
         return IsSameType<Value, With>();
     }
 
+    // Gnine doesn't support exceptions for now!
+    /*
     class Exception : public STD_NAMESPACE::exception {
         public:
             Exception(String message) : m_strMessage(message) {}
@@ -838,7 +865,7 @@ namespace GNINE_NAMESPACE {
 
         private:
             String m_strMessage;
-    };
+    };*/
     
     class Callable {
         public:
@@ -1212,7 +1239,8 @@ namespace GNINE_NAMESPACE {
                 bool success = Invoke(NULL, &results, &errorMessage);
 
                 if (!success) {
-                    throw Exception(errorMessage);
+                    // throw Exception(errorMessage);
+                    return NULL;
                 }
                 
                 return results;
@@ -1232,7 +1260,8 @@ namespace GNINE_NAMESPACE {
                 m_FunctionArguments = NULL;
 
                 if (!success) {
-                    throw Exception(errorMessage);
+                    // throw Exception(errorMessage);
+                    return NULL;
                 }
                 
                 return results;
@@ -4188,6 +4217,662 @@ namespace GNINE_NAMESPACE {
 
             static Blip CreateBlipAttachedTo(Element element, Int32 icon = 0, Int32 size = 2, Color color = { 0, 0, 255, 255 }, Int32 ordering = 0, Int32 visibleDistance = 16383, Element visibleTo = GetRootElement()) {
                 return gnine_create_blip_attached_to(element, icon, size, &color, ordering, visibleDistance, visibleTo);
+            }
+    };
+
+    struct DatabaseResultColumn {
+        enum class ResultType : Byte {
+            String,
+            Number,
+            Null
+        };
+
+        DatabaseResultColumn() {
+            columnName = "";
+            type = ResultType::Null;
+
+            value.string = "";
+            value.number = 0;
+        }
+
+        String     columnName;
+        ResultType type;
+        struct {
+            String    string;
+            LuaNumber number;
+        }          value;
+    };
+
+    using DatabaseResultColumnList = STD_NAMESPACE::vector<DatabaseResultColumn>;
+
+    class DatabaseResultRow {
+        public:
+            static const UInt32 InvalidIndex = -1;
+
+            DatabaseResultRow() {
+                Drop();
+            }
+
+            ~DatabaseResultRow() {
+                Drop();
+            }
+
+            void Drop() {
+                m_lsColumns.clear();
+                m_lsColumns = DatabaseResultColumnList();
+            }
+
+            void AddColumn(const DatabaseResultColumn& column) {
+                if (!IsValidColumn(column)) {
+                    return;
+                }
+
+                m_lsColumns.push_back(column);
+            }
+
+            bool CopyColumnList(DatabaseResultColumnList* list) const {
+                if (!list) {
+                    return false;
+                }
+
+                for (const DatabaseResultColumn& column : m_lsColumns) {
+                    list->push_back(column);
+                }
+
+                return true;
+            }
+
+            UInt32 Count() const {
+                return m_lsColumns.size();
+            }
+
+            bool Empty() const {
+                return m_lsColumns.empty();
+            }
+
+            bool IsValidIndex(UInt32 index) const {
+                return index < m_lsColumns.size();
+            }
+
+            StringList GetColumnNames() const {
+                StringList names;
+
+                for (const DatabaseResultColumn& column : m_lsColumns) {
+                    names.push_back(column.columnName);
+                }
+
+                return names;
+            }
+
+            UInt32 FindIndexByColumnName(String columnName) const {
+                if (columnName.empty()) {
+                    return InvalidIndex;
+                }
+
+                UInt32 count = m_lsColumns.size();
+
+                for (UInt32 i = 0; i < count; i++) {
+                    if (m_lsColumns[i].columnName == columnName) {
+                        return i;
+                    }
+                }
+
+                return InvalidIndex;
+            }
+
+            String FindColumnNameByIndex(UInt32 index) const {
+                if (!IsValidIndex(index)) {
+                    return String();
+                }
+
+                return m_lsColumns[index].columnName;
+            }
+
+            DatabaseResultColumn Get(UInt32 index) const {
+                DatabaseResultColumn dummyColumn;
+                dummyColumn.type = DatabaseResultColumn::ResultType::Null;
+
+                if (!IsValidIndex(index)) {
+                    return dummyColumn;
+                }
+
+                return m_lsColumns[index];
+            }
+
+            DatabaseResultColumn Get(String columnName) const {
+                DatabaseResultColumn dummyColumn;
+                dummyColumn.type = DatabaseResultColumn::ResultType::Null;
+
+                for (const DatabaseResultColumn& column : m_lsColumns) {
+                    if (column.columnName == columnName) {
+                        return column;
+                    }
+                }
+
+                return dummyColumn;
+            }
+
+            bool IsNull(UInt32 index) const {
+                return Get(index).type == DatabaseResultColumn::ResultType::Null;
+            }
+
+            bool IsNull(String columnName) const {
+                return Get(columnName).type == DatabaseResultColumn::ResultType::Null;
+            }
+            
+            bool IsString(UInt32 index) const {
+                return Get(index).type == DatabaseResultColumn::ResultType::String;
+            }
+
+            bool IsString(String columnName) const {
+                return Get(columnName).type == DatabaseResultColumn::ResultType::String;
+            }
+            
+            bool IsNumber(UInt32 index) const {
+                return Get(index).type == DatabaseResultColumn::ResultType::Number;
+            }
+
+            bool IsNumber(String columnName) const {
+                return Get(columnName).type == DatabaseResultColumn::ResultType::Number;
+            }
+
+            DatabaseResultColumn::ResultType GetType(UInt32 index) const {
+                return Get(index).type;
+            }
+            
+            DatabaseResultColumn::ResultType GetType(String columnName) const {
+                return Get(columnName).type;
+            }
+            
+            String GetAsString(UInt32 index) const {
+                return Get(index).value.string;
+            }
+
+            String GetAsString(String columnName) const {
+                return Get(columnName).value.string;
+            }
+            
+            LuaNumber GetAsNumber(UInt32 index) const {
+                return Get(index).value.number;
+            }
+
+            LuaNumber GetAsNumber(String columnName) const {
+                return Get(columnName).value.number;
+            }
+
+            DatabaseResultColumn operator[](UInt32 index) const {
+                return Get(index);
+            }
+
+            DatabaseResultColumn operator[](String columnName) const {
+                return Get(columnName);
+            }
+
+            static bool IsValidColumn(const DatabaseResultColumn& column) {
+                return column.columnName.empty();
+            }
+
+        private:
+            DatabaseResultColumnList m_lsColumns;
+    };
+
+    using DatabaseResultRowList = STD_NAMESPACE::vector<DatabaseResultRow>;
+
+    class DatabaseResult {
+        public:
+            DatabaseResult() {
+                Drop();
+            }
+
+            DatabaseResult(const Callable::Arguments& arguments) {
+                Drop();
+
+                ReadResultFromArguments(arguments);
+            }
+
+            ~DatabaseResult() {
+                Drop();
+            };
+
+            void Drop() {
+                m_lsRows.clear();
+
+                m_lsRows = DatabaseResultRowList();
+                m_strErrorMessage = "";
+            }
+
+            bool ReadResultFromArguments(const Callable::Arguments& arguments) {
+                if (!arguments) {
+                    return false;
+                }
+
+                UInt32 count = arguments.Count();
+
+                if (count < 1) {
+                    return false;
+                }
+
+                Drop();
+
+                /*
+                rows : [
+                    row1 : [
+                        column1, value1,
+                        column2, value2
+                    ],
+                    row2 : [
+                        column1, value1,
+                        column2, value2,
+                        column3, value3
+                    ],
+                    ...
+                ]
+
+                for (i = 0; i < rowCount; i++)
+                    for (j = 0; j < rowDataSize; j += 2)
+                        column = rows[i][j]
+                        value  = rows[i][j + 1]
+                */
+
+                for (UInt32 i = 0; i < count; i++) {
+                    Callable::Arguments aRow = arguments.GetAsList(i);
+
+                    UInt32 rowDataSize = aRow.Count();
+
+                    if (rowDataSize < 2) {
+                        continue;
+                    }
+
+                    if (rowDataSize % 2 != 0) {
+                        // throw Exception("Database Result Error: Couldn't parse database result columns!");
+
+                        m_strErrorMessage = "Database Result Error: Couldn't parse database result columns!";
+                        return false;
+                    }
+
+                    DatabaseResultRow row;
+
+                    for (UInt32 j = 1; j <= rowDataSize; j += 2) {
+                        String columnName = aRow.GetAsString(j);
+
+                        DatabaseResultColumn column;
+                        column.columnName = columnName;
+                        column.type = DatabaseResultColumn::ResultType::Null;
+
+                        switch (aRow.GetType(j + 1)) {
+                            case GNINE_ARGUMENT_TYPE_STRING:
+                                column.type = DatabaseResultColumn::ResultType::String;
+                                column.value.string = aRow.GetAsString(j + 1, GNINE_DATABASE_RESULT_STRING_SIZE);
+
+                                break;
+                            case GNINE_ARGUMENT_TYPE_NUMBER:
+                                column.type = DatabaseResultColumn::ResultType::Number;
+                                column.value.number = aRow.GetAsNumber(j + 1);
+
+                                break;
+                            case GNINE_ARGUMENT_TYPE_NULL:
+                                break;
+                            default:
+                                break;
+                        }
+
+                        row.AddColumn(column);
+                    }
+
+                    m_lsRows.push_back(row);
+                }
+
+                return true;
+            }
+
+            void CopyRowList(DatabaseResultRowList* list) const {
+                if (!list) {
+                    return;
+                }
+
+                for (const DatabaseResultRow& row : m_lsRows) {
+                    list->push_back(row);
+                }
+            }
+
+            UInt32 Count() const {
+                return m_lsRows.size();
+            }
+
+            bool Empty() const {
+                return m_lsRows.empty();
+            }
+
+            StringList GetColumnNames() const {
+                if (m_lsRows.empty()) {
+                    return StringList();
+                }
+
+                return m_lsRows.front().GetColumnNames();
+            }
+
+            bool IsValidIndex(UInt32 index) const {
+                return index < m_lsRows.size();
+            }
+
+            DatabaseResultRow Get(UInt32 index) const {
+                DatabaseResultRow dummyRow;
+
+                if (!IsValidIndex(index)) {
+                    return dummyRow;
+                }
+
+                return m_lsRows[index];
+            }
+
+            void SetErrorMessage(String message) {
+                m_strErrorMessage = message;
+            }
+
+            String GetErrorMessage() const {
+                return m_strErrorMessage;
+            }
+
+            bool HasError() const {
+                return !m_strErrorMessage.empty();
+            }
+
+            DatabaseResultRow operator[](UInt32 index) const {
+                return Get(index);
+            }
+
+            static bool IsDummyRow(const DatabaseResultRow& row) {
+                return row.Empty();
+            }
+
+        private:
+            DatabaseResultRowList m_lsRows;
+            String                m_strErrorMessage;
+    };
+
+    class DatabaseQuery {
+        public:
+            DatabaseQuery() {
+                Drop();
+            }
+
+            DatabaseQuery(DatabaseQueryHandle handle) {
+                Drop();
+
+                m_queryHandle = handle;
+            }
+
+            ~DatabaseQuery() {
+                Drop();
+            };
+
+            void Drop() {
+                m_queryHandle = NULL;
+                m_result = DatabaseResult();
+                m_bIsResultReady = false;
+            }
+
+            bool Poll(Int32 timeout = -1) {
+                if (m_bIsResultReady) {
+                    return false;
+                }
+
+                Int8 errorMessage[1024];
+                memset((MemoryPointer)errorMessage, 0, sizeof(errorMessage));
+
+                Callable::Arguments result = gnine_db_poll(m_queryHandle, timeout, errorMessage, sizeof(errorMessage));
+
+                if (!result) {
+                    // throw Exception(errorMessage);
+                    
+                    m_strErrorMessage = errorMessage;
+
+                    m_result.SetErrorMessage(errorMessage);
+
+                    return false;
+                }
+
+                if (!m_result.ReadResultFromArguments(result)) {
+                    return false;
+                }
+
+                m_bIsResultReady = true;
+
+                return true;
+            }
+
+            bool Free() {
+                bool result = gnine_db_free(m_queryHandle);
+
+                Drop();
+
+                return result;
+            }
+
+            bool IsResultReady() const {
+                return m_bIsResultReady;
+            }
+
+            const DatabaseResult& GetResult() const {
+                return m_result;
+            }
+
+            DatabaseQueryHandle GetHandle() const {
+                return m_queryHandle;
+            }
+
+            void SetErrorMessage(String message) {
+                m_strErrorMessage = message;
+            }
+
+            String GetErrorMessage() const {
+                return m_strErrorMessage;
+            }
+
+            bool HasError() const {
+                return !m_strErrorMessage.empty();
+            }
+
+            DatabaseQuery& operator=(DatabaseQueryHandle qHandle) {
+                Drop();
+
+                m_queryHandle = qHandle;
+
+                return *this;
+            }
+
+            DatabaseQuery& operator=(const DatabaseQuery& query) {
+                m_queryHandle = query.m_queryHandle;
+                m_result = query.m_result;
+                m_bIsResultReady = query.m_bIsResultReady;
+                m_strErrorMessage = query.m_strErrorMessage;
+
+                return *this;
+            }
+
+            operator DatabaseQueryHandle() {
+                return m_queryHandle;
+            }
+
+        private:
+            DatabaseQueryHandle m_queryHandle;
+            DatabaseResult      m_result;
+            bool                m_bIsResultReady;
+
+            String m_strErrorMessage;
+    };
+
+    class DatabaseConnection : public Element {
+        public:
+            DatabaseConnection() {
+                Drop();
+            }
+
+            DatabaseConnection(DatabaseId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~DatabaseConnection() = default;
+
+            DatabaseConnection& operator=(DatabaseConnection database) {
+                SetId(database);
+
+                return *this;
+            }
+
+            bool Execute(String query, const Callable::Arguments& arguments = NULL, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                bool result = gnine_db_exec(*this, query.c_str(), arguments, errorM, sizeof(errorM));
+
+                if (!result) {
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    return false;
+                }
+
+                return result;
+            }
+
+            DatabaseQuery Query(String query, const Callable::Arguments& arguments = NULL, const Callable& callback = NULL, const Callable::Arguments& callbackArguments = NULL, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                DatabaseQuery dQuery;
+
+                DatabaseQueryHandle qHandle = gnine_db_query(*this, query.c_str(), arguments, callback, callbackArguments, errorM, sizeof(errorM));
+
+                if (!qHandle) {
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    dQuery.SetErrorMessage(errorM);
+
+                    return dQuery;
+                }
+
+                dQuery = qHandle;
+
+                return dQuery;
+            }
+
+            static DatabaseConnection CreateDatabaseConnection(String type, String host, String username = "", String password = "", String options = "") {
+                return gnine_db_connect(type.c_str(), host.c_str(), username.c_str(), password.c_str(), options.c_str());
+            }
+
+            static bool ExecuteSQLCreateTable(String table, String definition) {
+                return gnine_execute_sql_create_table(table.c_str(), definition.c_str());
+            }
+
+            static bool ExecuteSQLDropTable(String table) {
+                return gnine_execute_sql_drop_table(table.c_str());
+            }
+
+            static bool ExecuteSQLDelete(String table, String definition, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                bool result = gnine_execute_sql_delete(table.c_str(), definition.c_str(), errorM, sizeof(errorM));
+
+                if (!result) {
+                    // throw Exception(errorMessage);
+                    
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    return false;
+                }
+
+                return result;
+            }
+
+            static bool ExecuteSQLInsert(String table, String definition, String columns, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                bool result = gnine_execute_sql_insert(table.c_str(), definition.c_str(), columns.c_str(), errorM, sizeof(errorM));
+
+                if (!result) {
+                    // throw Exception(errorMessage);
+
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    return false;
+                }
+
+                return result;
+            }
+
+            static const DatabaseResult ExecuteSQLSelect(String table, String columns, String where = "", UInt32 limit = 0, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                DatabaseResult result;
+
+                Callable::Arguments aResult = gnine_execute_sql_select(table.c_str(), columns.c_str(), where.c_str(), limit, errorM, sizeof(errorM));
+
+                if (!aResult) {
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    result.SetErrorMessage(errorM);
+
+                    return result;
+                }
+
+                result.ReadResultFromArguments(aResult);
+
+                return result;
+            }
+
+            static bool ExecuteSQLUpdate(String table, String set, String where = "", String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                bool result = gnine_execute_sql_update(table.c_str(), set.c_str(), where.c_str(), errorM, sizeof(errorM));
+
+                if (!result) {
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    return false;
+                }
+
+                return result;
+            }
+
+            static const DatabaseResult ExecuteSQLQuery(String query, const Callable::Arguments& arguments = NULL, String* errorMessage = NULL) {
+                Int8 errorM[1024];
+                memset((MemoryPointer)errorM, 0, sizeof(errorM));
+
+                DatabaseResult result;
+
+                Callable::Arguments aResult = gnine_execute_sql_query(query.c_str(), arguments, errorM, sizeof(errorM));
+
+                if (!aResult) {
+                    if (errorMessage) {
+                        *errorMessage = errorM;
+                    }
+
+                    result.SetErrorMessage(errorM);
+
+                    return result;
+                }
+
+                result.ReadResultFromArguments(aResult);
+
+                return result;
             }
     };
 
