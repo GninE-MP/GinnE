@@ -94,6 +94,9 @@
 #define GNINE_DATABASE_RESULT_STRING_SIZE (1024)
 #endif
 
+#define GNINE_FILE_INVALID_POSITION (-1)
+#define GNINE_FILE_INVALID_SIZE (-1)
+
 typedef char GNINE_I8;
 typedef unsigned char GNINE_UI8;
 typedef GNINE_UI8 GNINE_BYTE;
@@ -156,6 +159,7 @@ typedef GNINE_ELEMENT GNINE_PICKUP;
 typedef GNINE_ELEMENT GNINE_BLIP;
 
 typedef GNINE_ELEMENT GNINE_DATABASE;
+typedef GNINE_ELEMENT GNINE_FILE;
 
 typedef GNINE_UI8 GNINE_CALLABLE_REF[
     sizeof(GNINE_CALLABLE_REF_BYTE_HEADER) - 1 + // header -> identifier
@@ -700,6 +704,27 @@ GNINE_API_IMPORT(execute_sql_select, (GNINE_STRING table, GNINE_STRING columns, 
 GNINE_API_IMPORT(execute_sql_update, (GNINE_STRING table, GNINE_STRING set, GNINE_STRING where, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), bool);
 GNINE_API_IMPORT(execute_sql_query, (GNINE_STRING query, GNINE_ARGUMENTS arguments, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_ARGUMENTS);
 
+GNINE_API_IMPORT(file_open, (GNINE_STRING file_path, bool read_only), GNINE_FILE);
+GNINE_API_IMPORT(file_create, (GNINE_STRING file_path), GNINE_FILE);
+GNINE_API_IMPORT(file_exists, (GNINE_STRING file_path), bool);
+GNINE_API_IMPORT(file_copy, (GNINE_STRING file_path, GNINE_STRING new_file_path, bool overwrite), bool);
+GNINE_API_IMPORT(file_rename, (GNINE_STRING file_path, GNINE_STRING new_file_path), bool);
+GNINE_API_IMPORT(file_delete, (GNINE_STRING file_path), bool);
+
+GNINE_API_IMPORT(file_close, (GNINE_FILE file), bool);
+GNINE_API_IMPORT(file_flush, (GNINE_FILE file), bool);
+GNINE_API_IMPORT(file_read, (GNINE_FILE file, GNINE_I_PTR byte_count, GNINE_XSTRING out_content, GNINE_I_PTR max_content_size), GNINE_I_PTR);
+GNINE_API_IMPORT(file_write, (GNINE_FILE file, GNINE_STRING content, GNINE_I_PTR content_size), GNINE_I_PTR);
+GNINE_API_IMPORT(file_get_contents, (GNINE_FILE file, GNINE_XSTRING out_content, GNINE_I_PTR max_content_size, bool verify_content), GNINE_I_PTR);
+
+GNINE_API_IMPORT(file_get_pos, (GNINE_FILE file), GNINE_I64);
+GNINE_API_IMPORT(file_get_size, (GNINE_FILE file), GNINE_I64);
+GNINE_API_IMPORT(file_get_path, (GNINE_FILE file, GNINE_XSTRING out_path, GNINE_I_PTR max_path_size), GNINE_I_PTR);
+
+GNINE_API_IMPORT(file_is_eof, (GNINE_FILE file), bool);
+
+GNINE_API_IMPORT(file_set_pos, (GNINE_FILE file, GNINE_I64 position), GNINE_I64);
+
 /*
     Gnine still can't use shared memory for web assembly modules.
     This means we can't use threads normaly like we do in real C & CPP applications.
@@ -822,6 +847,7 @@ namespace GNINE_NAMESPACE {
     using RadarAreaId = GNINE_RADAR_AREA;
     using PickupId = GNINE_PICKUP;
     using BlipId = GNINE_BLIP;
+    using FileId = GNINE_FILE;
 
     using DatabaseId = GNINE_DATABASE;
     using DatabaseQueryHandle = GNINE_QUERY_HANDLE;
@@ -4873,6 +4899,109 @@ namespace GNINE_NAMESPACE {
                 result.ReadResultFromArguments(aResult);
 
                 return result;
+            }
+    };
+
+    class File : public Element
+    {
+        public:
+            File() {
+                Drop();
+            }
+
+            File(FileId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~File() = default;
+
+            File& operator=(File blip) {
+                SetId(blip);
+
+                return *this;
+            }
+
+            Int64 SetPointer(Int64 position)
+            {
+                return gnine_file_set_pos(*this, position);
+            }
+
+            bool IsEOF()
+            {
+                return gnine_file_is_eof(*this);
+            }
+
+            String GetPath(UIntPtr maxPathSize = 1024)
+            {
+                Int8 path[maxPathSize];
+                memset((MemoryPointer)path, 0, sizeof(path));
+
+                UIntPtr size = gnine_file_get_path(*this, path, sizeof(path));
+
+                return String(path, size);
+            }
+
+            Int64 GetSize()
+            {
+                return gnine_file_get_size(*this);
+            }
+
+            Int64 GetPointer()
+            {
+                return gnine_file_get_pos(*this);
+            }
+
+            String GetContents(bool verifyContent = true, UIntPtr maxContentSize = 1024)
+            {
+                Int8 content[maxContentSize];
+                memset((MemoryPointer)content, 0, sizeof(content));
+
+                UIntPtr contentSize = gnine_file_get_contents(*this, content, sizeof(content), verifyContent);
+
+                return String(content, contentSize);
+            }
+
+            UIntPtr Write(CXString content, UIntPtr contentSize)
+            {
+                return gnine_file_write(*this, content, contentSize);
+            }
+
+            UIntPtr Read(UIntPtr byteCount, CXString outContent, UIntPtr maxContentSize = 1024) {
+                return gnine_file_read(*this, byteCount, outContent, maxContentSize);
+            }
+
+            bool Flush() {
+                return gnine_file_flush(*this);
+            }
+
+            bool Close() {
+                return gnine_file_close(*this);
+            }
+
+            static File FileOpen(String path, bool readOnly = false) {
+                return gnine_file_open(path.c_str(), readOnly);
+            } 
+
+            static File FileCreate(String path) {
+                return gnine_file_create(path.c_str());
+            }
+
+            static bool FileExists(String path) {
+                return gnine_file_exists(path.c_str());
+            }
+
+            static bool FileCopy(String path, String newPath, bool overwrite = false) {
+                return gnine_file_copy(path.c_str(), newPath.c_str(), overwrite);
+            }
+
+            static bool FileRename(String path, String newPath) {
+                return gnine_file_rename(path.c_str(), newPath.c_str());
+            }
+
+            static bool FileDelete(String path) {
+                return gnine_file_delete(path.c_str());
             }
     };
 
