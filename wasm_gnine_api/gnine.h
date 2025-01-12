@@ -155,6 +155,7 @@ typedef GNINE_ELEMENT GNINE_TEAM;
 typedef GNINE_ELEMENT GNINE_WATER;
 typedef GNINE_ELEMENT GNINE_RADAR_AREA;
 typedef GNINE_ELEMENT GNINE_PICKUP;
+typedef GNINE_ELEMENT GNINE_OBJECT;
 
 typedef GNINE_ELEMENT GNINE_BLIP;
 
@@ -180,7 +181,7 @@ enum GNINE_ARGUMENT_TYPE : GNINE_BYTE {
     GNINE_ARGUMENT_TYPE_LIST = 'l'
 };
 
-struct GNINE_REAL_TIME {
+typedef struct {
     GNINE_I32 second;
     GNINE_I32 minute;
     GNINE_I32 hour;
@@ -191,41 +192,41 @@ struct GNINE_REAL_TIME {
     GNINE_I32 yearday;
     GNINE_I32 isdst;
     GNINE_I64 timestamp;
-};
+} GNINE_REAL_TIME;
 
-struct GNINE_COLOR {
+typedef struct {
     GNINE_BYTE b;
     GNINE_BYTE g;
     GNINE_BYTE r;
     GNINE_BYTE a;
-};
+} GNINE_COLOR;
 
-struct GNINE_VECTOR2 {
+typedef struct {
     GNINE_F32 x;
     GNINE_F32 y;
-};
+} GNINE_VECTOR2;
 
-struct GNINE_VECTOR3 {
+typedef struct {
     GNINE_F32 x;
     GNINE_F32 y;
     GNINE_F32 z;
-};
+} GNINE_VECTOR3;
 
-typedef struct GNINE_VECTOR3 GNINE_VECTOR;
+typedef GNINE_VECTOR3 GNINE_VECTOR;
 
-struct GNINE_MATRIX {
-    struct GNINE_VECTOR3 right;
-    struct GNINE_VECTOR3 front;
-    struct GNINE_VECTOR3 up;
-    struct GNINE_VECTOR3 pos;
-};
+typedef struct {
+    GNINE_VECTOR3 right;
+    GNINE_VECTOR3 front;
+    GNINE_VECTOR3 up;
+    GNINE_VECTOR3 pos;
+} GNINE_MATRIX;
 
-struct GNINE_PROCESS_MEMORY_STATS {
+typedef struct {
     GNINE_UI32 virtualMemorySize;
     GNINE_UI32 residentMemorySize;
     GNINE_UI32 sharedMemorySize;
     GNINE_UI32 privateMemorySize;
-};
+} GNINE_PROCESS_MEMORY_STATS;
 
 typedef GNINE_BYTE GNINE_WORKER_STATE_TYPE;
 enum GNINE_WORKER_STATE : GNINE_WORKER_STATE_TYPE {
@@ -239,18 +240,18 @@ enum GNINE_WORKER_STATE : GNINE_WORKER_STATE_TYPE {
 
 typedef void (*GNINE_WORKER_HANDLER)(GNINE_SHARED_POINTER_ADDRESS data);
 
-struct GNINE_TIMER_DETAILS {
+typedef struct {
     GNINE_UI32 timeLeft;
     GNINE_UI32 repeats;
     GNINE_UI32 delay;
-};
+} GNINE_TIMER_DETAILS;
 
-struct GNINE_CAMERA_MATRIX {
-    struct GNINE_VECTOR3 position;
-    struct GNINE_VECTOR3 lookAt;
-    GNINE_F32            roll;
-    GNINE_F32            fov;
-};
+typedef struct {
+    GNINE_VECTOR3 position;
+    GNINE_VECTOR3 lookAt;
+    GNINE_F32     roll;
+    GNINE_F32     fov;
+} GNINE_CAMERA_MATRIX;
 
 /*
     header & formFields code example:
@@ -272,7 +273,7 @@ struct GNINE_CAMERA_MATRIX {
         options.formFieldsCount = 3;
     }
 */
-struct GNINE_REMOTE_REQUEST_OPTIONS {
+typedef struct {
     GNINE_UI32    connectionAttempts;
     GNINE_UI32    connectTimeout;
     GNINE_STRING  method;
@@ -286,9 +287,9 @@ struct GNINE_REMOTE_REQUEST_OPTIONS {
     GNINE_UI32    headersCount;
     GNINE_STRING* formFields;
     GNINE_UI32    formFieldsCount;
-};
+} GNINE_REMOTE_REQUEST_OPTIONS;
 
-struct GNINE_REMOTE_REQUEST_INFO {
+typedef struct {
     bool           isFetch;
     GNINE_STRING   url;
     GNINE_STRING   queue;
@@ -304,7 +305,7 @@ struct GNINE_REMOTE_REQUEST_INFO {
     GNINE_UI32     bytesReceived;
     GNINE_UI32     bytesTotal;
     GNINE_UI32     currentAttempt;
-};
+} GNINE_REMOTE_REQUEST_INFO;
 
 typedef GNINE_I32 GNINE_PICKUP_TYPE_T;
 enum GNINE_PICKUP_TYPE : GNINE_PICKUP_TYPE_T {
@@ -315,10 +316,10 @@ enum GNINE_PICKUP_TYPE : GNINE_PICKUP_TYPE_T {
     GNINE_PICKUP_TYPE_CUSTOM = 3
 };
 
-struct GNINE_COL_POLYGON_HEIGHT {
+typedef struct {
     GNINE_F32 floor;
     GNINE_F32 ceil;
-};
+} GNINE_COL_POLYGON_HEIGHT;
 
 typedef GNINE_UI32 GNINE_COL_SHAPE_TYPE_T;
 enum GNINE_COL_SHAPE_TYPE : GNINE_COL_SHAPE_TYPE_T {
@@ -342,19 +343,19 @@ GNINE_API_IMPORT(get_max_shared_pointer_size, (GNINE_SHARED_POINTER_ADDRESS shar
 GNINE_API_IMPORT(get_memory_free_space, (), GNINE_I_PTR);
 
 GNINE_API_IMPORT(get_tick_count, (), GNINE_I64);
-GNINE_API_IMPORT(get_real_time, (struct GNINE_REAL_TIME* out_time, GNINE_I64 seconds, bool local_time), bool);
+GNINE_API_IMPORT(get_real_time, (GNINE_REAL_TIME* out_time, GNINE_I64 seconds, bool local_time), bool);
 GNINE_API_IMPORT(get_userdata_type, (GNINE_USERDATA userdata, GNINE_XSTRING out_string, GNINE_I_PTR max_size), GNINE_I_PTR);
-GNINE_API_IMPORT(get_color_from_string, (GNINE_STRING colorString, struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_color_from_string, (GNINE_STRING colorString, GNINE_COLOR* out_color), bool);
 
-GNINE_API_IMPORT(get_distance_between_points_2D, (struct GNINE_VECTOR2* point_1, struct GNINE_VECTOR2* point_2), GNINE_F32);
-GNINE_API_IMPORT(get_distance_between_points_3D, (struct GNINE_VECTOR3* point_1, struct GNINE_VECTOR3* point_2), GNINE_F32);
+GNINE_API_IMPORT(get_distance_between_points_2D, (GNINE_VECTOR2* point_1, GNINE_VECTOR2* point_2), GNINE_F32);
+GNINE_API_IMPORT(get_distance_between_points_3D, (GNINE_VECTOR3* point_1, GNINE_VECTOR3* point_2), GNINE_F32);
 GNINE_API_IMPORT(get_easing_value, (GNINE_F32 progress, GNINE_STRING easing_type, GNINE_F32 easing_period, GNINE_F32 easing_amplitude, GNINE_F32 easing_overshoot), GNINE_F32);
-GNINE_API_IMPORT(interpolate_between, (struct GNINE_VECTOR3* point_1, struct GNINE_VECTOR3* point_2, struct GNINE_VECTOR3* out_point, GNINE_F32 progress, GNINE_STRING easingType, GNINE_F32 easing_period, GNINE_F32 easing_amplitude, GNINE_F32 easing_overshoot), bool);
+GNINE_API_IMPORT(interpolate_between, (GNINE_VECTOR3* point_1, GNINE_VECTOR3* point_2, GNINE_VECTOR3* out_point, GNINE_F32 progress, GNINE_STRING easingType, GNINE_F32 easing_period, GNINE_F32 easing_amplitude, GNINE_F32 easing_overshoot), bool);
 
 GNINE_API_IMPORT(debug_sleep, (GNINE_I32 time_ms), bool);
 
 GNINE_API_IMPORT(to_color, (GNINE_I32 r, GNINE_I32 g, GNINE_I32 b, GNINE_I32 a), GNINE_I32);
-GNINE_API_IMPORT(get_process_memory_stats, (struct GNINE_PROCESS_MEMORY_STATS* out_status), bool);
+GNINE_API_IMPORT(get_process_memory_stats, (GNINE_PROCESS_MEMORY_STATS* out_status), bool);
 
 GNINE_API_IMPORT(call_callable, (GNINE_CALLABLE_REF function, GNINE_ARGUMENTS args, GNINE_XSTRING out_error, GNINE_I_PTR max_error_size), GNINE_ARGUMENTS);
 GNINE_API_IMPORT(is_valid_callable, (GNINE_CALLABLE_REF function), bool);
@@ -391,7 +392,7 @@ GNINE_API_IMPORT(get_c_function_numeric_position, (GNINE_PTR function), GNINE_UI
 
 GNINE_API_IMPORT(create_element, (GNINE_STRING type_name, GNINE_STRING id), GNINE_ELEMENT);
 GNINE_API_IMPORT(destroy_element, (GNINE_ELEMENT element), bool);
-GNINE_API_IMPORT(clone_element, (GNINE_ELEMENT element, struct GNINE_VECTOR3* position, bool cloneChildren), GNINE_ELEMENT);
+GNINE_API_IMPORT(clone_element, (GNINE_ELEMENT element, GNINE_VECTOR3* position, bool cloneChildren), GNINE_ELEMENT);
 
 GNINE_API_IMPORT(is_element, (GNINE_ELEMENT element), bool);
 GNINE_API_IMPORT(is_element_within_col_shape, (GNINE_ELEMENT element, GNINE_COL_SHAPE col_shape), bool);
@@ -409,16 +410,16 @@ GNINE_API_IMPORT(get_element_child, (GNINE_ELEMENT parent, GNINE_UI32 index), GN
 GNINE_API_IMPORT(get_element_children_count, (GNINE_ELEMENT element), GNINE_UI32);
 GNINE_API_IMPORT(get_element_id, (GNINE_ELEMENT element, GNINE_XSTRING out_id, GNINE_I_PTR max_size), GNINE_I_PTR);
 GNINE_API_IMPORT(get_element_parent, (GNINE_ELEMENT element), GNINE_ELEMENT);
-GNINE_API_IMPORT(get_element_matrix, (GNINE_ELEMENT element, struct GNINE_MATRIX* out_matrix, bool badSyntax), bool);
-GNINE_API_IMPORT(get_element_position, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_position), bool);
-GNINE_API_IMPORT(get_element_rotation, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_rotation, GNINE_STRING rotationOrder), bool);
-GNINE_API_IMPORT(get_element_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_velocity), bool);
-GNINE_API_IMPORT(get_element_turn_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_turn_velocity), bool);
+GNINE_API_IMPORT(get_element_matrix, (GNINE_ELEMENT element, GNINE_MATRIX* out_matrix, bool badSyntax), bool);
+GNINE_API_IMPORT(get_element_position, (GNINE_ELEMENT element, GNINE_VECTOR3* out_position), bool);
+GNINE_API_IMPORT(get_element_rotation, (GNINE_ELEMENT element, GNINE_VECTOR3* out_rotation, GNINE_STRING rotationOrder), bool);
+GNINE_API_IMPORT(get_element_velocity, (GNINE_ELEMENT element, GNINE_VECTOR3* out_velocity), bool);
+GNINE_API_IMPORT(get_element_turn_velocity, (GNINE_ELEMENT element, GNINE_VECTOR3* out_turn_velocity), bool);
 GNINE_API_IMPORT(get_elements_by_type, (GNINE_STRING type, GNINE_ELEMENT start_at, GNINE_ELEMENT* out_elements, GNINE_UI32 max_size), GNINE_UI32);
 GNINE_API_IMPORT(get_element_type, (GNINE_ELEMENT element, GNINE_XSTRING out_string, GNINE_I_PTR max_size), GNINE_I_PTR);
 GNINE_API_IMPORT(get_element_interior, (GNINE_ELEMENT element), GNINE_I32);
 GNINE_API_IMPORT(get_elements_within_col_shape, (GNINE_COL_SHAPE col_shape, GNINE_STRING element_type, GNINE_ELEMENT* out_elements, GNINE_UI32 max_size), GNINE_UI32);
-GNINE_API_IMPORT(get_elements_within_range, (struct GNINE_VECTOR3* position, GNINE_F32 radius, GNINE_ELEMENT* out_elements, GNINE_UI32 max_size, GNINE_STRING elementType, GNINE_I32 interior, GNINE_I32 dimension), GNINE_UI32);
+GNINE_API_IMPORT(get_elements_within_range, (GNINE_VECTOR3* position, GNINE_F32 radius, GNINE_ELEMENT* out_elements, GNINE_UI32 max_size, GNINE_STRING elementType, GNINE_I32 interior, GNINE_I32 dimension), GNINE_UI32);
 GNINE_API_IMPORT(get_element_dimension, (GNINE_ELEMENT element), GNINE_I32);
 GNINE_API_IMPORT(get_element_zone_name, (GNINE_ELEMENT element, GNINE_XSTRING out_string, GNINE_I_PTR max_size, bool cities_only), GNINE_I_PTR);
 GNINE_API_IMPORT(get_element_col_shape, (GNINE_ELEMENT element), GNINE_COL_SHAPE);
@@ -430,13 +431,13 @@ GNINE_API_IMPORT(get_element_syncer, (GNINE_ELEMENT element), GNINE_ELEMENT);
 GNINE_API_IMPORT(get_element_collisions_enabled, (GNINE_ELEMENT element), bool);
 GNINE_API_IMPORT(get_low_lod_element, (GNINE_ELEMENT element), GNINE_ELEMENT);
 
-GNINE_API_IMPORT(attach_elements, (GNINE_ELEMENT element, GNINE_ELEMENT attach_to, struct GNINE_VECTOR3* position_offset, struct GNINE_VECTOR3* rotation_offset), bool);
+GNINE_API_IMPORT(attach_elements, (GNINE_ELEMENT element, GNINE_ELEMENT attach_to, GNINE_VECTOR3* position_offset, GNINE_VECTOR3* rotation_offset), bool);
 GNINE_API_IMPORT(detach_elements, (GNINE_ELEMENT element, GNINE_ELEMENT target_element), bool);
 GNINE_API_IMPORT(is_element_attached, (GNINE_ELEMENT element), bool);
 GNINE_API_IMPORT(get_attached_elements, (GNINE_ELEMENT element, GNINE_ELEMENT* out_elements, GNINE_UI32 max_size), GNINE_UI32);
 GNINE_API_IMPORT(get_element_attached_to, (GNINE_ELEMENT element), GNINE_ELEMENT);
-GNINE_API_IMPORT(set_element_attached_offsets, (GNINE_ELEMENT element, struct GNINE_VECTOR3* position_offset, struct GNINE_VECTOR3* rotation_offset), bool);
-GNINE_API_IMPORT(get_element_attached_offsets, (GNINE_ELEMENT element, struct GNINE_VECTOR3* out_position_offset, struct GNINE_VECTOR3* out_rotation_offset), bool);
+GNINE_API_IMPORT(set_element_attached_offsets, (GNINE_ELEMENT element, GNINE_VECTOR3* position_offset, GNINE_VECTOR3* rotation_offset), bool);
+GNINE_API_IMPORT(get_element_attached_offsets, (GNINE_ELEMENT element, GNINE_VECTOR3* out_position_offset, GNINE_VECTOR3* out_rotation_offset), bool);
 
 GNINE_API_IMPORT(get_element_data, (GNINE_ELEMENT element, GNINE_STRING key, bool inherit), GNINE_ARGUMENTS);
 GNINE_API_IMPORT(get_all_element_data, (GNINE_ELEMENT element, GNINE_STRING* data_list_out, GNINE_UI32 max_item_size), GNINE_UI32);
@@ -449,15 +450,15 @@ GNINE_API_IMPORT(has_element_data_subscriber, (GNINE_ELEMENT element, GNINE_STRI
 
 GNINE_API_IMPORT(set_element_id, (GNINE_ELEMENT element, GNINE_STRING id), bool);
 GNINE_API_IMPORT(set_element_parent, (GNINE_ELEMENT element, GNINE_ELEMENT parent), bool);
-GNINE_API_IMPORT(set_element_matrix, (GNINE_ELEMENT element, struct GNINE_MATRIX* matrix), bool);
-GNINE_API_IMPORT(set_element_position, (GNINE_ELEMENT element, struct GNINE_VECTOR3* position, bool wrap), bool);
-GNINE_API_IMPORT(set_element_rotation, (GNINE_ELEMENT element, struct GNINE_VECTOR3* rotation, GNINE_STRING rotation_order, bool fix_ped_rotaion), bool);
-GNINE_API_IMPORT(set_element_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* velocity), bool);
-GNINE_API_IMPORT(set_element_turn_velocity, (GNINE_ELEMENT element, struct GNINE_VECTOR3* velocity), bool);
+GNINE_API_IMPORT(set_element_matrix, (GNINE_ELEMENT element, GNINE_MATRIX* matrix), bool);
+GNINE_API_IMPORT(set_element_position, (GNINE_ELEMENT element, GNINE_VECTOR3* position, bool wrap), bool);
+GNINE_API_IMPORT(set_element_rotation, (GNINE_ELEMENT element, GNINE_VECTOR3* rotation, GNINE_STRING rotation_order, bool fix_ped_rotaion), bool);
+GNINE_API_IMPORT(set_element_velocity, (GNINE_ELEMENT element, GNINE_VECTOR3* velocity), bool);
+GNINE_API_IMPORT(set_element_turn_velocity, (GNINE_ELEMENT element, GNINE_VECTOR3* velocity), bool);
 GNINE_API_IMPORT(set_element_visible_to, (GNINE_ELEMENT element, GNINE_ELEMENT to_element, bool visible), bool);
 GNINE_API_IMPORT(clear_element_visible_to, (GNINE_ELEMENT element), bool);
 GNINE_API_IMPORT(is_element_visible_to, (GNINE_ELEMENT element, GNINE_ELEMENT to_element), bool);
-GNINE_API_IMPORT(set_element_interior, (GNINE_ELEMENT element, GNINE_I32 interior, bool set_position, struct GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(set_element_interior, (GNINE_ELEMENT element, GNINE_I32 interior, bool set_position, GNINE_VECTOR3* position), bool);
 GNINE_API_IMPORT(set_element_dimension, (GNINE_ELEMENT element, GNINE_I32 dimension), bool);
 GNINE_API_IMPORT(set_element_alpha, (GNINE_ELEMENT element, GNINE_I32 alpha), bool);
 GNINE_API_IMPORT(set_element_double_sided, (GNINE_ELEMENT element, bool enabled), bool);
@@ -484,7 +485,7 @@ GNINE_API_IMPORT(get_player_idle_time, (GNINE_PLAYER player), GNINE_I64);
 GNINE_API_IMPORT(is_player_scoreboard_forced, (GNINE_PLAYER player), bool);
 GNINE_API_IMPORT(is_player_map_forced, (GNINE_PLAYER player), bool);
 GNINE_API_IMPORT(get_player_nametag_text, (GNINE_PLAYER player, GNINE_XSTRING out_text, GNINE_I_PTR max_size), GNINE_I_PTR);
-GNINE_API_IMPORT(get_player_nametag_color, (GNINE_PLAYER player, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(get_player_nametag_color, (GNINE_PLAYER player, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(is_player_nametag_showing, (GNINE_PLAYER player), bool);
 GNINE_API_IMPORT(get_player_serial, (GNINE_PLAYER player, GNINE_UI32 index, GNINE_XSTRING out_serial, GNINE_I_PTR max_size), GNINE_I_PTR);
 GNINE_API_IMPORT(get_player_community_id, (GNINE_PLAYER player, GNINE_XSTRING out_id, GNINE_I_PTR max_size), GNINE_I_PTR);
@@ -500,12 +501,12 @@ GNINE_API_IMPORT(get_player_script_debug_level, (GNINE_PLAYER player), GNINE_UI3
 GNINE_API_IMPORT(set_player_money, (GNINE_PLAYER player, GNINE_I32 money, bool instant), bool);
 GNINE_API_IMPORT(give_player_money, (GNINE_PLAYER player, GNINE_I32 money), bool);
 GNINE_API_IMPORT(take_player_money, (GNINE_PLAYER player, GNINE_I32 money), bool);
-GNINE_API_IMPORT(spawn_player, (GNINE_PLAYER player, struct GNINE_VECTOR3* position, GNINE_F32 rotation, GNINE_I32 model, GNINE_I32 interior, GNINE_I32 dimension, GNINE_TEAM team), bool);
+GNINE_API_IMPORT(spawn_player, (GNINE_PLAYER player, GNINE_VECTOR3* position, GNINE_F32 rotation, GNINE_I32 model, GNINE_I32 interior, GNINE_I32 dimension, GNINE_TEAM team), bool);
 GNINE_API_IMPORT(show_player_hud_component, (GNINE_PLAYER player, GNINE_STRING component, bool show), bool);
 GNINE_API_IMPORT(set_player_wanted_level, (GNINE_PLAYER player, GNINE_UI32 level), bool);
 GNINE_API_IMPORT(force_player_map, (GNINE_PLAYER player, bool force), bool);
 GNINE_API_IMPORT(set_player_nametag_text, (GNINE_PLAYER player, GNINE_STRING nametag_text), bool);
-GNINE_API_IMPORT(set_player_nametag_color, (GNINE_PLAYER player, struct GNINE_COLOR* nametag_color), bool);
+GNINE_API_IMPORT(set_player_nametag_color, (GNINE_PLAYER player, GNINE_COLOR* nametag_color), bool);
 GNINE_API_IMPORT(set_player_nametag_showing, (GNINE_PLAYER player, bool show), bool);
 GNINE_API_IMPORT(set_player_muted, (GNINE_PLAYER player , bool muted), bool);
 GNINE_API_IMPORT(set_player_blur_level, (GNINE_PLAYER player, GNINE_I32 blur_level), bool);
@@ -535,7 +536,7 @@ GNINE_API_IMPORT(toggle_control, (GNINE_PLAYER player, GNINE_STRING control, boo
 GNINE_API_IMPORT(toggle_all_controls, (GNINE_PLAYER player, bool enabled, bool gta_controls, bool gnine_controls), bool);
 
 GNINE_API_IMPORT(play_sound_front_end, (GNINE_PLAYER player, GNINE_UI32 sound), bool);
-GNINE_API_IMPORT(play_mission_audio, (GNINE_PLAYER player, struct GNINE_VECTOR3* position, GNINE_UI32 slot), bool);
+GNINE_API_IMPORT(play_mission_audio, (GNINE_PLAYER player, GNINE_VECTOR3* position, GNINE_UI32 slot), bool);
 GNINE_API_IMPORT(preload_mission_audio, (GNINE_PLAYER player, GNINE_UI32 sound, GNINE_UI32 slot), bool);
 
 GNINE_API_IMPORT(is_cursor_showing, (GNINE_PLAYER player), bool);
@@ -546,18 +547,18 @@ GNINE_API_IMPORT(show_chat, (GNINE_PLAYER player, bool show, bool input_blocked)
 GNINE_API_IMPORT(kick_player, (GNINE_PLAYER player, GNINE_PLAYER responsible, GNINE_STRING reason), bool);
 GNINE_API_IMPORT(ban_player, (GNINE_PLAYER player, bool ip, bool username, bool serial, GNINE_ELEMENT responsible_player, GNINE_STRING reason, GNINE_I64 seconds), GNINE_BAN);
 
-GNINE_API_IMPORT(create_team, (GNINE_STRING name, struct GNINE_COLOR* color), GNINE_TEAM);
+GNINE_API_IMPORT(create_team, (GNINE_STRING name, GNINE_COLOR* color), GNINE_TEAM);
 
 GNINE_API_IMPORT(get_team_from_name, (GNINE_STRING name), GNINE_TEAM);
 GNINE_API_IMPORT(get_team_name, (GNINE_TEAM team, GNINE_XSTRING out_name, GNINE_I_PTR max_size), GNINE_I_PTR);
-GNINE_API_IMPORT(get_team_color, (GNINE_TEAM team, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(get_team_color, (GNINE_TEAM team, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(get_team_friendly_fire, (GNINE_TEAM team), bool);
 GNINE_API_IMPORT(get_players_in_team, (GNINE_TEAM team, GNINE_PLAYER* out_players, GNINE_UI32 max_item_size), GNINE_UI32);
 GNINE_API_IMPORT(count_players_in_team, (GNINE_TEAM team), GNINE_UI32);
 
 GNINE_API_IMPORT(set_player_team, (GNINE_PLAYER player, GNINE_TEAM team), bool);
 GNINE_API_IMPORT(set_team_name, (GNINE_TEAM team, GNINE_STRING name), bool);
-GNINE_API_IMPORT(set_team_color, (GNINE_TEAM team, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_team_color, (GNINE_TEAM team, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_team_friendly_fire, (GNINE_TEAM team, bool friend_fire), bool);
 
 GNINE_API_IMPORT(create_worker, (GNINE_WORKER_HANDLER function, GNINE_PTR data_to_send_to_worker), GNINE_WORKER);
@@ -581,49 +582,49 @@ GNINE_API_IMPORT(kill_timer, (GNINE_TIMER timer), bool);
 GNINE_API_IMPORT(reset_timer, (GNINE_TIMER timer), bool);
 GNINE_API_IMPORT(get_timers, (GNINE_F64 time, GNINE_TIMER* out_timers, GNINE_UI32 max_item_count), GNINE_UI32);
 GNINE_API_IMPORT(is_timer, (GNINE_TIMER timer), bool);
-GNINE_API_IMPORT(get_timer_details, (GNINE_TIMER timer, struct GNINE_TIMER_DETAILS* out_timer_details), bool);
+GNINE_API_IMPORT(get_timer_details, (GNINE_TIMER timer, GNINE_TIMER_DETAILS* out_timer_details), bool);
 
-GNINE_API_IMPORT(get_camera_matrix, (GNINE_PLAYER player, struct GNINE_CAMERA_MATRIX* out_camera_matrix), bool);
+GNINE_API_IMPORT(get_camera_matrix, (GNINE_PLAYER player, GNINE_CAMERA_MATRIX* out_camera_matrix), bool);
 GNINE_API_IMPORT(get_camera_target, (GNINE_PLAYER player), GNINE_ELEMENT);
 GNINE_API_IMPORT(get_camera_interior, (GNINE_PLAYER player), GNINE_I32);
 
-GNINE_API_IMPORT(set_camera_matrix, (GNINE_PLAYER player, struct GNINE_CAMERA_MATRIX* camera_matrix), bool);
+GNINE_API_IMPORT(set_camera_matrix, (GNINE_PLAYER player, GNINE_CAMERA_MATRIX* camera_matrix), bool);
 GNINE_API_IMPORT(set_camera_target, (GNINE_PLAYER player, GNINE_ELEMENT target), bool);
 GNINE_API_IMPORT(set_camera_interior, (GNINE_PLAYER player, GNINE_I32 interior), bool);
-GNINE_API_IMPORT(fade_camera, (GNINE_PLAYER player, bool fade_in, float time_to_fade, struct GNINE_COLOR* screen_color), bool);
+GNINE_API_IMPORT(fade_camera, (GNINE_PLAYER player, bool fade_in, float time_to_fade, GNINE_COLOR* screen_color), bool);
 
 GNINE_API_IMPORT(call_remote, (GNINE_STRING url, GNINE_STRING queue_name, GNINE_UI32 connection_attempts, GNINE_UI32 connection_timeout, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
-GNINE_API_IMPORT(fetch_remote, (GNINE_STRING url, struct GNINE_REMOTE_REQUEST_OPTIONS* options, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
+GNINE_API_IMPORT(fetch_remote, (GNINE_STRING url, GNINE_REMOTE_REQUEST_OPTIONS* options, GNINE_CALLABLE_REF callback_function, GNINE_ARGUMENTS arguments), GNINE_REMOTE_REQUEST);
 GNINE_API_IMPORT(get_remote_requests, (GNINE_RESOURCE resource, GNINE_REMOTE_REQUEST* out_remote_request, GNINE_UI32 max_item_count), GNINE_UI32);
-GNINE_API_IMPORT(get_remote_request_info, (GNINE_REMOTE_REQUEST request, struct GNINE_REMOTE_REQUEST_INFO* out_info, GNINE_I32 post_data_length, bool include_headers), bool);
-GNINE_API_IMPORT(cleanup_remote_request_info, (struct GNINE_REMOTE_REQUEST_INFO* info), bool);
+GNINE_API_IMPORT(get_remote_request_info, (GNINE_REMOTE_REQUEST request, GNINE_REMOTE_REQUEST_INFO* out_info, GNINE_I32 post_data_length, bool include_headers), bool);
+GNINE_API_IMPORT(cleanup_remote_request_info, (GNINE_REMOTE_REQUEST_INFO* info), bool);
 GNINE_API_IMPORT(abort_remote_request, (GNINE_REMOTE_REQUEST request), bool);
 
 GNINE_API_IMPORT(is_voice_enabled, (), bool);
 GNINE_API_IMPORT(set_player_voice_broadcast_to, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
 GNINE_API_IMPORT(set_player_voice_ignore_from, (GNINE_PLAYER player, GNINE_PLAYER* target_players, GNINE_UI32 target_players_count), bool);
 
-GNINE_API_IMPORT(create_water, (struct GNINE_VECTOR3* v1, struct GNINE_VECTOR3* v2, struct GNINE_VECTOR3* v3, struct GNINE_VECTOR3* v4, bool shallow), GNINE_WATER);
+GNINE_API_IMPORT(create_water, (GNINE_VECTOR3* v1, GNINE_VECTOR3* v2, GNINE_VECTOR3* v3, GNINE_VECTOR3* v4, bool shallow), GNINE_WATER);
 GNINE_API_IMPORT(set_water_level, (GNINE_WATER water, GNINE_F32 level, bool include_world_non_sea_level, bool include_all_water_elements, bool include_world_sea_level, bool include_outside_world_level), bool);
 GNINE_API_IMPORT(reset_water_level, (), bool);
-GNINE_API_IMPORT(get_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, struct GNINE_VECTOR3* out_position), bool);
-GNINE_API_IMPORT(set_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, struct GNINE_VECTOR3* position), bool);
-GNINE_API_IMPORT(get_water_color, (struct GNINE_COLOR* out_color), bool);
-GNINE_API_IMPORT(set_water_color, (struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(get_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* out_position), bool);
+GNINE_API_IMPORT(set_water_vertex_position, (GNINE_WATER water, GNINE_I32 vertex_index, GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(get_water_color, (GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(set_water_color, (GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(reset_water_color, (), bool);
 
-GNINE_API_IMPORT(create_radar_area, (struct GNINE_VECTOR2* position, struct GNINE_VECTOR2* size, struct GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_RADAR_AREA);
+GNINE_API_IMPORT(create_radar_area, (GNINE_VECTOR2* position, GNINE_VECTOR2* size, GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_RADAR_AREA);
 
-GNINE_API_IMPORT(get_radar_area_size, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* out_size), bool);
-GNINE_API_IMPORT(get_radar_area_color, (GNINE_RADAR_AREA radar_area, struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* out_size), bool);
+GNINE_API_IMPORT(get_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* out_color), bool);
 GNINE_API_IMPORT(is_radar_area_flashing, (GNINE_RADAR_AREA radar_area), bool);
-GNINE_API_IMPORT(is_inside_radar_area, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* position), bool);
+GNINE_API_IMPORT(is_inside_radar_area, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* position), bool);
 
-GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, struct GNINE_VECTOR2* size), bool);
-GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_radar_area_size, (GNINE_RADAR_AREA radar_area, GNINE_VECTOR2* size), bool);
+GNINE_API_IMPORT(set_radar_area_color, (GNINE_RADAR_AREA radar_area, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_radar_area_flashing, (GNINE_RADAR_AREA radar_area, bool flash), bool);
 
-GNINE_API_IMPORT(create_pickup, (struct GNINE_VECTOR3* position, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_UI32 respawn_time, GNINE_I32 ammo), GNINE_PICKUP);
+GNINE_API_IMPORT(create_pickup, (GNINE_VECTOR3* position, GNINE_PICKUP_TYPE_T type, GNINE_I32 value, GNINE_UI32 respawn_time, GNINE_I32 ammo), GNINE_PICKUP);
 
 GNINE_API_IMPORT(get_pickup_type, (GNINE_PICKUP pickup), GNINE_PICKUP_TYPE_T);
 GNINE_API_IMPORT(get_pickup_weapon, (GNINE_PICKUP pickup), GNINE_I32);
@@ -636,56 +637,56 @@ GNINE_API_IMPORT(set_pickup_type, (GNINE_PICKUP pickup, GNINE_PICKUP_TYPE_T type
 GNINE_API_IMPORT(set_pickup_respawn_interval, (GNINE_PICKUP pickup, GNINE_UI32 time_ms), bool);
 GNINE_API_IMPORT(use_pickup, (GNINE_PICKUP pickup, GNINE_PLAYER player), bool);
 
-GNINE_API_IMPORT(create_marker, (struct GNINE_VECTOR3* position, GNINE_STRING type, GNINE_F32 size, struct GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_MARKER);
+GNINE_API_IMPORT(create_marker, (GNINE_VECTOR3* position, GNINE_STRING type, GNINE_F32 size, GNINE_COLOR* color, GNINE_ELEMENT visible_to), GNINE_MARKER);
 
 GNINE_API_IMPORT(get_marker_count, (), GNINE_UI32);
 GNINE_API_IMPORT(get_marker_type, (GNINE_MARKER marker, GNINE_XSTRING out_string, GNINE_I_PTR max_size), GNINE_I_PTR);
 GNINE_API_IMPORT(get_marker_size, (GNINE_MARKER marker), GNINE_F32);
-GNINE_API_IMPORT(get_marker_color, (GNINE_MARKER marker, struct GNINE_COLOR* out_color), bool);
-GNINE_API_IMPORT(get_marker_target, (GNINE_MARKER marker, struct GNINE_VECTOR3* out_target), bool);
+GNINE_API_IMPORT(get_marker_color, (GNINE_MARKER marker, GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_marker_target, (GNINE_MARKER marker, GNINE_VECTOR3* out_target), bool);
 GNINE_API_IMPORT(get_marker_icon, (GNINE_MARKER marker, GNINE_XSTRING out_icon, GNINE_I_PTR max_size), GNINE_I_PTR);
 
 GNINE_API_IMPORT(set_marker_type, (GNINE_MARKER marker, GNINE_STRING type), bool);
 GNINE_API_IMPORT(set_marker_size, (GNINE_MARKER marker, GNINE_F32 size), bool);
-GNINE_API_IMPORT(set_marker_color, (GNINE_MARKER marker, struct GNINE_COLOR* color), bool);
-GNINE_API_IMPORT(set_marker_target, (GNINE_MARKER marker, struct GNINE_VECTOR3* target), bool);
+GNINE_API_IMPORT(set_marker_color, (GNINE_MARKER marker, GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_marker_target, (GNINE_MARKER marker, GNINE_VECTOR3* target), bool);
 GNINE_API_IMPORT(set_marker_icon, (GNINE_MARKER marker, GNINE_STRING icon), bool);
 
-GNINE_API_IMPORT(create_col_circle, (struct GNINE_VECTOR2* position, GNINE_F32 radius), GNINE_COL_SHAPE);
-GNINE_API_IMPORT(create_col_cuboid, (struct GNINE_VECTOR3* position, struct GNINE_VECTOR3* size), GNINE_COL_SHAPE);
-GNINE_API_IMPORT(create_col_sphere, (struct GNINE_VECTOR3* position, GNINE_F32 radius), GNINE_COL_SHAPE);
-GNINE_API_IMPORT(create_col_rectangle, (struct GNINE_VECTOR2* position, struct GNINE_VECTOR2* size), GNINE_COL_SHAPE);
-GNINE_API_IMPORT(create_col_polygon, (struct GNINE_VECTOR2* center, struct GNINE_VECTOR2* point_list, GNINE_UI32 point_count), GNINE_COL_SHAPE);
-GNINE_API_IMPORT(create_col_tube, (struct GNINE_VECTOR3* position, GNINE_F32 radius, GNINE_F32 height), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_circle, (GNINE_VECTOR2* position, GNINE_F32 radius), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_cuboid, (GNINE_VECTOR3* position, GNINE_VECTOR3* size), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_sphere, (GNINE_VECTOR3* position, GNINE_F32 radius), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_rectangle, (GNINE_VECTOR2* position, GNINE_VECTOR2* size), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_polygon, (GNINE_VECTOR2* center, GNINE_VECTOR2* point_list, GNINE_UI32 point_count), GNINE_COL_SHAPE);
+GNINE_API_IMPORT(create_col_tube, (GNINE_VECTOR3* position, GNINE_F32 radius, GNINE_F32 height), GNINE_COL_SHAPE);
 
 GNINE_API_IMPORT(get_col_shape_radius, (GNINE_COL_SHAPE col_shape), GNINE_F32);
 GNINE_API_IMPORT(set_col_shape_radius, (GNINE_COL_SHAPE col_shape, GNINE_F32 radius), bool);
-GNINE_API_IMPORT(get_col_shape_size, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* out_size), bool);
-GNINE_API_IMPORT(set_col_shape_size, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* size), bool);
-GNINE_API_IMPORT(get_col_polygon_points, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR2* out_points, GNINE_UI32 max_item_size), GNINE_UI32);
-GNINE_API_IMPORT(get_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, struct GNINE_VECTOR2* out_position), bool);
-GNINE_API_IMPORT(set_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, struct GNINE_VECTOR2* position), bool);
-GNINE_API_IMPORT(add_col_polygon_point, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR2* point_position, GNINE_UI32 point_index), bool);
+GNINE_API_IMPORT(get_col_shape_size, (GNINE_COL_SHAPE col_shape, GNINE_VECTOR3* out_size), bool);
+GNINE_API_IMPORT(set_col_shape_size, (GNINE_COL_SHAPE col_shape, GNINE_VECTOR3* size), bool);
+GNINE_API_IMPORT(get_col_polygon_points, (GNINE_COL_SHAPE col_shape, GNINE_VECTOR2* out_points, GNINE_UI32 max_item_size), GNINE_UI32);
+GNINE_API_IMPORT(get_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, GNINE_VECTOR2* out_position), bool);
+GNINE_API_IMPORT(set_col_polygon_point_position, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index, GNINE_VECTOR2* position), bool);
+GNINE_API_IMPORT(add_col_polygon_point, (GNINE_COL_SHAPE col_shape, GNINE_VECTOR2* point_position, GNINE_UI32 point_index), bool);
 GNINE_API_IMPORT(remove_col_polygon_point, (GNINE_COL_SHAPE col_shape, GNINE_UI32 point_index), bool);
 
-GNINE_API_IMPORT(is_inside_col_shape, (GNINE_COL_SHAPE col_shape, struct GNINE_VECTOR3* position), bool);
+GNINE_API_IMPORT(is_inside_col_shape, (GNINE_COL_SHAPE col_shape, GNINE_VECTOR3* position), bool);
 GNINE_API_IMPORT(get_col_shape_type, (GNINE_COL_SHAPE col_shape), GNINE_COL_SHAPE_TYPE_T);
 
 GNINE_API_IMPORT(get_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32* floor, GNINE_F32* ceil), bool);
 GNINE_API_IMPORT(set_col_polygon_height, (GNINE_COL_SHAPE col_shape, GNINE_F32 floor, GNINE_F32 ceil), bool);
 
-GNINE_API_IMPORT(create_blip, (struct GNINE_VECTOR3* position, GNINE_I32 icon, GNINE_I32 size, struct GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
-GNINE_API_IMPORT(create_blip_attached_to, (GNINE_ELEMENT element, GNINE_I32 icon, GNINE_I32 size, struct GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
+GNINE_API_IMPORT(create_blip, (GNINE_VECTOR3* position, GNINE_I32 icon, GNINE_I32 size, GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
+GNINE_API_IMPORT(create_blip_attached_to, (GNINE_ELEMENT element, GNINE_I32 icon, GNINE_I32 size, GNINE_COLOR* color, GNINE_I32 ordering, GNINE_I32 visible_distance, GNINE_ELEMENT visible_to), GNINE_BLIP);
 
 GNINE_API_IMPORT(get_blip_icon, (GNINE_BLIP blip), GNINE_I32);
 GNINE_API_IMPORT(get_blip_size, (GNINE_BLIP blip), GNINE_I32);
-GNINE_API_IMPORT(get_blip_color, (GNINE_BLIP blip, struct GNINE_COLOR* out_color), bool);
+GNINE_API_IMPORT(get_blip_color, (GNINE_BLIP blip, GNINE_COLOR* out_color), bool);
 GNINE_API_IMPORT(get_blip_ordering, (GNINE_BLIP blip), GNINE_I32);
 GNINE_API_IMPORT(get_blip_visible_distance, (GNINE_BLIP blip), GNINE_I32);
 
 GNINE_API_IMPORT(set_blip_icon, (GNINE_BLIP blip, GNINE_I32 icon), bool);
 GNINE_API_IMPORT(set_blip_size, (GNINE_BLIP blip, GNINE_I32 size), bool);
-GNINE_API_IMPORT(set_blip_color, (GNINE_BLIP blip, struct GNINE_COLOR* color), bool);
+GNINE_API_IMPORT(set_blip_color, (GNINE_BLIP blip, GNINE_COLOR* color), bool);
 GNINE_API_IMPORT(set_blip_ordering, (GNINE_BLIP blip, GNINE_I32 ordering), bool);
 GNINE_API_IMPORT(set_blip_visible_distance, (GNINE_BLIP blip, GNINE_I32 visible_distance), bool);
 
@@ -724,6 +725,18 @@ GNINE_API_IMPORT(file_get_path, (GNINE_FILE file, GNINE_XSTRING out_path, GNINE_
 GNINE_API_IMPORT(file_is_eof, (GNINE_FILE file), bool);
 
 GNINE_API_IMPORT(file_set_pos, (GNINE_FILE file, GNINE_I64 position), GNINE_I64);
+
+GNINE_API_IMPORT(create_object, (GNINE_I32 model_id, GNINE_VECTOR3* position, GNINE_VECTOR3* rotation, bool lowLOD), GNINE_OBJECT);
+
+GNINE_API_IMPORT(get_object_rotation, (GNINE_OBJECT object, GNINE_VECTOR3* out_rotation), bool);
+GNINE_API_IMPORT(get_object_scale, (GNINE_OBJECT object, GNINE_VECTOR3* out_scale), bool);
+GNINE_API_IMPORT(is_object_breakable, (GNINE_OBJECT object), bool);
+
+GNINE_API_IMPORT(set_object_rotation, (GNINE_OBJECT object, GNINE_VECTOR3* rotation), bool);
+GNINE_API_IMPORT(set_object_scale, (GNINE_OBJECT object, GNINE_VECTOR3* scale), bool);
+GNINE_API_IMPORT(set_object_breakable, (GNINE_OBJECT object, bool breakable), bool);
+GNINE_API_IMPORT(move_object, (GNINE_OBJECT object, GNINE_I32 time, GNINE_VECTOR3* target_position, GNINE_VECTOR3* target_rotation, GNINE_STRING easing_type, GNINE_F32 easing_period, GNINE_F32 easing_amplitude, GNINE_F32 easing_overshoot), bool);
+GNINE_API_IMPORT(stop_object, (GNINE_OBJECT object), bool);
 
 /*
     Gnine still can't use shared memory for web assembly modules.
@@ -792,6 +805,7 @@ GNINE_API GNINE_ARGUMENTS gnine_execute_lua_code(GNINE_STRING code, GNINE_ARGUME
 #include <optional>
 #include <map>
 #include <unordered_map>
+#include <tuple>
 
 /*
     MACRO: GNINE_LAMBDA
@@ -848,6 +862,7 @@ namespace GNINE_NAMESPACE {
     using PickupId = GNINE_PICKUP;
     using BlipId = GNINE_BLIP;
     using FileId = GNINE_FILE;
+    using ObjectId = GNINE_OBJECT;
 
     using DatabaseId = GNINE_DATABASE;
     using DatabaseQueryHandle = GNINE_QUERY_HANDLE;
@@ -878,6 +893,41 @@ namespace GNINE_NAMESPACE {
     inline constexpr bool InstanceOf(Value value) {
         return IsSameType<Value, With>();
     }
+    
+    template<typename R>
+    struct FunctionTraits {
+        using ReturnType = R;
+
+        static constexpr size_t ArgumentCount = 0;
+    };
+
+    template<typename R, typename ...Args>
+    struct FunctionTraits<R(Args...)> {
+        using ReturnType = R;
+        using ArgumentsType = std::tuple<Args...>;
+
+        static constexpr size_t ArgumentCount = sizeof...(Args);
+
+        static ArgumentsType MakeTuple() {
+            return std::make_tuple(Args()...);
+        }
+
+        static ArgumentsType MakeTuple(Args&&... args) {
+            return std::make_tuple(std::forward<Args>(args)...);
+        }
+    };
+
+    template<typename R, typename ...Args>
+    struct FunctionTraits<R(*)(Args...)> : FunctionTraits<R(Args...)> {};
+
+    template<typename R, typename ...Args>
+    struct FunctionTraits<std::function<R(Args...)>> : FunctionTraits<R(Args...)> {};
+
+    template<typename R, typename C, typename ...Args>
+    struct FunctionTraits<R(C::*)(Args...)> : FunctionTraits<R(Args...)> {};
+
+    // template<typename R>
+    // struct FunctionTraits<R(int)> : FunctionTraits<R(int)> {};
 
     // Gnine doesn't support exceptions for now!
     /*
@@ -4191,15 +4241,15 @@ namespace GNINE_NAMESPACE {
                 return *this;
             }
 
-            Int32 GetIcon() {
+            Int32 GetIcon() const {
                 return gnine_get_blip_icon(*this);
             }
 
-            Int32 GetSize() {
+            Int32 GetSize() const {
                 return gnine_get_blip_size(*this);
             }
 
-            Color GetColor() {
+            Color GetColor() const {
                 Color color;
 
                 gnine_get_blip_color(*this, &color);
@@ -4207,11 +4257,11 @@ namespace GNINE_NAMESPACE {
                 return color;
             }
 
-            Int32 GetOrdering() {
+            Int32 GetOrdering() const {
                 return gnine_get_blip_ordering(*this);
             }
 
-            Int32 GetVisibleDistance() {
+            Int32 GetVisibleDistance() const {
                 return gnine_get_blip_visible_distance(*this);
             }
 
@@ -4243,6 +4293,81 @@ namespace GNINE_NAMESPACE {
 
             static Blip CreateBlipAttachedTo(Element element, Int32 icon = 0, Int32 size = 2, Color color = { 0, 0, 255, 255 }, Int32 ordering = 0, Int32 visibleDistance = 16383, Element visibleTo = GetRootElement()) {
                 return gnine_create_blip_attached_to(element, icon, size, &color, ordering, visibleDistance, visibleTo);
+            }
+    };
+    
+    class Object : public Element {
+        public:
+            Object() {
+                Drop();
+            }
+
+            Object(ObjectId id) {
+                Drop();
+                
+                SetId(id);
+            }
+
+            ~Object() = default;
+
+            Object& operator=(Object team) {
+                SetId(team);
+
+                return *this;
+            }
+
+            Vector3 GetObjectRotation() const {
+                GNINE_VECTOR3 rotation;
+
+                gnine_get_object_rotation(*this, &rotation);
+
+                return Vector3(rotation.x, rotation.y, rotation.z);
+            }
+
+            Vector3 GetObjectScale() const {
+                GNINE_VECTOR3 scale;
+
+                gnine_get_object_scale(*this, &scale);
+
+                return Vector3(scale.x, scale.y, scale.z);
+            }
+
+            bool IsObjectBreakable() const {
+                return gnine_is_object_breakable(*this);
+            }
+
+            bool SetObjectRotation(Vector3 rotation) {
+                GNINE_VECTOR3 rot = rotation;
+
+                return gnine_set_object_rotation(*this, &rot);
+            }
+
+            bool SetObjectScale(Vector3 scale) {
+                GNINE_VECTOR3 s = scale;
+
+                return gnine_set_object_scale(*this, &s);
+            }
+
+            bool SetObjectBreakable(bool breakable) {
+                return gnine_set_object_breakable(*this, breakable);
+            }
+
+            bool MoveObject(Int32 time, Vector3 position, Vector3 rotation, String easingType = "Linear", Float32 easingPeriod = 0.3f, Float32 easingAmplitude = 1.0f, Float32 easingOvershoot = 1.70158f) {
+                GNINE_VECTOR3 pos = position;
+                GNINE_VECTOR3 rot = rotation;
+
+                return gnine_move_object(*this, time, &pos, &rot, easingType.c_str(), easingPeriod, easingAmplitude, easingOvershoot);
+            }
+
+            bool StopObject() {
+                return gnine_stop_object(*this);
+            }
+
+            static Object CreateObject(Int32 modelId, Vector3 position, Vector3 rotation = Vector3(0.0f, 0.0f, 0.0f), bool lowLOD = false) {
+                GNINE_VECTOR3 pos = position;
+                GNINE_VECTOR3 rot = rotation;
+                
+                return gnine_create_object(modelId, &pos, &rot, lowLOD);
             }
     };
 
