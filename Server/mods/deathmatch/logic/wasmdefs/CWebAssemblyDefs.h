@@ -27,6 +27,7 @@
     { \
         script->RegisterApiFunction(GetApiName(function.first), GetFunctionType(function.first), function.second); \
     } \
+    functions.clear(); \
 }
 
 class CWebAssemblyVariables;

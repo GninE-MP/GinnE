@@ -152,7 +152,7 @@ void CWebAssemblyUtilDefs::RegisterFunctions(CWebAssemblyScript* script)
         
         { "execute_lua_code", ExecuteLuaCode }
     };
-
+    
     WASM_REGISTER_API(script, functions);
 }
 

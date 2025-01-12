@@ -225,6 +225,8 @@ bool CWebAssemblyThread::Terminate()
 
     int result = pthread_cancel(m_ThreadId);
 
+    pthread_join(m_ThreadId, NULL);
+
     SetState(CWebAssemblyThreadState::Terminated);
 
     if (m_pExecutorScript)
@@ -335,11 +337,6 @@ CWebAssemblyScript* CWebAssemblyThread::GetExecutorScript()
     return m_pExecutorScript;
 }
 
-void* CWebAssemblyThread::GetThreadArg()
-{
-    return m_pThreadArg;
-}
-
 bool CWebAssemblyThread::IsValidThreadData(CWebAssemblyThreadData data)
 {
     return data.mainScript ? true : false;
@@ -407,7 +404,7 @@ void* CWebAssemblyThread::ThreadExecutor(void* threadArg)
     }
 
     CWebAssemblySharedScriptData* sharedData = data->mainScript->CreateSharedScriptData(workerStore, &(data->thread->GetId()));
-
+    
     if (!sharedData)
     {
         data->thread->SetState(CWebAssemblyThreadState::Finished);
@@ -581,7 +578,7 @@ void CWebAssemblyContext::DestroyScript(CWebAssemblyScript* script)
     if (index >= 0)
     {
         delete script;
-
+        
         m_lsScripts.erase(m_lsScripts.begin() + index);
     }
 }
@@ -1529,7 +1526,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 continue;
                 
             ImportFail:
-                CWebAssemblyFunction     dummyFunction;
+                CWebAssemblyFunction dummyFunction;
 
                 dummyFunction.SetFunctionType(importFuncType);
                 
@@ -1539,7 +1536,7 @@ CWebAssemblyLoadState CWebAssemblyScript::LoadBinary(const char* binary, const s
                 {
                     goto Fail;
                 }
-
+                
                 CWebAssemblyFunction* luaFunctionCaller = GetGlobalFunction(importName);
 
                 imports[i] = wasm_func_as_extern(luaFunctionCaller->GetFunctionContext());

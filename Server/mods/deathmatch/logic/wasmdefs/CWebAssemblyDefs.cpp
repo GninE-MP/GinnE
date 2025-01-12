@@ -32,6 +32,7 @@
 #include "CWebAssemblyBlipDefs.h"
 #include "CWebAssemblyDatabaseDefs.h"
 #include "CWebAssemblyFileDefs.h"
+#include "CWebAssemblyObjectDefs.h"
 
 CFastHashMap<SString, CWebAssemblyFunctionType> FunctionTypes;
 
@@ -54,6 +55,7 @@ void CWebAssemblyDefs::RegisterApiFunctionTypes()
     CWebAssemblyBlipDefs::RegisterFunctionTypes();
     CWebAssemblyDatabaseDefs::RegisterFunctionTypes();
     CWebAssemblyFileDefs::RegisterFunctionTypes();
+    CWebAssemblyObjectDefs::RegisterFunctionTypes();
 }
 
 void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
@@ -75,6 +77,7 @@ void CWebAssemblyDefs::RegisterApi(CWebAssemblyScript* script)
     CWebAssemblyBlipDefs::RegisterFunctions(script);
     CWebAssemblyDatabaseDefs::RegisterFunctions(script);
     CWebAssemblyFileDefs::RegisterFunctions(script);
+    CWebAssemblyObjectDefs::RegisterFunctions(script);
 }
 
 void CWebAssemblyDefs::SetFunctionType(const SString& functionName, CWebAssemblyFunctionType functionType)

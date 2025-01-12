@@ -161,8 +161,6 @@ private:
     CWebAssemblyStore*            m_pStore;
     CWebAssemblyScript*           m_pExecutorScript;
 
-    void* m_pThreadArg;
-
     static void* ThreadExecutor(void* threadArg);
 };
 
